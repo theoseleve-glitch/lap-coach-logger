@@ -1,0 +1,7 @@
+module Components
+NavBar 1.0 NavBar.qml
+StatusPill 1.0 StatusPill.qml
+MetricCard 1.0 MetricCard.qml
+ToggleSwitch 1.0 ToggleSwitch.qml
+SlideOver 1.0 SlideOver.qml
+ConfirmDialog 1.0 ConfirmDialog.qml
