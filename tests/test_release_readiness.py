@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from lap_coach_logger import assets
-from lap_coach_logger.ui.status_text import build_status_detail
+from lap_coach_logger.ui.desktop.status_text import build_status_detail
 
 
 def _fake_asset_path(root: Path, relative: str) -> Path:
