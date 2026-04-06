@@ -1,0 +1,33 @@
+{
+  "output_dir": "C:\\Users\\Admin\\Documents\\LapCoachLogger_sessions",
+  "poll_interval_s": 1.0,
+  "sample_interval_s": 0.1,
+  "session_end_grace_s": 5.0,
+  "debug": false,
+  "start_with_windows": false,
+  "iracing": {
+    "enabled": true
+  },
+  "acc": {
+    "enabled": true
+  },
+  "writer": {
+    "parquet_row_group_size": 10000,
+    "parquet_compression": "snappy",
+    "csv_fallback_enabled": true,
+    "debug_csv_export": false
+  },
+  "session": {
+    "min_samples_to_save": 50,
+    "min_duration_s": 10.0,
+    "stale_timeout_s": 8.0,
+    "cooldown_after_finalize_s": 3.0,
+    "data_freeze_timeout_s": 5.0
+  },
+  "sync": {
+    "enabled": false,
+    "api_url": "https://api.lap-coach.racing",
+    "device_token": "",
+    "device_name": ""
+  }
+}

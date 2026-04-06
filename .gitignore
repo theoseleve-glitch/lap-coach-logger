@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/*
+!build/windows/
+build/windows/*
+!build/windows/version_info.txt
+.venv/
+venv/
+*.log
+*.parquet
+*.csv
+.mypy_cache/
+.pytest_cache/
+config.json

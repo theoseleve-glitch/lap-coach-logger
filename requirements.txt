@@ -1,0 +1,6 @@
+# Bootstrap the project for local development, tests, and packaging.
+-e .[build,dev]
+
+# Optional: iRacing telemetry support for live shared-memory capture.
+# Install separately when needed:
+# pyirsdk>=1.3

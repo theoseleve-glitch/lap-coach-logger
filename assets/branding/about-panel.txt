@@ -1,0 +1,3 @@
+LAP COACH LOGGER
+Local-first telemetry capture
+No cloud sync. No account. No nonsense.

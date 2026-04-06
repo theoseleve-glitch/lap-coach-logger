@@ -1,0 +1,80 @@
+"""Centralised logging configuration with rotating file handler.
+
+Call ``setup_logging()`` once at app startup. All modules then use the
+standard ``logging.getLogger(__name__)`` pattern.
+"""
+
+from __future__ import annotations
+
+import logging
+import sys
+import threading
+from logging.handlers import RotatingFileHandler
+
+from lap_coach_logger.utils.paths import logs_dir
+
+
+_LOG_FORMAT = (
+    "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+)
+_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+_MAX_BYTES = 5 * 1024 * 1024  # 5 MB per file
+_BACKUP_COUNT = 3
+
+
+def setup_logging(*, debug: bool = False) -> None:
+    """Configure root logger with file + stderr handlers."""
+    level = logging.DEBUG if debug else logging.INFO
+    root = logging.getLogger()
+    root.setLevel(level)
+
+    # Avoid duplicate handlers on repeated calls
+    if root.handlers:
+        return
+
+    formatter = logging.Formatter(_LOG_FORMAT, datefmt=_DATE_FORMAT)
+
+    # Rotating file handler
+    log_file = logs_dir() / "lap_coach_logger.log"
+    fh = RotatingFileHandler(
+        log_file, maxBytes=_MAX_BYTES, backupCount=_BACKUP_COUNT, encoding="utf-8"
+    )
+    fh.setLevel(level)
+    fh.setFormatter(formatter)
+    root.addHandler(fh)
+
+    # Stderr handler (visible in console during dev, suppressed in windowed exe)
+    sh = logging.StreamHandler(sys.stderr)
+    sh.setLevel(level)
+    sh.setFormatter(formatter)
+    root.addHandler(sh)
+
+    # Quieten noisy third-party loggers
+    for name in ("PIL", "pyarrow", "pystray", "PySide6", "PySide6.QtDBus"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+    _install_global_exception_logging()
+
+
+def _install_global_exception_logging() -> None:
+    """Capture otherwise-unhandled exceptions into the configured logger."""
+
+    def _sys_hook(exc_type, exc_value, exc_traceback) -> None:  # noqa: ANN001
+        if issubclass(exc_type, KeyboardInterrupt):
+            return
+        logging.getLogger("unhandled").critical(
+            "Unhandled exception",
+            exc_info=(exc_type, exc_value, exc_traceback),
+        )
+
+    def _thread_hook(args: threading.ExceptHookArgs) -> None:
+        if args.exc_type and issubclass(args.exc_type, KeyboardInterrupt):
+            return
+        logging.getLogger("unhandled.thread").critical(
+            "Unhandled thread exception",
+            exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+        )
+
+    sys.excepthook = _sys_hook
+    threading.excepthook = _thread_hook
