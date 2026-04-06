@@ -4,6 +4,8 @@ import QtQuick.Layouts
 import "Theme" as Theme
 import "Components" as Components
 import "Pages" as Pages
+import "Panels" as Panels
+import "Onboarding" as Onboarding
 
 Item {
     id: root
@@ -168,20 +170,49 @@ Item {
 
         onCloseRequested: {
             settingsSlideOver.isOpen = false
+            // Reset to settings view when closing
+            settingsStack.currentIndex = 0
         }
 
-        // Placeholder content for Task 12
-        Text {
-            anchors {
-                top: parent.top
-                left: parent.left
-                topMargin: Theme.Tokens.lg
+        // Panel stack: 0=Settings, 1=Diagnostics, 2=About
+        Item {
+            anchors.fill: parent
+
+            property int currentIndex: 0
+
+            // Alias for children to reference
+            id: settingsStack
+
+            Panels.SettingsPanel {
+                anchors.fill: parent
+                visible: settingsStack.currentIndex === 0
+                opacity: visible ? 1.0 : 0.0
+                Behavior on opacity {
+                    NumberAnimation { duration: 200; easing.type: Easing.InOutQuad }
+                }
+                onShowDiagnostics: settingsStack.currentIndex = 1
             }
-            text: "Settings panel will be added in Task 12."
-            font.family: Theme.Typography.bodyFamily
-            font.pixelSize: Theme.Typography.bodySize
-            color: Theme.Tokens.steel
-            wrapMode: Text.WordWrap
+
+            Panels.DiagnosticsPanel {
+                anchors.fill: parent
+                visible: settingsStack.currentIndex === 1
+                opacity: visible ? 1.0 : 0.0
+                Behavior on opacity {
+                    NumberAnimation { duration: 200; easing.type: Easing.InOutQuad }
+                }
+                onBackRequested: settingsStack.currentIndex = 0
+                onShowAbout: settingsStack.currentIndex = 2
+            }
+
+            Panels.AboutPanel {
+                anchors.fill: parent
+                visible: settingsStack.currentIndex === 2
+                opacity: visible ? 1.0 : 0.0
+                Behavior on opacity {
+                    NumberAnimation { duration: 200; easing.type: Easing.InOutQuad }
+                }
+                onBackRequested: settingsStack.currentIndex = 1
+            }
         }
     }
 
@@ -208,6 +239,11 @@ Item {
             confirmDialog._onConfirm = onConfirm
             confirmDialog.isOpen = true
         }
+    }
+
+    // === 5. Onboarding overlay (shown on first launch) ===
+    Onboarding.OnboardingFlow {
+        id: onboarding
     }
 
     // === Page components ===

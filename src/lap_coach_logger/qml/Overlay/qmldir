@@ -1,0 +1,3 @@
+module Overlay
+OverlayWindow 1.0 OverlayWindow.qml
+OverlayContent 1.0 OverlayContent.qml
