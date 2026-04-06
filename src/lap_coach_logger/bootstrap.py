@@ -24,7 +24,7 @@ from lap_coach_logger.config.models import AppConfig
 from lap_coach_logger.core.health import HealthMonitor
 from lap_coach_logger.core.session_coordinator import SessionCoordinator
 from lap_coach_logger.detection.process_watcher import ProcessWatcher
-from lap_coach_logger.ui.desktop.main_window import run_desktop_shell
+from lap_coach_logger.qml_bootstrap import run_qml_shell
 from lap_coach_logger.utils.logging_setup import setup_logging
 from lap_coach_logger.utils.single_instance import SingleInstance
 from lap_coach_logger.utils.shutdown import (
@@ -105,11 +105,11 @@ def run(*, debug_override: bool = False) -> None:
     # 8. Start background services
     watcher.start()
 
-    log.info("All backend services running – launching desktop shell")
+    log.info("All backend services running – launching QML shell")
 
-    # 9. Launch desktop shell (blocking until app exits)
+    # 9. Launch QML shell (blocking until app exits)
     try:
-        run_desktop_shell(
+        run_qml_shell(
             config=config,
             config_manager=cfg_manager,
             coordinator=coordinator,

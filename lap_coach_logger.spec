@@ -33,7 +33,10 @@ def _asset_data(path: Path) -> tuple[str, str]:
     return (str(path), target_dir)
 
 
-datas = [(str(ROOT / "config.sample.json"), ".")]
+datas = [
+    (str(ROOT / "config.sample.json"), "."),
+    (str(ROOT / "src" / "lap_coach_logger" / "qml"), "lap_coach_logger/qml"),
+]
 for candidates in (APP_ICON_CANDIDATES, TRAY_ICON_CANDIDATES, ABOUT_ART_CANDIDATES, MONOGRAM_CANDIDATES):
     asset_path = _first_existing(ROOT, candidates)
     if asset_path is not None:
@@ -55,6 +58,8 @@ a = Analysis(
         "PySide6.QtWidgets",
         "PySide6.QtSvg",
         "PySide6.QtSvgWidgets",
+        "PySide6.QtQuick",
+        "PySide6.QtQml",
         "pyarrow",
         "pyarrow.parquet",
     ],
