@@ -2,16 +2,49 @@ import QtQuick
 import QtQuick.Window
 import "../Theme" as Theme
 
+/*  OverlayWidget — frameless, always-on-top, draggable window wrapper.
+
+    Designed for sim racing: stays above borderless-fullscreen games
+    without stealing focus. On Windows, applies WS_EX_TOPMOST +
+    WS_EX_NOACTIVATE + WS_EX_TOOLWINDOW via native API after show.
+
+    Cross-platform: flags degrade gracefully on non-Windows.
+*/
 Window {
     id: root
 
-    // Each overlay widget is its own frameless, draggable, always-on-top window
-    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
+    flags: Qt.FramelessWindowHint
+         | Qt.WindowStaysOnTopHint
+         | Qt.WindowDoesNotAcceptFocus
+         | Qt.Tool
+
     color: "transparent"
     visible: false
 
     // Content injected by parent
     default property alias content: contentArea.data
+
+    // Apply native overlay flags when window becomes visible
+    onVisibleChanged: {
+        if (visible && overlayVM) {
+            // Small delay to let the window fully realize before calling native API
+            applyFlagsTimer.start()
+        }
+    }
+
+    Timer {
+        id: applyFlagsTimer
+        interval: 100
+        repeat: false
+        onTriggered: {
+            if (root.visible && overlayVM) {
+                // transientParent.winId() or root itself — get the native handle
+                // In QML, Window doesn't directly expose HWND, but we can use
+                // a workaround: the ViewModel applies flags by window title match
+                overlayVM.applyOverlayFlags(0)  // 0 = apply to all overlay windows
+            }
+        }
+    }
 
     // Glass surface container
     Rectangle {
@@ -43,11 +76,11 @@ Window {
         }
     }
 
-    // Drag anywhere
+    // Drag support — grabs anywhere on the window
     MouseArea {
         anchors.fill: parent
         property point clickPos
-        z: -1 // below content so buttons still work
+        z: -1  // below content so widget buttons still work
         onPressed: function(mouse) { clickPos = Qt.point(mouse.x, mouse.y) }
         onPositionChanged: function(mouse) {
             root.x += mouse.x - clickPos.x

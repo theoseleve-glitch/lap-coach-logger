@@ -11,6 +11,7 @@ import logging
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
 from lap_coach_logger.core.live_telemetry_processor import LiveTelemetryProcessor
+from lap_coach_logger.utils.overlay_hwnd import apply_overlay_flags, apply_overlay_flags_to_all_overlays, remove_overlay_flags
 
 log = logging.getLogger(__name__)
 
@@ -398,6 +399,25 @@ class OverlayViewModel(QObject):
     def getAllWidgetIds(self) -> list:  # noqa: N802
         """Return list of all widget IDs."""
         return list(self._widget_settings.keys())
+
+    @Slot(int)
+    def applyOverlayFlags(self, hwnd: int) -> None:  # noqa: N802
+        """Apply TOPMOST + NOACTIVATE flags to overlay windows.
+
+        If hwnd is 0, applies to ALL overlay windows in this process.
+        Called from QML after OverlayWidget windows are created.
+        Ensures overlays stay above borderless-fullscreen sims.
+        """
+        if hwnd == 0:
+            count = apply_overlay_flags_to_all_overlays()
+            log.debug("Applied overlay flags to %d windows", count)
+        else:
+            apply_overlay_flags(hwnd)
+
+    @Slot(int)
+    def removeOverlayFlags(self, hwnd: int) -> None:  # noqa: N802
+        """Remove overlay flags (restore normal window behavior)."""
+        remove_overlay_flags(hwnd)
 
     @Slot(str)
     def resetWidget(self, widget_id: str) -> None:  # noqa: N802
