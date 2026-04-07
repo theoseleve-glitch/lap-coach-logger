@@ -2,222 +2,227 @@ import QtQuick
 import QtQuick.Layouts
 import "../../Theme" as Theme
 
-/*  HeadToHeadWidget — driver comparison panel (300 x 160).
-    Side-by-side comparison of two drivers showing sector
-    times, lap times, and speed.                                */
+/*  HeadToHeadWidget -- driver comparison panel (300 x 160).
+    Side-by-side layout with center divider and "VS" badge.
+    Each driver: name, lap time, 3 sector times, speed.
+    Green/red highlighting for faster/slower values.
+    Comparison rows extracted into inline component.              */
 Rectangle {
     id: root
     width: 300
     height: 160
     color: "transparent"
 
-    // ── public API ──────────────────────────────────────────────────
+    // -- public API ------------------------------------------------------
     // {name, time, sectors: [s1, s2, s3], speed}
-    property var driver1: ({name: "", time: "", sectors: [], speed: 0})
-    property var driver2: ({name: "", time: "", sectors: [], speed: 0})
+    property var driver1: null
+    property var driver2: null
 
-    function fasterColor(v1, v2) {
-        if (v1 === v2 || v1 === "" || v2 === "") return Theme.Tokens.chalk
+    // -- null-safe driver accessors --------------------------------------
+    readonly property var _d1: root.driver1 || _emptyDriver
+    readonly property var _d2: root.driver2 || _emptyDriver
+
+    readonly property var _emptyDriver: ({
+        name: "", time: "", sectors: [], speed: 0
+    })
+
+    // -- comparison helper -----------------------------------------------
+    function _fasterColor(v1, v2) {
+        if (v1 === v2 || v1 === "" || v2 === "" ||
+            v1 === undefined || v2 === undefined)
+            return Theme.Tokens.chalk
         return v1 < v2 ? Theme.Tokens.acidGreen : Theme.Tokens.safetyRed
     }
 
+    function _safeSector(driver, idx) {
+        var sectors = driver ? driver.sectors : null
+        if (!sectors || !Array.isArray(sectors) || idx >= sectors.length)
+            return ""
+        return sectors[idx]
+    }
+
+    function _safeSpeed(driver) {
+        if (!driver || driver.speed === undefined || driver.speed === null)
+            return 0
+        return Number(driver.speed) || 0
+    }
+
+    function _safeTime(driver) {
+        if (!driver || !driver.time) return ""
+        return driver.time
+    }
+
+    function _safeName(driver, fallback) {
+        if (!driver || !driver.name) return fallback
+        return driver.name
+    }
+
+    // -- inline component: comparison row --------------------------------
+    component ComparisonRow: RowLayout {
+        id: _cmpRow
+
+        required property string leftValue
+        required property string rightValue
+        required property string label
+        property bool isSpeed: false
+
+        Layout.fillWidth: true
+        spacing: 0
+
+        Text {
+            Layout.fillWidth: true
+            text: _cmpRow.leftValue || (_cmpRow.isSpeed ? "-- kph" : "--:--.---")
+            font.family:    Theme.Typography.monoFamily
+            font.pixelSize: _cmpRow.isSpeed ? Theme.Typography.microSize : 11
+            font.weight:    _cmpRow.label === "LAP" ? Font.Bold : Font.Normal
+            color: {
+                if (_cmpRow.isSpeed) {
+                    var l = parseFloat(_cmpRow.leftValue) || 0
+                    var r = parseFloat(_cmpRow.rightValue) || 0
+                    return l >= r ? Theme.Tokens.acidGreen : Theme.Tokens.safetyRed
+                }
+                return root._fasterColor(_cmpRow.leftValue, _cmpRow.rightValue)
+            }
+            Behavior on color { ColorAnimation { duration: Theme.Motion.statusColorDuration } }
+        }
+
+        Text {
+            text: _cmpRow.label
+            font.family:       Theme.Typography.monoFamily
+            font.pixelSize:    8
+            font.weight:       Font.Bold
+            font.letterSpacing: _cmpRow.label.length <= 3 ? 1.0 : 0.8
+            color: Theme.Tokens.steel
+            opacity: 0.5
+        }
+
+        Text {
+            Layout.fillWidth: true
+            text: _cmpRow.rightValue || (_cmpRow.isSpeed ? "-- kph" : "--:--.---")
+            font.family:    Theme.Typography.monoFamily
+            font.pixelSize: _cmpRow.isSpeed ? Theme.Typography.microSize : 11
+            font.weight:    _cmpRow.label === "LAP" ? Font.Bold : Font.Normal
+            horizontalAlignment: Text.AlignRight
+            color: {
+                if (_cmpRow.isSpeed) {
+                    var l2 = parseFloat(_cmpRow.leftValue) || 0
+                    var r2 = parseFloat(_cmpRow.rightValue) || 0
+                    return r2 >= l2 ? Theme.Tokens.acidGreen : Theme.Tokens.safetyRed
+                }
+                return root._fasterColor(_cmpRow.rightValue, _cmpRow.leftValue)
+            }
+            Behavior on color { ColorAnimation { duration: Theme.Motion.statusColorDuration } }
+        }
+    }
+
+    // -- main layout -----------------------------------------------------
     ColumnLayout {
         anchors {
             fill: parent
-            topMargin: 10
-            bottomMargin: 10
-            leftMargin: 12
-            rightMargin: 12
+            topMargin:    Theme.Tokens.sm
+            bottomMargin: Theme.Tokens.sm
+            leftMargin:   Theme.Tokens.md
+            rightMargin:  Theme.Tokens.md
         }
-        spacing: 6
+        spacing: Theme.Tokens.sm
 
-        // ── Header ─────────────────────────────────────────────────
+        // -- Title -------------------------------------------------------
         Text {
             text: "HEAD TO HEAD"
-            font.family: Theme.Typography.monoFamily
-            font.pixelSize: 9
-            font.weight: Font.Bold
-            font.letterSpacing: 1.2
+            font.family:       Theme.Typography.monoFamily
+            font.pixelSize:    Theme.Typography.microSize
+            font.weight:       Font.Bold
+            font.letterSpacing: Theme.Typography.microSpacing
             color: Theme.Tokens.steel
         }
 
-        // ── Driver names row ───────────────────────────────────────
+        // -- Driver names row with VS badge ------------------------------
         RowLayout {
             Layout.fillWidth: true
             spacing: 0
 
             Text {
                 Layout.fillWidth: true
-                text: (root.driver1 && root.driver1.name) || "Driver 1"
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 12
-                font.weight: Font.Bold
+                text: root._safeName(root._d1, "Driver 1")
+                font.family:    Theme.Typography.monoFamily
+                font.pixelSize: Theme.Typography.captionSize
+                font.weight:    Font.Bold
                 color: Theme.Tokens.acidGreen
                 elide: Text.ElideRight
             }
 
-            Text {
-                text: "VS"
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
-                font.weight: Font.Bold
-                font.letterSpacing: 1
-                color: Theme.Tokens.steel
-                opacity: 0.5
+            // VS badge
+            Rectangle {
+                Layout.preferredWidth:  28
+                Layout.preferredHeight: 16
+                radius: 3
+                color: Theme.Tokens.subtle(Theme.Tokens.steel, 0.12)
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "VS"
+                    font.family:       Theme.Typography.monoFamily
+                    font.pixelSize:    8
+                    font.weight:       Font.Bold
+                    font.letterSpacing: 1
+                    color: Theme.Tokens.steel
+                }
             }
 
             Text {
                 Layout.fillWidth: true
-                text: (root.driver2 && root.driver2.name) || "Driver 2"
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 12
-                font.weight: Font.Bold
+                text: root._safeName(root._d2, "Driver 2")
+                font.family:    Theme.Typography.monoFamily
+                font.pixelSize: Theme.Typography.captionSize
+                font.weight:    Font.Bold
                 color: Theme.Tokens.pitOrange
                 horizontalAlignment: Text.AlignRight
                 elide: Text.ElideRight
             }
         }
 
-        // ── Separator ──────────────────────────────────────────────
+        // -- Center divider ----------------------------------------------
         Rectangle {
             Layout.fillWidth: true
             height: 1
-            color: Qt.rgba(Theme.Tokens.chalk.r,
-                           Theme.Tokens.chalk.g,
-                           Theme.Tokens.chalk.b, 0.06)
+            color: Theme.Tokens.subtle(Theme.Tokens.chalk)
         }
 
-        // ── Lap time comparison ────────────────────────────────────
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 0
-
-            Text {
-                Layout.fillWidth: true
-                text: (root.driver1 && root.driver1.time) || "--:--.---"
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 14
-                font.weight: Font.Bold
-                color: {
-                    var t1 = root.driver1 ? root.driver1.time : ""
-                    var t2 = root.driver2 ? root.driver2.time : ""
-                    return root.fasterColor(t1, t2)
-                }
-            }
-
-            Text {
-                text: "LAP"
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
-                font.weight: Font.Bold
-                font.letterSpacing: 1
-                color: Theme.Tokens.steel
-                opacity: 0.5
-            }
-
-            Text {
-                Layout.fillWidth: true
-                text: (root.driver2 && root.driver2.time) || "--:--.---"
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 14
-                font.weight: Font.Bold
-                horizontalAlignment: Text.AlignRight
-                color: {
-                    var t1 = root.driver1 ? root.driver1.time : ""
-                    var t2 = root.driver2 ? root.driver2.time : ""
-                    return root.fasterColor(t2, t1)
-                }
-            }
+        // -- Lap time comparison -----------------------------------------
+        ComparisonRow {
+            leftValue:  root._safeTime(root._d1)
+            rightValue: root._safeTime(root._d2)
+            label: "LAP"
         }
 
-        // ── Sector comparisons ─────────────────────────────────────
+        // -- Sector comparisons (S1, S2, S3) -----------------------------
         Repeater {
             model: 3
 
-            RowLayout {
+            ComparisonRow {
                 required property int index
 
-                Layout.fillWidth: true
-                spacing: 0
-
-                readonly property var s1: {
-                    var sectors = root.driver1 ? root.driver1.sectors : []
-                    return sectors && index < sectors.length
-                           ? sectors[index] : ""
+                leftValue: {
+                    var v = root._safeSector(root._d1, index)
+                    return v !== "" ? v.toString() : ""
                 }
-                readonly property var s2: {
-                    var sectors = root.driver2 ? root.driver2.sectors : []
-                    return sectors && index < sectors.length
-                           ? sectors[index] : ""
+                rightValue: {
+                    var v2 = root._safeSector(root._d2, index)
+                    return v2 !== "" ? v2.toString() : ""
                 }
-
-                Text {
-                    Layout.fillWidth: true
-                    text: s1 !== "" ? s1.toString() : "--.---"
-                    font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 10
-                    color: root.fasterColor(s1, s2)
-                }
-
-                Text {
-                    text: "S" + (index + 1)
-                    font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
-                    font.weight: Font.Bold
-                    font.letterSpacing: 0.8
-                    color: Theme.Tokens.steel
-                    opacity: 0.5
-                }
-
-                Text {
-                    Layout.fillWidth: true
-                    text: s2 !== "" ? s2.toString() : "--.---"
-                    font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 10
-                    horizontalAlignment: Text.AlignRight
-                    color: root.fasterColor(s2, s1)
-                }
+                label: "S" + (index + 1)
             }
         }
 
-        // ── Speed comparison ───────────────────────────────────────
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 0
+        // -- Speed comparison --------------------------------------------
+        ComparisonRow {
+            readonly property real _spd1: root._safeSpeed(root._d1)
+            readonly property real _spd2: root._safeSpeed(root._d2)
 
-            readonly property real spd1: root.driver1 ? (root.driver1.speed || 0) : 0
-            readonly property real spd2: root.driver2 ? (root.driver2.speed || 0) : 0
-
-            Text {
-                Layout.fillWidth: true
-                text: parent.spd1 > 0 ? parent.spd1.toFixed(0) + " kph" : "-- kph"
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 10
-                color: parent.spd1 >= parent.spd2
-                       ? Theme.Tokens.acidGreen
-                       : Theme.Tokens.safetyRed
-            }
-
-            Text {
-                text: "SPD"
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
-                font.weight: Font.Bold
-                font.letterSpacing: 0.8
-                color: Theme.Tokens.steel
-                opacity: 0.5
-            }
-
-            Text {
-                Layout.fillWidth: true
-                text: parent.spd2 > 0 ? parent.spd2.toFixed(0) + " kph" : "-- kph"
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 10
-                horizontalAlignment: Text.AlignRight
-                color: parent.spd2 >= parent.spd1
-                       ? Theme.Tokens.acidGreen
-                       : Theme.Tokens.safetyRed
-            }
+            leftValue:  _spd1 > 0 ? _spd1.toFixed(0) + " kph" : ""
+            rightValue: _spd2 > 0 ? _spd2.toFixed(0) + " kph" : ""
+            label:   "SPD"
+            isSpeed: true
         }
     }
 }
