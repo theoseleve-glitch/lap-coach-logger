@@ -128,6 +128,7 @@ class SessionCoordinator:
             "throttle_pct": d.get("throttle_pct"),
             "brake_pct": d.get("brake_pct"),
             "steering_deg": d.get("steering_deg"),
+            "clutch_pct": d.get("clutch_pct"),
             "lap_number": d.get("lap_number"),
             "lap_distance_m": d.get("lap_distance_m"),
             "session_time_s": d.get("session_time_s"),
@@ -138,7 +139,30 @@ class SessionCoordinator:
             "long_accel_g": d.get("long_accel_g"),
             "lap_dist_pct": d.get("lap_dist_pct"),
             "track_length_m": d.get("track_length_m"),
-            "session_type": d.get("session_type"),
+            # Orientation
+            "yaw_deg": d.get("yaw_deg"),
+            "pitch_deg": d.get("pitch"),
+            "roll_deg": d.get("roll"),
+            # Tyre temperatures
+            "tyre_temp_lf": d.get("tyre_temp_lf"),
+            "tyre_temp_rf": d.get("tyre_temp_rf"),
+            "tyre_temp_lr": d.get("tyre_temp_lr"),
+            "tyre_temp_rr": d.get("tyre_temp_rr"),
+            # Brake temperatures
+            "brake_temp_lf": d.get("brake_temp_lf"),
+            "brake_temp_rf": d.get("brake_temp_rf"),
+            "brake_temp_lr": d.get("brake_temp_lr"),
+            "brake_temp_rr": d.get("brake_temp_rr"),
+            # World position
+            "world_pos_x": d.get("world_pos_x"),
+            "world_pos_y": d.get("world_pos_y"),
+            "world_pos_z": d.get("world_pos_z"),
+            # Race position
+            "position": d.get("position"),
+            "num_cars": d.get("num_cars"),
+            # Environment
+            "track_temp_c": d.get("track_temp_c"),
+            "air_temp_c": d.get("air_temp_c"),
         }
 
     # -- detection callbacks (called from ProcessWatcher) ------------------

@@ -64,6 +64,19 @@ class TelemetrySample:
     tyre_temp_lr: float | None = None
     tyre_temp_rr: float | None = None
 
+    # Brake temperatures (°C)
+    brake_temp_lf: float | None = None
+    brake_temp_rf: float | None = None
+    brake_temp_lr: float | None = None
+    brake_temp_rr: float | None = None
+
+    # Race position
+    position: int | None = None
+    num_cars: int | None = None
+
+    # Track geometry
+    track_length_m: float | None = None
+
     # Fuel
     fuel_level: float | None = None   # litres remaining
     fuel_capacity: float | None = None  # tank capacity litres

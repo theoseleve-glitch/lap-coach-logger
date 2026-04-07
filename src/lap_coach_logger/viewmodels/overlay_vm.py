@@ -96,6 +96,24 @@ class OverlayViewModel(QObject):
         self._gear: int = 0
         self._rpm: int = 0
 
+        # Additional vehicle state
+        self._clutch_pct: float = 0.0
+        self._position: int = 0
+        self._num_cars: int = 0
+
+        # Temperatures
+        self._tyre_temp_avg: float = 0.0
+        self._brake_temp_max: float = 0.0
+        self._track_temp: float = 0.0
+        self._air_temp: float = 0.0
+
+        # Session info
+        self._session_type: str = ""
+        self._track_length_m: float = 0.0
+
+        # Flag state
+        self._current_flag: str = "none"
+
         # Detection flags
         self._lockup_active: bool = False
         self._wheelspin_active: bool = False
@@ -265,6 +283,56 @@ class OverlayViewModel(QObject):
     @Property(str, notify=contextChanged)
     def car(self) -> str:
         return self._car
+
+    @Property(float, notify=inputsChanged)
+    def clutchPct(self) -> float:  # noqa: N802
+        """Clutch position as a percentage (0-100)."""
+        return self._clutch_pct
+
+    @Property(int, notify=contextChanged)
+    def position(self) -> int:
+        """Race position (1-based)."""
+        return self._position
+
+    @Property(int, notify=contextChanged)
+    def numCars(self) -> int:  # noqa: N802
+        """Total cars in session."""
+        return self._num_cars
+
+    @Property(float, notify=inputsChanged)
+    def tyreTempAvg(self) -> float:  # noqa: N802
+        """Average tyre temperature across all four corners."""
+        return self._tyre_temp_avg
+
+    @Property(float, notify=inputsChanged)
+    def brakeTempMax(self) -> float:  # noqa: N802
+        """Maximum brake temperature across all four corners."""
+        return self._brake_temp_max
+
+    @Property(float, notify=contextChanged)
+    def trackTemp(self) -> float:  # noqa: N802
+        """Track surface temperature in degrees C."""
+        return self._track_temp
+
+    @Property(float, notify=contextChanged)
+    def airTemp(self) -> float:  # noqa: N802
+        """Ambient air temperature in degrees C."""
+        return self._air_temp
+
+    @Property(str, notify=contextChanged)
+    def sessionType(self) -> str:  # noqa: N802
+        """Session type (Practice, Qualifying, Race, etc.)."""
+        return self._session_type
+
+    @Property(float, notify=contextChanged)
+    def trackLengthM(self) -> float:  # noqa: N802
+        """Track length in metres."""
+        return self._track_length_m
+
+    @Property(str, notify=contextChanged)
+    def currentFlag(self) -> str:  # noqa: N802
+        """Current flag state (none, green, yellow, red, blue, white, checkered)."""
+        return self._current_flag
 
     @Property(float, notify=inputsChanged)
     def lapProgress(self) -> float:  # noqa: N802
@@ -531,11 +599,33 @@ class OverlayViewModel(QObject):
         self._steering_deg = float(live.get("steering_deg", 0.0))
         self._lat_accel_g = float(live.get("lat_accel_g", 0.0))
         self._long_accel_g = float(live.get("long_accel_g", 0.0))
+        self._clutch_pct = float(live.get("clutch_pct", 0.0))
         self._lap_dist_pct = float(live.get("lap_dist_pct") or 0.0)
         self._lap_progress = self._lap_dist_pct * 100.0
         self._lap_number = int(live.get("lap_number") or live.get("current_lap", 0))
         self._gear = int(live.get("gear", 0))
         self._rpm = int(live.get("rpm", 0))
+
+        # Tyre temperature average (only count non-None values)
+        tyre_temps = [
+            live.get("tyre_temp_lf"), live.get("tyre_temp_rf"),
+            live.get("tyre_temp_lr"), live.get("tyre_temp_rr"),
+        ]
+        valid_tyre = [float(t) for t in tyre_temps if t is not None]
+        self._tyre_temp_avg = round(sum(valid_tyre) / len(valid_tyre), 1) if valid_tyre else 0.0
+
+        # Brake temperature max
+        brake_temps = [
+            live.get("brake_temp_lf"), live.get("brake_temp_rf"),
+            live.get("brake_temp_lr"), live.get("brake_temp_rr"),
+        ]
+        valid_brake = [float(t) for t in brake_temps if t is not None]
+        self._brake_temp_max = round(max(valid_brake), 1) if valid_brake else 0.0
+
+        # Race position
+        self._position = int(live.get("position") or 0)
+        self._num_cars = int(live.get("num_cars") or 0)
+
         self.inputsChanged.emit()
 
         # Live telemetry processor -- delta, timing, sectors, detections
@@ -626,6 +716,21 @@ class OverlayViewModel(QObject):
         self._track = str(live.get("track_name") or snap.get("track") or snap.get("sim") or "")
         self._car = str(live.get("car_name") or snap.get("car") or "")
         self._is_recording = str(snap.get("status", "")).lower() == "recording"
+        self._session_type = str(live.get("session_type") or "")
+        self._track_length_m = float(live.get("track_length_m") or 0.0)
+        self._track_temp = float(live.get("track_temp_c") or 0.0)
+        self._air_temp = float(live.get("air_temp_c") or 0.0)
+
+        # Flag detection: derive from pit/track status and session type
+        is_in_pits = bool(live.get("is_in_pits"))
+        is_on_track = bool(live.get("is_on_track"))
+        if is_in_pits and not is_on_track:
+            self._current_flag = "none"
+        elif self._is_recording and is_on_track:
+            self._current_flag = "green"
+        else:
+            self._current_flag = "none"
+
         self.contextChanged.emit()
 
         # Fuel calculation

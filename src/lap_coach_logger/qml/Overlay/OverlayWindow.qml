@@ -241,6 +241,8 @@ Item {
         OverlayWidget {
             Widgets.WeatherMonitorWidget {
                 anchors.fill: parent; anchors.margins: 4
+                trackTemp: overlayVM ? overlayVM.trackTemp : 0
+                airTemp: overlayVM ? overlayVM.airTemp : 0
             }
         }
     }
@@ -282,6 +284,7 @@ Item {
             Widgets.SessionTimerWidget {
                 anchors.fill: parent; anchors.margins: 4
                 elapsed: overlayVM ? overlayVM.elapsed || "0:00:00" : "0:00:00"
+                sessionType: overlayVM ? overlayVM.sessionType || "Practice" : "Practice"
             }
         }
     }
@@ -303,6 +306,7 @@ Item {
         OverlayWidget {
             Widgets.FlagsWidget {
                 anchors.fill: parent; anchors.margins: 4
+                flag: overlayVM ? overlayVM.currentFlag : "none"
             }
         }
     }
@@ -313,6 +317,7 @@ Item {
         OverlayWidget {
             Widgets.DigiflagWidget {
                 anchors.fill: parent; anchors.margins: 4
+                flag: overlayVM ? overlayVM.currentFlag : "none"
             }
         }
     }
@@ -459,6 +464,8 @@ Item {
         OverlayWidget {
             Widgets.WeatherMonitorWidget {
                 anchors.fill: parent; anchors.margins: 4
+                trackTemp: overlayVM ? overlayVM.trackTemp : 0
+                airTemp: overlayVM ? overlayVM.airTemp : 0
             }
         }
     }
@@ -544,9 +551,11 @@ Item {
                 anchors.fill: parent; anchors.margins: 4
                 throttle: overlayVM ? overlayVM.throttlePct : 0
                 brake: overlayVM ? overlayVM.brakePct : 0
+                clutch: overlayVM ? overlayVM.clutchPct : 0
                 steering: overlayVM ? overlayVM.steeringDeg / 450.0 : 0
                 gear: overlayVM ? overlayVM.gear : 0
                 rpm: overlayVM ? overlayVM.rpm : 0
+                maxRpm: 8000
             }
         }
     }
