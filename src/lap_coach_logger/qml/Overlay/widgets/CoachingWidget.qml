@@ -3,8 +3,10 @@ import QtQuick.Layouts
 import "../../Theme" as Theme
 
 /*  CoachingWidget — live coaching advice overlay (290 px wide).
-    Asymmetric-radius glass panel with severity accent, category / sector
-    meta, headline + subtext, confidence bar, and a compact history list.  */
+    Asymmetric-radius glass panel (4px apex corner top-left, 14px elsewhere)
+    with severity accent, category / sector meta, headline + subtext,
+    severity-colored confidence bar, "Coach" brand mark, and dismiss
+    animation (scale down + fade).                                           */
 GlassSurface {
     id: root
     width: 290
@@ -26,16 +28,75 @@ GlassSurface {
 
     // ── severity colors ─────────────────────────────────────────────
     readonly property color severityColor: {
-        switch (severity) {
+        switch (root.severity) {
         case "caution":  return Theme.Tokens.marshalYellow
         case "critical": return Theme.Tokens.safetyRed
         default:         return Theme.Tokens.acidGreen
         }
     }
 
-    // ── Critical top rule ──────────────────────────────────────────
+    readonly property bool isCritical: root.severity === "critical"
+
+    // ── Dismiss animation (scale down + fade) ──────────────────────
+    opacity: 1.0
+    scale: 1.0
+    transformOrigin: Item.Center
+    visible: opacity > 0
+
+    function dismiss() {
+        dismissAnim.start()
+    }
+
+    ParallelAnimation {
+        id: dismissAnim
+
+        NumberAnimation {
+            target: root
+            property: "opacity"
+            to: 0.0
+            duration: 200
+            easing.type: Easing.InCubic
+        }
+        NumberAnimation {
+            target: root
+            property: "scale"
+            to: 0.92
+            duration: 200
+            easing.type: Easing.InCubic
+        }
+
+        onFinished: {
+            root.dismissed()
+            root.opacity = 1.0
+            root.scale = 1.0
+        }
+    }
+
+    // ── Appear animation ───────────────────────────────────────────
+    Component.onCompleted: appearAnim.start()
+
+    ParallelAnimation {
+        id: appearAnim
+
+        NumberAnimation {
+            target: root
+            property: "opacity"
+            from: 0.0; to: 1.0
+            duration: 250
+            easing.type: Easing.OutCubic
+        }
+        NumberAnimation {
+            target: root
+            property: "scale"
+            from: 0.95; to: 1.0
+            duration: 250
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    // ── Critical top rule (1.5px red) ──────────────────────────────
     Rectangle {
-        visible: root.severity === "critical"
+        visible: root.isCritical
         anchors {
             top: parent.top
             left: parent.left
@@ -46,6 +107,9 @@ GlassSurface {
         height: 1.5
         color: Theme.Tokens.safetyRed
         z: 2
+
+        opacity: root.isCritical ? 1.0 : 0.0
+        Behavior on opacity { NumberAnimation { duration: 200 } }
     }
 
     ColumnLayout {
@@ -67,8 +131,10 @@ GlassSurface {
             Text {
                 text: {
                     var parts = []
-                    if (root.category) parts.push(root.category.toUpperCase())
-                    if (root.sector) parts.push(root.sector.toUpperCase())
+                    if (root.category && root.category.length > 0)
+                        parts.push(root.category.toUpperCase())
+                    if (root.sector && root.sector.length > 0)
+                        parts.push(root.sector.toUpperCase())
                     return parts.join(" \u00B7 ")
                 }
                 font.family: Theme.Typography.monoFamily
@@ -84,35 +150,35 @@ GlassSurface {
 
             // Dismiss button
             Rectangle {
+                id: dismissBtn
                 width: 16; height: 16; radius: 4
-                color: Qt.rgba(Theme.Tokens.chalk.r,
-                               Theme.Tokens.chalk.g,
-                               Theme.Tokens.chalk.b, 0.0)
+                color: "transparent"
 
                 Text {
                     anchors.centerIn: parent
-                    text: "\u00D7"   // multiplication sign (x)
+                    text: "\u00D7"
                     font.pixelSize: 12
                     font.weight: Font.Bold
-                    color: Theme.Tokens.steel
+                    color: dismissArea.containsMouse
+                          ? Theme.Tokens.chalk : Theme.Tokens.steel
+                    Behavior on color { ColorAnimation { duration: 120 } }
                 }
 
                 MouseArea {
+                    id: dismissArea
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true
-                    onEntered: parent.color = Qt.rgba(Theme.Tokens.chalk.r,
-                                                      Theme.Tokens.chalk.g,
-                                                      Theme.Tokens.chalk.b, 0.06)
-                    onExited:  parent.color = "transparent"
-                    onClicked: root.dismissed()
+                    onEntered: dismissBtn.color = Theme.Tokens.subtle(Theme.Tokens.chalk, 0.06)
+                    onExited:  dismissBtn.color = "transparent"
+                    onClicked: root.dismiss()
                 }
             }
         }
 
         // ── Headline ───────────────────────────────────────────────
         Text {
-            text: root.headline
+            text: root.headline || ""
             font.family: Theme.Typography.bodyFamily
             font.pixelSize: 19
             font.weight: Font.DemiBold
@@ -124,8 +190,8 @@ GlassSurface {
 
         // ── Sub line ───────────────────────────────────────────────
         Text {
-            visible: root.sub.length > 0
-            text: root.sub
+            visible: (root.sub ? root.sub.length : 0) > 0
+            text: root.sub || ""
             font.family: Theme.Typography.bodyFamily
             font.pixelSize: 12
             color: Theme.Tokens.steel
@@ -134,13 +200,13 @@ GlassSurface {
             Layout.topMargin: 2
         }
 
-        // ── Confidence bar + "Coach" ───────────────────────────────
+        // ── Confidence bar + percentage + "Coach" ──────────────────
         RowLayout {
             Layout.fillWidth: true
             Layout.topMargin: 10
             spacing: 8
 
-            // Thin confidence bar
+            // Thin confidence bar (colored by severity)
             Item {
                 Layout.preferredWidth: 36
                 Layout.preferredHeight: 3
@@ -149,9 +215,7 @@ GlassSurface {
                 Rectangle {
                     anchors.fill: parent
                     radius: 1.5
-                    color: Qt.rgba(Theme.Tokens.chalk.r,
-                                   Theme.Tokens.chalk.g,
-                                   Theme.Tokens.chalk.b, 0.06)
+                    color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.06)
                 }
 
                 Rectangle {
@@ -164,7 +228,7 @@ GlassSurface {
                     radius: 1.5
                     color: root.severityColor
 
-                    Behavior on width { NumberAnimation { duration: 200 } }
+                    Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                     Behavior on color { ColorAnimation { duration: 200 } }
                 }
             }
