@@ -39,10 +39,30 @@ Item {
                 steering: overlayVM ? overlayVM.steeringDeg / 450.0 : 0
                 gForceX: overlayVM ? overlayVM.latAccelG : 0
                 gForceY: overlayVM ? overlayVM.longAccelG : 0
-                lockup: false
-                wheelspin: false
-                smoothness: 0.85
+                lockup: overlayVM ? overlayVM.lockupActive : false
+                wheelspin: overlayVM ? overlayVM.wheelspinActive : false
+                smoothness: overlayVM ? overlayVM.inputSmoothness : 0.75
             }
+        }
+
+        // Center column: Coaching (only when visible)
+        ColumnLayout {
+            Layout.fillHeight: true
+            Layout.preferredWidth: 290
+            spacing: 8
+            visible: overlayVM ? overlayVM.coachingVisible : false
+
+            Widgets.CoachingWidget {
+                Layout.fillWidth: true
+                headline: overlayVM ? overlayVM.coachingHeadline : ""
+                sub: overlayVM ? overlayVM.coachingSub : ""
+                category: overlayVM ? overlayVM.coachingCategory : ""
+                severity: overlayVM ? overlayVM.coachingSeverity : "positive"
+                confidence: overlayVM ? overlayVM.coachingConfidence : 0
+                sector: overlayVM ? overlayVM.coachingSector : ""
+            }
+
+            Item { Layout.fillHeight: true }
         }
 
         // Right column: Fuel widget

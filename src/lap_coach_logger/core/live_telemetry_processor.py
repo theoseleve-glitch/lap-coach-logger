@@ -9,6 +9,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from lap_coach_logger.core.live_coach import LiveCoachTracker
+from lap_coach_logger.core.live_input_diagnostics import LiveInputDiagnosticsTracker
 from lap_coach_logger.core.live_lap_compare import LiveLapComparisonTracker
 from lap_coach_logger.core.schema import TelemetrySample
 
@@ -53,8 +55,19 @@ def _build_sample_from_live(live: dict[str, Any], snap: dict[str, Any]) -> Telem
 class LiveTelemetryProcessor:
     """Composes live analysis trackers into a single processing pipeline."""
 
+    # -- Lockup / wheelspin heuristic thresholds --------------------------------
+    _LOCKUP_BRAKE_MIN: float = 0.8
+    _LOCKUP_SPEED_MIN_KPH: float = 30.0
+    _LOCKUP_LONG_G_MIN: float = 0.8  # hard deceleration (positive = braking)
+
+    _WHEELSPIN_THROTTLE_MIN: float = 0.7
+    _WHEELSPIN_LAT_G_MIN: float = 0.3
+    _WHEELSPIN_SPEED_MIN_KPH: float = 20.0
+
     def __init__(self) -> None:
         self._lap_tracker = LiveLapComparisonTracker()
+        self._coach_tracker = LiveCoachTracker()
+        self._input_tracker = LiveInputDiagnosticsTracker()
 
     def process(self, live_dict: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
         """Process a raw snapshot, return aggregated overlay state.
@@ -90,6 +103,30 @@ class LiveTelemetryProcessor:
         last_profile = self._lap_tracker._last_profile
         last_lap_time_s = last_profile.lap_time_s if last_profile else None
 
+        # -- Lockup / wheelspin heuristic detection --------------------------
+        lockup_active = self._detect_lockup(sample)
+        wheelspin_active = self._detect_wheelspin(sample)
+
+        # -- Coaching tracker ------------------------------------------------
+        self._coach_tracker.push_sample(
+            sample,
+            dashboard_state=live_dict,
+            derived_state=snap.get("derived"),
+        )
+        coach_snap = self._coach_tracker.snapshot()
+        coaching_alerts = coach_snap.get("alerts", [])
+        coaching_prompts = coach_snap.get("coaching", [])
+        coaching_cards = self._build_coaching_cards(coaching_alerts, coaching_prompts)
+
+        # -- Input diagnostics -----------------------------------------------
+        self._input_tracker.push_sample(
+            sample,
+            dashboard_state=live_dict,
+            derived_state=snap.get("derived"),
+        )
+        input_snap = self._input_tracker.snapshot()
+        input_smoothness = self._compute_smoothness(input_snap)
+
         return {
             "live_delta_s": live_delta_s,
             "best_lap_time_s": best_lap_time_s,
@@ -99,11 +136,86 @@ class LiveTelemetryProcessor:
             "last_lap_time_fmt": _format_lap_time(last_lap_time_s),
             "current_lap_time_fmt": _format_lap_time(current_lap_time_s),
             "sector_rows": compare.get("sector_rows", []),
+            "lockup_active": lockup_active,
+            "wheelspin_active": wheelspin_active,
+            "coaching_cards": coaching_cards,
+            "input_smoothness": input_smoothness,
         }
+
+    # -- heuristic helpers -----------------------------------------------------
+
+    def _detect_lockup(self, sample: TelemetrySample) -> bool:
+        """Lockup: heavy braking at speed with strong longitudinal deceleration."""
+        brake = sample.brake_pct
+        speed = sample.speed_kph
+        long_g = sample.long_accel_g
+        if brake is None or speed is None or long_g is None:
+            return False
+        # long_accel_g is negative under braking in most sims; compare abs.
+        return (
+            brake >= self._LOCKUP_BRAKE_MIN
+            and speed >= self._LOCKUP_SPEED_MIN_KPH
+            and abs(long_g) >= self._LOCKUP_LONG_G_MIN
+        )
+
+    def _detect_wheelspin(self, sample: TelemetrySample) -> bool:
+        """Wheelspin: high throttle with lateral slip at moderate speed."""
+        throttle = sample.throttle_pct
+        speed = sample.speed_kph
+        lat_g = sample.lat_accel_g
+        if throttle is None or speed is None or lat_g is None:
+            return False
+        return (
+            throttle >= self._WHEELSPIN_THROTTLE_MIN
+            and abs(lat_g) >= self._WHEELSPIN_LAT_G_MIN
+            and speed >= self._WHEELSPIN_SPEED_MIN_KPH
+        )
+
+    @staticmethod
+    def _build_coaching_cards(
+        alerts: list[dict], prompts: list[dict],
+    ) -> list[dict]:
+        """Merge alerts and coaching prompts into a unified card list."""
+        cards: list[dict] = []
+        for alert in alerts:
+            severity = str(alert.get("severity", "caution"))
+            if severity == "error":
+                severity = "critical"
+            cards.append({
+                "headline": str(alert.get("title", "")),
+                "sub": str(alert.get("detail", "")),
+                "category": "ALERT",
+                "severity": severity,
+                "confidence": 90,
+                "sector": "",
+            })
+        for prompt in prompts:
+            cards.append({
+                "headline": str(prompt.get("title", "")),
+                "sub": str(prompt.get("detail", "")),
+                "category": "COACHING",
+                "severity": "caution",
+                "confidence": 80,
+                "sector": str(prompt.get("corner", "")),
+            })
+        return cards
+
+    @staticmethod
+    def _compute_smoothness(input_snap: dict) -> float:
+        """Derive a 0-1 smoothness score from input diagnostics."""
+        rows = input_snap.get("rows", {})
+        brake_score = rows.get("brake_trace", {}).get("score")
+        throttle_score = rows.get("throttle_modulation", {}).get("score")
+        scores = [s for s in (brake_score, throttle_score) if isinstance(s, (int, float))]
+        if not scores:
+            return 0.75  # default before enough data
+        return max(0.0, min(1.0, sum(scores) / len(scores) / 100.0))
 
     def reset(self) -> None:
         """Reset all trackers (new session)."""
         self._lap_tracker.reset()
+        self._coach_tracker.reset()
+        self._input_tracker.reset()
 
 
 # -- tiny helpers (avoid importing from other modules) -------------------------

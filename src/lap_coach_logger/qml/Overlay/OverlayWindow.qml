@@ -8,8 +8,8 @@ Window {
 
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
     color: "transparent"
-    width: 500
-    height: 340
+    width: 790
+    height: 380
     visible: false  // controlled externally
 
     OverlayContent {

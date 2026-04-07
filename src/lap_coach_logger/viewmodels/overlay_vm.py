@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import Property, QObject, Signal
+from PySide6.QtCore import Property, QObject, Signal, Slot
 
 from lap_coach_logger.core.live_telemetry_processor import LiveTelemetryProcessor
 
@@ -24,6 +24,7 @@ class OverlayViewModel(QObject):
     contextChanged = Signal()
     fuelChanged = Signal()
     deltaChanged = Signal()
+    coachingChanged = Signal()
 
     # -- construction ----------------------------------------------------------
 
@@ -61,6 +62,21 @@ class OverlayViewModel(QObject):
         self._elapsed: str = ""
         self._gear: int = 0
         self._rpm: int = 0
+
+        # Detection flags
+        self._lockup_active: bool = False
+        self._wheelspin_active: bool = False
+        self._input_smoothness: float = 0.75
+
+        # Coaching
+        self._coaching_cards: list[dict] = []
+        self._coaching_visible: bool = False
+        self._coaching_headline: str = ""
+        self._coaching_sub: str = ""
+        self._coaching_category: str = ""
+        self._coaching_severity: str = "positive"
+        self._coaching_confidence: int = 0
+        self._coaching_sector: str = ""
 
         # Fuel
         self._fuel_level: float = 0.0
@@ -159,6 +175,48 @@ class OverlayViewModel(QObject):
     def lapDistPct(self) -> float:  # noqa: N802
         return self._lap_dist_pct
 
+    @Property(bool, notify=inputsChanged)
+    def lockupActive(self) -> bool:  # noqa: N802
+        """True while a wheel-lockup condition is detected."""
+        return self._lockup_active
+
+    @Property(bool, notify=inputsChanged)
+    def wheelspinActive(self) -> bool:  # noqa: N802
+        """True while a wheelspin condition is detected."""
+        return self._wheelspin_active
+
+    @Property(float, notify=inputsChanged)
+    def inputSmoothness(self) -> float:  # noqa: N802
+        return self._input_smoothness
+
+    @Property(bool, notify=coachingChanged)
+    def coachingVisible(self) -> bool:  # noqa: N802
+        return self._coaching_visible
+
+    @Property(str, notify=coachingChanged)
+    def coachingHeadline(self) -> str:  # noqa: N802
+        return self._coaching_headline
+
+    @Property(str, notify=coachingChanged)
+    def coachingSub(self) -> str:  # noqa: N802
+        return self._coaching_sub
+
+    @Property(str, notify=coachingChanged)
+    def coachingCategory(self) -> str:  # noqa: N802
+        return self._coaching_category
+
+    @Property(str, notify=coachingChanged)
+    def coachingSeverity(self) -> str:  # noqa: N802
+        return self._coaching_severity
+
+    @Property(int, notify=coachingChanged)
+    def coachingConfidence(self) -> int:  # noqa: N802
+        return self._coaching_confidence
+
+    @Property(str, notify=coachingChanged)
+    def coachingSector(self) -> str:  # noqa: N802
+        return self._coaching_sector
+
     @Property(float, notify=deltaChanged)
     def liveDelta(self) -> float:  # noqa: N802
         """Real-time delta vs best lap in seconds (from processor)."""
@@ -205,10 +263,30 @@ class OverlayViewModel(QObject):
         self._rpm = int(live.get("rpm", 0))
         self.inputsChanged.emit()
 
-        # Live telemetry processor -- delta, timing, sectors
+        # Live telemetry processor -- delta, timing, sectors, detections
         result = self._processor.process(live, snap)
+        self._lockup_active = bool(result.get("lockup_active", False))
+        self._wheelspin_active = bool(result.get("wheelspin_active", False))
+        self._input_smoothness = float(result.get("input_smoothness", 0.75))
         self._live_delta = float(result.get("live_delta_s", 0.0))
         self._current_lap_time = result.get("current_lap_time_fmt", "")
+
+        # Coaching cards — show highest-severity card
+        cards = result.get("coaching_cards", [])
+        if cards:
+            self._coaching_cards = cards
+            top = cards[0]
+            self._coaching_visible = True
+            self._coaching_headline = str(top.get("headline", ""))
+            self._coaching_sub = str(top.get("sub", ""))
+            self._coaching_category = str(top.get("category", ""))
+            self._coaching_severity = str(top.get("severity", "caution"))
+            self._coaching_confidence = int(top.get("confidence", 80))
+            self._coaching_sector = str(top.get("sector", ""))
+            self.coachingChanged.emit()
+        elif self._coaching_visible:
+            self._coaching_visible = False
+            self.coachingChanged.emit()
 
         # Use processor output for best/last when available, keep
         # existing values as fallback so the overlay never blanks out.
@@ -304,3 +382,22 @@ class OverlayViewModel(QObject):
                 else:
                     self._fuel_state = "SAFE"
             self.fuelChanged.emit()
+
+    @Slot()
+    def dismissCoaching(self) -> None:
+        """Dismiss the current coaching card."""
+        if self._coaching_cards:
+            self._coaching_cards.pop(0)
+        if self._coaching_cards:
+            top = self._coaching_cards[0]
+            self._coaching_headline = str(top.get("headline", ""))
+            self._coaching_sub = str(top.get("sub", ""))
+            self._coaching_category = str(top.get("category", ""))
+            self._coaching_severity = str(top.get("severity", "caution"))
+            self._coaching_confidence = int(top.get("confidence", 80))
+            self._coaching_sector = str(top.get("sector", ""))
+        else:
+            self._coaching_visible = False
+            self._coaching_headline = ""
+            self._coaching_sub = ""
+        self.coachingChanged.emit()
