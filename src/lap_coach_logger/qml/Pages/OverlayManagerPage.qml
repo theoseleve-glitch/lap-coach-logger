@@ -488,8 +488,7 @@ Item {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            // Avoid capturing clicks on the toggle
-                            propagateComposedEvents: true
+                            z: -1  // behind toggle so it doesn't steal clicks
                             onClicked: function(mouse) {
                                 root.selectedIndex = index
                                 if (overlayVM) overlayVM.selectWidget(widgetId)

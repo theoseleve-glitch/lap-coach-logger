@@ -30,12 +30,15 @@ Rectangle {
 
     // -- fade + slide animation ----------------------------------------------
     opacity: visible_ ? 1.0 : 0.0
-    transform: Translate { id: slideTransform; y: visible_ ? 0 : 8 }
+    transform: Translate {
+        id: slideTransform
+        y: visible_ ? 0 : 8
+        Behavior on y {
+            NumberAnimation { duration: 400; easing.type: Easing.InOutQuad }
+        }
+    }
 
     Behavior on opacity {
-        NumberAnimation { duration: 400; easing.type: Easing.InOutQuad }
-    }
-    Behavior on slideTransform.y {        // keep in sync with opacity
         NumberAnimation { duration: 400; easing.type: Easing.InOutQuad }
     }
 
