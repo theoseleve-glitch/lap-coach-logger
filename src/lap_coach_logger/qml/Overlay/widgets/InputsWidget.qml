@@ -2,376 +2,340 @@ import QtQuick
 import QtQuick.Layouts
 import "../../Theme" as Theme
 
-/*  InputsWidget — throttle / brake / grip overlay.
-    Vertical control bars for THR and BRK, a Canvas-based friction circle,
-    smoothness indicator, and lockup / wheelspin status dots.               */
+/*  InputsWidget — premium throttle/brake/grip overlay.
+    Matches Figma: vertical control bars with gradient fills,
+    friction circle with reference rings + fading trail,
+    steering arc, smoothness bar, lockup/wheelspin with flash.
+
+    Design reference: Figma Make inputs-grpi-overlay
+*/
 GlassSurface {
     id: root
     width: 220
     implicitHeight: col.implicitHeight + 24
 
-    // ── public API ──────────────────────────────────────────────────
-    property real throttle: 0.0     // 0-1
-    property real brake: 0.0        // 0-1
+    // ── Public API ──────────────────────────────────────────────
+    property real throttle: 0.0     // 0–1
+    property real brake: 0.0        // 0–1
     property real steering: 0.0     // -1 to 1
     property real gForceX: 0.0
     property real gForceY: 0.0
     property bool lockup: false
     property bool wheelspin: false
-    property real smoothness: 0.75  // 0-1
+    property real smoothness: 0.75  // 0–1
 
-    // G-force trail buffer
+    // G-force trail (ring buffer)
     property var _trail: []
+    property bool _pedalOverlap: throttle > 0.05 && brake > 0.05
 
-    onGForceXChanged: _updateTrail()
-    onGForceYChanged: _updateTrail()
+    onGForceXChanged: _pushTrail()
+    onGForceYChanged: _pushTrail()
 
-    function _updateTrail() {
+    function _pushTrail() {
         var t = _trail.slice()
         t.push({ x: gForceX, y: gForceY })
-        if (t.length > 20) t.shift()
+        if (t.length > 30) t.shift()
         _trail = t
         frictionCanvas.requestPaint()
     }
 
+    // ── Inline: Vertical Control Bar ────────────────────────────
+    component PedalBar: ColumnLayout {
+        property string label: "THR"
+        property real value: 0.0
+        property color barColor: Theme.Tokens.acidGreen
+        spacing: 3
+        Layout.alignment: Qt.AlignTop
+
+        Text {
+            text: label
+            font { family: Theme.Typography.monoFamily; pixelSize: 8; weight: Font.Bold; letterSpacing: 1 }
+            color: barColor
+            horizontalAlignment: Text.AlignHCenter
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        Item {
+            Layout.preferredWidth: 18
+            Layout.preferredHeight: 72
+
+            Rectangle {
+                anchors.fill: parent; radius: 4
+                color: Qt.rgba(barColor.r, barColor.g, barColor.b, 0.06)
+                border.width: 1
+                border.color: Qt.rgba(barColor.r, barColor.g, barColor.b, 0.08)
+            }
+
+            // Fill with gradient
+            Rectangle {
+                anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 1 }
+                height: (parent.height - 2) * Math.max(0, Math.min(1, value))
+                radius: 3
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Qt.rgba(barColor.r, barColor.g, barColor.b, 0.6) }
+                    GradientStop { position: 1.0; color: barColor }
+                }
+                Behavior on height { NumberAnimation { duration: 40 } }
+            }
+
+            // Top highlight
+            Rectangle {
+                anchors { top: parent.top; left: parent.left; right: parent.right }
+                height: 1; radius: 4
+                color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.06)
+            }
+        }
+
+        Text {
+            text: Math.round(value * 100)
+            font { family: Theme.Typography.monoFamily; pixelSize: 10; weight: Font.Bold }
+            color: Theme.Tokens.chalk
+            horizontalAlignment: Text.AlignHCenter
+            Layout.alignment: Qt.AlignHCenter
+        }
+    }
+
+    // ── Inline: Status indicator with flash ─────────────────────
+    component StatusDot: Row {
+        property bool active: false
+        property color dotColor: Theme.Tokens.safetyRed
+        property string label: "LOCK"
+        spacing: 4
+
+        Rectangle {
+            width: 5; height: 5; radius: 2.5
+            anchors.verticalCenter: parent.verticalCenter
+            color: active ? dotColor : Qt.rgba(dotColor.r, dotColor.g, dotColor.b, 0.15)
+            Behavior on color { ColorAnimation { duration: 100 } }
+
+            // Flash animation when active
+            SequentialAnimation on opacity {
+                running: active
+                loops: Animation.Infinite
+                NumberAnimation { to: 0.4; duration: 300 }
+                NumberAnimation { to: 1.0; duration: 300 }
+            }
+            opacity: active ? 1.0 : 1.0
+        }
+        Text {
+            text: label
+            font { family: Theme.Typography.monoFamily; pixelSize: 8; weight: Font.Bold; letterSpacing: 0.5 }
+            color: active ? dotColor : Theme.Tokens.steel
+            Behavior on color { ColorAnimation { duration: 100 } }
+        }
+    }
+
     ColumnLayout {
         id: col
-        anchors {
-            fill: parent
-            topMargin: 12
-            bottomMargin: 10
-            leftMargin: 12
-            rightMargin: 12
-        }
+        anchors { fill: parent; topMargin: 10; bottomMargin: 8; leftMargin: 12; rightMargin: 12 }
         spacing: 0
 
-        // ── Header: INPUTS label + smoothness bar ──────────────────
+        // ── Header: INPUTS + smoothness ────────────────────────
         RowLayout {
             Layout.fillWidth: true
-            spacing: 8
+            spacing: 6
 
             Text {
                 text: "INPUTS"
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
-                font.weight: Font.Bold
-                font.letterSpacing: 1.2
+                font { family: Theme.Typography.monoFamily; pixelSize: 9; weight: Font.Bold; letterSpacing: 2 }
                 color: Theme.Tokens.steel
             }
-
             Item { Layout.fillWidth: true }
 
-            // Smoothness squares
+            // Smoothness bar (green gradient, not purple)
             Row {
-                spacing: 2
+                spacing: 1.5
                 Repeater {
                     model: 8
                     Rectangle {
                         required property int index
-                        width: 5
-                        height: 5
-                        radius: 1
+                        width: 4; height: 4; radius: 1
                         color: (index / 8) < root.smoothness
-                               ? Theme.Tokens.racingPurple
-                               : Qt.rgba(Theme.Tokens.chalk.r,
-                                         Theme.Tokens.chalk.g,
-                                         Theme.Tokens.chalk.b, 0.08)
+                               ? Qt.rgba(Theme.Tokens.acidGreen.r, Theme.Tokens.acidGreen.g, Theme.Tokens.acidGreen.b,
+                                         0.3 + (index / 8) * 0.7)
+                               : Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.06)
                     }
                 }
             }
         }
 
-        // ── Separator ──────────────────────────────────────────────
+        // Separator
         Item {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 9
+            Layout.fillWidth: true; Layout.preferredHeight: 8
             Rectangle {
-                anchors.centerIn: parent
-                width: parent.width
-                height: 1
+                anchors.centerIn: parent; width: parent.width; height: 1
                 gradient: Gradient {
                     orientation: Gradient.Horizontal
                     GradientStop { position: 0.0; color: "transparent" }
-                    GradientStop { position: 0.5; color: Qt.rgba(Theme.Tokens.chalk.r,
-                                                                  Theme.Tokens.chalk.g,
-                                                                  Theme.Tokens.chalk.b, 0.08) }
+                    GradientStop { position: 0.5; color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.06) }
                     GradientStop { position: 1.0; color: "transparent" }
                 }
             }
         }
 
-        // ── Main: Control bars + Friction circle ───────────────────
+        // ── Main: Bars + Friction circle ───────────────────────
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 100
-            spacing: 8
+            Layout.preferredHeight: 110
+            spacing: 6
 
-            // Throttle bar
+            PedalBar { label: "THR"; value: root.throttle; barColor: Theme.Tokens.acidGreen }
+            PedalBar { label: "BRK"; value: root.brake; barColor: Theme.Tokens.safetyRed }
+
+            // Friction circle + steering arc
             ColumnLayout {
-                spacing: 3
-                Layout.alignment: Qt.AlignTop
-
-                Text {
-                    text: "THR"
-                    font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
-                    font.weight: Font.Bold
-                    color: Theme.Tokens.acidGreen
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.alignment: Qt.AlignHCenter
-                }
-
-                // Vertical bar container
-                Item {
-                    Layout.preferredWidth: 16
-                    Layout.preferredHeight: 70
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 3
-                        color: Qt.rgba(Theme.Tokens.acidGreen.r,
-                                       Theme.Tokens.acidGreen.g,
-                                       Theme.Tokens.acidGreen.b, 0.08)
-                    }
-
-                    Rectangle {
-                        anchors {
-                            left: parent.left
-                            right: parent.right
-                            bottom: parent.bottom
-                        }
-                        height: parent.height * Math.max(0, Math.min(1, root.throttle))
-                        radius: 3
-                        color: Theme.Tokens.acidGreen
-
-                        Behavior on height { NumberAnimation { duration: 50 } }
-                    }
-                }
-
-                Text {
-                    text: Math.round(root.throttle * 100) + "%"
-                    font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 9
-                    font.weight: Font.Bold
-                    color: Theme.Tokens.chalk
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.alignment: Qt.AlignHCenter
-                }
-            }
-
-            // Brake bar
-            ColumnLayout {
-                spacing: 3
-                Layout.alignment: Qt.AlignTop
-
-                Text {
-                    text: "BRK"
-                    font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
-                    font.weight: Font.Bold
-                    color: Theme.Tokens.safetyRed
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.alignment: Qt.AlignHCenter
-                }
-
-                Item {
-                    Layout.preferredWidth: 16
-                    Layout.preferredHeight: 70
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 3
-                        color: Qt.rgba(Theme.Tokens.safetyRed.r,
-                                       Theme.Tokens.safetyRed.g,
-                                       Theme.Tokens.safetyRed.b, 0.08)
-                    }
-
-                    Rectangle {
-                        anchors {
-                            left: parent.left
-                            right: parent.right
-                            bottom: parent.bottom
-                        }
-                        height: parent.height * Math.max(0, Math.min(1, root.brake))
-                        radius: 3
-                        color: Theme.Tokens.safetyRed
-
-                        Behavior on height { NumberAnimation { duration: 50 } }
-                    }
-                }
-
-                Text {
-                    text: Math.round(root.brake * 100) + "%"
-                    font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 9
-                    font.weight: Font.Bold
-                    color: Theme.Tokens.chalk
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.alignment: Qt.AlignHCenter
-                }
-            }
-
-            // Friction circle
-            Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 100
+                Layout.fillHeight: true
+                spacing: 4
 
                 Canvas {
                     id: frictionCanvas
-                    anchors.fill: parent
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 85
+
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
 
                     onPaint: {
                         var ctx = getContext("2d")
-                        var w = width
-                        var h = height
-                        var cx = w / 2
-                        var cy = h / 2
-                        var r = Math.min(cx, cy) - 4   // limit circle radius
-
+                        var w = width, h = height
+                        var cx = w / 2, cy = h / 2
+                        var r = Math.min(cx, cy) - 6
                         ctx.reset()
                         ctx.clearRect(0, 0, w, h)
 
-                        // Outer limit circle
+                        // Reference rings (1G, 2G)
+                        for (var ring = 1; ring <= 2; ring++) {
+                            ctx.beginPath()
+                            ctx.arc(cx, cy, r * ring / 2.5, 0, Math.PI * 2)
+                            ctx.strokeStyle = Qt.rgba(0.58, 0.58, 0.58, 0.08)
+                            ctx.lineWidth = 0.5
+                            ctx.stroke()
+                        }
+
+                        // Outer limit
                         ctx.beginPath()
                         ctx.arc(cx, cy, r, 0, Math.PI * 2)
-                        ctx.strokeStyle = Qt.rgba(Theme.Tokens.chalk.r,
-                                                  Theme.Tokens.chalk.g,
-                                                  Theme.Tokens.chalk.b, 0.10)
-                        ctx.lineWidth = 1
+                        ctx.strokeStyle = Qt.rgba(0.58, 0.58, 0.58, 0.15)
+                        ctx.lineWidth = 0.8
                         ctx.stroke()
 
                         // Crosshairs
                         ctx.beginPath()
-                        ctx.moveTo(cx - r, cy)
-                        ctx.lineTo(cx + r, cy)
-                        ctx.moveTo(cx, cy - r)
-                        ctx.lineTo(cx, cy + r)
-                        ctx.strokeStyle = Qt.rgba(Theme.Tokens.chalk.r,
-                                                  Theme.Tokens.chalk.g,
-                                                  Theme.Tokens.chalk.b, 0.06)
-                        ctx.lineWidth = 1
+                        ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy)
+                        ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r)
+                        ctx.strokeStyle = Qt.rgba(0.58, 0.58, 0.58, 0.06)
+                        ctx.lineWidth = 0.5
                         ctx.stroke()
 
-                        // G-force trail
+                        // Trail with fade
                         var trail = root._trail
                         if (trail.length > 1) {
-                            ctx.beginPath()
-                            for (var i = 0; i < trail.length; i++) {
-                                var px = cx + trail[i].x * r
-                                var py = cy - trail[i].y * r
-                                if (i === 0) ctx.moveTo(px, py)
-                                else ctx.lineTo(px, py)
+                            for (var i = 1; i < trail.length; i++) {
+                                var alpha = 0.05 + (i / trail.length) * 0.30
+                                ctx.beginPath()
+                                ctx.moveTo(cx + trail[i-1].x * r, cy - trail[i-1].y * r)
+                                ctx.lineTo(cx + trail[i].x * r, cy - trail[i].y * r)
+                                ctx.strokeStyle = Qt.rgba(Theme.Tokens.racingPurple.r, Theme.Tokens.racingPurple.g, Theme.Tokens.racingPurple.b, alpha)
+                                ctx.lineWidth = 1.2
+                                ctx.stroke()
                             }
-                            ctx.strokeStyle = Qt.rgba(Theme.Tokens.racingPurple.r,
-                                                      Theme.Tokens.racingPurple.g,
-                                                      Theme.Tokens.racingPurple.b, 0.35)
-                            ctx.lineWidth = 1.5
-                            ctx.stroke()
                         }
 
-                        // Current position dot
+                        // Center apex dot
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, 1.5, 0, Math.PI * 2)
+                        ctx.fillStyle = Qt.rgba(0.58, 0.58, 0.58, 0.3)
+                        ctx.fill()
+
+                        // Current G dot + glow
                         var dotX = cx + root.gForceX * r
                         var dotY = cy - root.gForceY * r
-
-                        // Glow
                         var grd = ctx.createRadialGradient(dotX, dotY, 0, dotX, dotY, 8)
-                        grd.addColorStop(0, Qt.rgba(Theme.Tokens.racingPurple.r,
-                                                    Theme.Tokens.racingPurple.g,
-                                                    Theme.Tokens.racingPurple.b, 0.4))
+                        grd.addColorStop(0, Qt.rgba(Theme.Tokens.racingPurple.r, Theme.Tokens.racingPurple.g, Theme.Tokens.racingPurple.b, 0.5))
                         grd.addColorStop(1, "transparent")
-                        ctx.beginPath()
-                        ctx.arc(dotX, dotY, 8, 0, Math.PI * 2)
-                        ctx.fillStyle = grd
-                        ctx.fill()
+                        ctx.beginPath(); ctx.arc(dotX, dotY, 8, 0, Math.PI * 2)
+                        ctx.fillStyle = grd; ctx.fill()
 
-                        // Dot
-                        ctx.beginPath()
-                        ctx.arc(dotX, dotY, 3, 0, Math.PI * 2)
-                        ctx.fillStyle = Theme.Tokens.racingPurple.toString()
-                        ctx.fill()
+                        ctx.beginPath(); ctx.arc(dotX, dotY, 2.5, 0, Math.PI * 2)
+                        ctx.fillStyle = Theme.Tokens.racingPurple.toString(); ctx.fill()
+                    }
+                }
+
+                // Steering arc
+                Canvas {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 16
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        var w = width, h = height
+                        var cx = w / 2, cy = h
+                        var r = w / 2 - 6
+                        ctx.reset(); ctx.clearRect(0, 0, w, h)
+
+                        // Arc track
+                        ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, 0)
+                        ctx.strokeStyle = Qt.rgba(0.58, 0.58, 0.58, 0.10)
+                        ctx.lineWidth = 2; ctx.stroke()
+
+                        // Center tick
+                        ctx.beginPath(); ctx.moveTo(cx, cy - r - 2); ctx.lineTo(cx, cy - r + 2)
+                        ctx.strokeStyle = Qt.rgba(0.58, 0.58, 0.58, 0.2)
+                        ctx.lineWidth = 1; ctx.stroke()
+
+                        // Needle position
+                        var angle = Math.PI - (root.steering + 1) * 0.5 * Math.PI
+                        var nx = cx + Math.cos(angle) * r
+                        var ny = cy + Math.sin(angle) * r
+                        ctx.beginPath(); ctx.arc(nx, ny, 2.5, 0, Math.PI * 2)
+                        ctx.fillStyle = Theme.Tokens.racingPurple.toString(); ctx.fill()
+                    }
+                    onWidthChanged: requestPaint()
+
+                    Connections {
+                        target: root
+                        function onSteeringChanged() { frictionCanvas.parent.children[1].requestPaint() }
                     }
                 }
             }
         }
 
-        // ── Separator ──────────────────────────────────────────────
+        // Separator
         Item {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 7
+            Layout.fillWidth: true; Layout.preferredHeight: 6
             Rectangle {
-                anchors.centerIn: parent
-                width: parent.width
-                height: 1
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: "transparent" }
-                    GradientStop { position: 0.5; color: Qt.rgba(Theme.Tokens.chalk.r,
-                                                                  Theme.Tokens.chalk.g,
-                                                                  Theme.Tokens.chalk.b, 0.08) }
-                    GradientStop { position: 1.0; color: "transparent" }
-                }
+                anchors.centerIn: parent; width: parent.width; height: 1
+                color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.04)
             }
         }
 
-        // ── Bottom status: LOCK + SPIN + G value ───────────────────
+        // ── Bottom: Status dots + G value ──────────────────────
         RowLayout {
             Layout.fillWidth: true
-            spacing: 10
+            spacing: 8
 
-            // Lockup indicator
-            Row {
-                spacing: 4
-                Rectangle {
-                    width: 5; height: 5; radius: 2.5
-                    color: root.lockup ? Theme.Tokens.safetyRed
-                                       : Qt.rgba(Theme.Tokens.safetyRed.r,
-                                                  Theme.Tokens.safetyRed.g,
-                                                  Theme.Tokens.safetyRed.b, 0.15)
-                    anchors.verticalCenter: parent.verticalCenter
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                }
-                Text {
-                    text: "LOCK"
-                    font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
-                    font.weight: Font.Bold
-                    color: root.lockup ? Theme.Tokens.safetyRed : Theme.Tokens.steel
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                }
-            }
+            StatusDot { active: root.lockup; dotColor: Theme.Tokens.safetyRed; label: "LOCK" }
+            StatusDot { active: root.wheelspin; dotColor: Theme.Tokens.marshalYellow; label: "SPIN" }
 
-            // Wheelspin indicator
-            Row {
-                spacing: 4
-                Rectangle {
-                    width: 5; height: 5; radius: 2.5
-                    color: root.wheelspin ? Theme.Tokens.marshalYellow
-                                          : Qt.rgba(Theme.Tokens.marshalYellow.r,
-                                                    Theme.Tokens.marshalYellow.g,
-                                                    Theme.Tokens.marshalYellow.b, 0.15)
-                    anchors.verticalCenter: parent.verticalCenter
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                }
+            // Pedal overlap warning
+            Rectangle {
+                visible: root._pedalOverlap
+                width: overlapText.implicitWidth + 8; height: 14; radius: 3
+                color: Qt.rgba(Theme.Tokens.marshalYellow.r, Theme.Tokens.marshalYellow.g, Theme.Tokens.marshalYellow.b, 0.12)
                 Text {
-                    text: "SPIN"
-                    font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
-                    font.weight: Font.Bold
-                    color: root.wheelspin ? Theme.Tokens.marshalYellow : Theme.Tokens.steel
-                    Behavior on color { ColorAnimation { duration: 120 } }
+                    id: overlapText; anchors.centerIn: parent
+                    text: "OVERLAP"
+                    font { family: Theme.Typography.monoFamily; pixelSize: 7; weight: Font.Bold }
+                    color: Theme.Tokens.marshalYellow; opacity: 0.7
                 }
             }
 
             Item { Layout.fillWidth: true }
 
-            // Combined G value
             Text {
-                text: Math.sqrt(root.gForceX * root.gForceX
-                                + root.gForceY * root.gForceY).toFixed(1) + " G"
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 10
-                font.weight: Font.Bold
-                color: Theme.Tokens.chalk
+                text: "G " + Math.sqrt(root.gForceX * root.gForceX + root.gForceY * root.gForceY).toFixed(1)
+                font { family: Theme.Typography.monoFamily; pixelSize: 9; weight: Font.Bold }
+                color: Theme.Tokens.steel
             }
         }
     }
