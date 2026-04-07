@@ -15,7 +15,8 @@ Item {
     readonly property var pageComponents: ({
         "dashboard": dashboardComponent,
         "live": liveComponent,
-        "history": historyComponent
+        "history": historyComponent,
+        "overlays": overlaysComponent
     })
 
     property string currentPage: "dashboard"
@@ -281,6 +282,11 @@ Item {
                 root.openReview(folder)
             }
         }
+    }
+
+    Component {
+        id: overlaysComponent
+        Pages.OverlayManagerPage {}
     }
 
     Component {

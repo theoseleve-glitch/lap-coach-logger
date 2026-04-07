@@ -25,6 +25,8 @@ class OverlayViewModel(QObject):
     fuelChanged = Signal()
     deltaChanged = Signal()
     coachingChanged = Signal()
+    widgetSettingsChanged = Signal()
+    selectedWidgetChanged = Signal()
 
     # -- construction ----------------------------------------------------------
 
@@ -88,6 +90,23 @@ class OverlayViewModel(QObject):
         self._fuel_state: str = "SAFE"
         self._prev_fuel_level: float = 0.0
         self._lap_fuel_samples: list[float] = []
+
+        # Per-widget settings (widget_id -> settings dict)
+        self._widget_settings: dict[str, dict] = {
+            "delta_timing": {"enabled": True, "width": 320, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "inputs_grip": {"enabled": True, "width": 240, "height": 260, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "fuel_strategy": {"enabled": True, "width": 180, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "coaching": {"enabled": False, "width": 290, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "gforce_meter": {"enabled": False, "width": 200, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "lap_timing": {"enabled": False, "width": 280, "height": 120, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "track_map": {"enabled": False, "width": 240, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "standings": {"enabled": False, "width": 300, "height": 300, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "weather": {"enabled": False, "width": 200, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+        }
+        self._widget_defaults: dict[str, dict] = {
+            k: dict(v) for k, v in self._widget_settings.items()
+        }
+        self._selected_widget: str = "delta_timing"
 
     # -- QML properties --------------------------------------------------------
 
@@ -249,6 +268,53 @@ class OverlayViewModel(QObject):
     @Property(str, notify=fuelChanged)
     def fuelState(self) -> str:  # noqa: N802
         return self._fuel_state
+
+    # -- Widget settings properties --------------------------------------------
+
+    @Property("QVariant", notify=widgetSettingsChanged)
+    def widgetSettings(self) -> dict:  # noqa: N802
+        """Full dict of widget_id -> settings for QML binding."""
+        return self._widget_settings
+
+    @Property(str, notify=selectedWidgetChanged)
+    def selectedWidget(self) -> str:  # noqa: N802
+        """Currently selected widget id in the overlay manager."""
+        return self._selected_widget
+
+    @Slot(str)
+    def selectWidget(self, widget_id: str) -> None:  # noqa: N802
+        """Select a widget in the overlay manager UI."""
+        if widget_id != self._selected_widget:
+            self._selected_widget = widget_id
+            self.selectedWidgetChanged.emit()
+
+    @Slot(str, str, "QVariant")
+    def setWidgetSetting(self, widget_id: str, key: str, value: object) -> None:  # noqa: N802
+        """Update a single setting for a widget and notify QML."""
+        if widget_id in self._widget_settings:
+            # Coerce numeric types for clean storage
+            if key in ("width", "height", "refresh_hz", "border_radius"):
+                value = int(value)
+            elif key in ("opacity", "font_scale"):
+                value = float(value)
+            self._widget_settings[widget_id][key] = value
+            self.widgetSettingsChanged.emit()
+
+    @Slot(str)
+    def toggleWidget(self, widget_id: str) -> None:  # noqa: N802
+        """Toggle the enabled state of a widget."""
+        if widget_id in self._widget_settings:
+            self._widget_settings[widget_id]["enabled"] = (
+                not self._widget_settings[widget_id]["enabled"]
+            )
+            self.widgetSettingsChanged.emit()
+
+    @Slot(str)
+    def resetWidget(self, widget_id: str) -> None:  # noqa: N802
+        """Reset a widget's settings to factory defaults."""
+        if widget_id in self._widget_defaults:
+            self._widget_settings[widget_id] = dict(self._widget_defaults[widget_id])
+            self.widgetSettingsChanged.emit()
 
     # -- public API ------------------------------------------------------------
 

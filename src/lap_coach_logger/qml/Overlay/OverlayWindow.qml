@@ -11,17 +11,26 @@ Item {
 
     property bool overlayVisible: false
 
+    // Read per-widget settings from the overlay ViewModel
+    property var ws: overlayVM ? overlayVM.widgetSettings : ({})
+
     onOverlayVisibleChanged: {
-        deltaWindow.visible = overlayVisible
-        inputsWindow.visible = overlayVisible
-        fuelWindow.visible = overlayVisible
+        var deltaEnabled = ws.delta_timing ? ws.delta_timing.enabled : true
+        var inputsEnabled = ws.inputs_grip ? ws.inputs_grip.enabled : true
+        var fuelEnabled = ws.fuel_strategy ? ws.fuel_strategy.enabled : true
+
+        deltaWindow.visible = overlayVisible && deltaEnabled
+        inputsWindow.visible = overlayVisible && inputsEnabled
+        fuelWindow.visible = overlayVisible && fuelEnabled
     }
 
     // ── Delta / Time Widget ──
     OverlayWidget {
         id: deltaWindow
-        width: 320
-        height: 200
+        width: ws.delta_timing ? ws.delta_timing.width : 320
+        height: ws.delta_timing ? ws.delta_timing.height : 200
+        opacity: ws.delta_timing ? ws.delta_timing.opacity : 0.92
+        visible: root.overlayVisible && (ws.delta_timing ? ws.delta_timing.enabled : true)
         x: 100
         y: 80
 
@@ -41,8 +50,10 @@ Item {
     // ── Inputs / Grip Widget ──
     OverlayWidget {
         id: inputsWindow
-        width: 240
-        height: 260
+        width: ws.inputs_grip ? ws.inputs_grip.width : 240
+        height: ws.inputs_grip ? ws.inputs_grip.height : 260
+        opacity: ws.inputs_grip ? ws.inputs_grip.opacity : 0.92
+        visible: root.overlayVisible && (ws.inputs_grip ? ws.inputs_grip.enabled : true)
         x: 440
         y: 80
 
@@ -63,8 +74,10 @@ Item {
     // ── Fuel Strategy Widget ──
     OverlayWidget {
         id: fuelWindow
-        width: 180
-        height: 240
+        width: ws.fuel_strategy ? ws.fuel_strategy.width : 180
+        height: ws.fuel_strategy ? ws.fuel_strategy.height : 240
+        opacity: ws.fuel_strategy ? ws.fuel_strategy.opacity : 0.92
+        visible: root.overlayVisible && (ws.fuel_strategy ? ws.fuel_strategy.enabled : true)
         x: 700
         y: 80
 

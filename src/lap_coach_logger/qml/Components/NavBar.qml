@@ -83,7 +83,8 @@ Rectangle {
                 model: [
                     { pageId: "dashboard", label: "Dashboard" },
                     { pageId: "live",      label: "Live" },
-                    { pageId: "history",   label: "History" }
+                    { pageId: "history",   label: "History" },
+                    { pageId: "overlays",  label: "Overlays" }
                 ]
 
                 delegate: Rectangle {
