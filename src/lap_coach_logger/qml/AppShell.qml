@@ -254,13 +254,13 @@ Item {
         id: onboarding
     }
 
-    // === 6. Overlay HUD window (separate floating window) ===
+    // === 6. Modular overlay system (RaceLab-style independent widget windows) ===
     Overlay.OverlayWindow {
-        id: overlayWindow
+        id: overlayManager
     }
 
     function toggleOverlay() {
-        overlayWindow.visible = !overlayWindow.visible
+        overlayManager.overlayVisible = !overlayManager.overlayVisible
     }
 
     // === Page components ===
