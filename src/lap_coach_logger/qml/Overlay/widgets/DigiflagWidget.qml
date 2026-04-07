@@ -2,23 +2,27 @@ import QtQuick
 import QtQuick.Layouts
 import "../../Theme" as Theme
 
-/*  DigiflagWidget — digital flag indicator (120 x 120).
-    Numbered flag with sector info, like a digital marshal post.
-    Shows the flag state, sector number, and optional message.   */
+/*  DigiflagWidget -- digital marshal post indicator (120 x 120).
+    LED-style sector number, flag-colored accent strip, message text.
+    Canvas LED digit display, null safety throughout.               */
 Rectangle {
     id: root
     width: 120
     height: 120
     color: "transparent"
 
-    // ── public API ──────────────────────────────────────────────────
-    property string flag: "none"   // green|yellow|red|blue|white|checkered|none
-    property int sector: 0
+    // -- public API ----------------------------------------------------------
+    property string flag: "none"    // green|yellow|red|blue|white|checkered|none
+    property int    sector: 0
     property string message: ""
 
-    // ── flag color mapping ──────────────────────────────────────────
+    // -- derived (null-safe) -------------------------------------------------
+    readonly property string safeFlag: (flag || "none").toLowerCase()
+    readonly property int    safeSector: Math.max(0, sector || 0)
+    readonly property string safeMessage: message || ""
+
     readonly property color flagColor: {
-        switch (flag) {
+        switch (safeFlag) {
         case "green":     return Theme.Tokens.acidGreen
         case "yellow":    return Theme.Tokens.marshalYellow
         case "red":       return Theme.Tokens.safetyRed
@@ -30,7 +34,7 @@ Rectangle {
     }
 
     readonly property string flagSymbol: {
-        switch (flag) {
+        switch (safeFlag) {
         case "green":     return "\u25CF"   // filled circle
         case "yellow":    return "\u26A0"   // warning
         case "red":       return "\u2716"   // heavy X
@@ -41,85 +45,158 @@ Rectangle {
         }
     }
 
+    readonly property string flagName: {
+        switch (safeFlag) {
+        case "none": return "CLEAR"
+        default:     return safeFlag.toUpperCase()
+        }
+    }
+
+    readonly property bool isActive: safeFlag !== "none"
+
     ColumnLayout {
         anchors {
             fill: parent
-            topMargin: 10
-            bottomMargin: 10
-            leftMargin: 10
-            rightMargin: 10
+            topMargin: 8
+            bottomMargin: 8
+            leftMargin: 8
+            rightMargin: 8
         }
         spacing: 0
 
-        // ── Sector indicator ───────────────────────────────────────
+        // -- Header label ----------------------------------------------------
         Text {
-            visible: root.sector > 0
-            text: "S" + root.sector
+            text: "MARSHAL POST"
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 9
+            font.pixelSize: 8
             font.weight: Font.Bold
             font.letterSpacing: 1.0
             color: Theme.Tokens.steel
+            opacity: 0.7
             Layout.alignment: Qt.AlignHCenter
         }
 
         Item { Layout.preferredHeight: 4 }
 
-        // ── Flag symbol (hero) ─────────────────────────────────────
+        // -- LED sector number (Canvas) --------------------------------------
+        Canvas {
+            id: ledCanvas
+            Layout.alignment: Qt.AlignHCenter
+            Layout.preferredWidth: 44
+            Layout.preferredHeight: 36
+
+            property string digit: root.safeSector > 0
+                                   ? root.safeSector.toString() : "-"
+            property color ledColor: root.flagColor
+
+            onDigitChanged:  requestPaint()
+            onLedColorChanged: requestPaint()
+            onWidthChanged:  requestPaint()
+            onHeightChanged: requestPaint()
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                ctx.clearRect(0, 0, width, height)
+
+                var c = ledColor || Theme.Tokens.steel
+
+                // LED background glow
+                ctx.fillStyle = Qt.rgba(c.r, c.g, c.b, 0.08).toString()
+                ctx.beginPath()
+                ctx.roundedRect(0, 0, width, height, 4, 4)
+                ctx.fill()
+
+                // LED border
+                ctx.strokeStyle = Qt.rgba(c.r, c.g, c.b, 0.25).toString()
+                ctx.lineWidth = 1
+                ctx.beginPath()
+                ctx.roundedRect(0.5, 0.5, width - 1, height - 1, 4, 4)
+                ctx.stroke()
+
+                // Digit text (LED style: mono, large)
+                ctx.fillStyle = c.toString()
+                ctx.font = "bold 24px " + Theme.Typography.monoFamily
+                ctx.textAlign = "center"
+                ctx.textBaseline = "middle"
+                ctx.fillText(digit, width / 2, height / 2 + 1)
+
+                // LED scanline effect (faint horizontal lines)
+                ctx.strokeStyle = Qt.rgba(0, 0, 0, 0.12).toString()
+                ctx.lineWidth = 0.5
+                for (var y = 2; y < height; y += 3) {
+                    ctx.beginPath()
+                    ctx.moveTo(0, y)
+                    ctx.lineTo(width, y)
+                    ctx.stroke()
+                }
+            }
+
+            Component.onCompleted: requestPaint()
+        }
+
+        Item { Layout.preferredHeight: 4 }
+
+        // -- Accent strip (flag color) ---------------------------------------
         Rectangle {
             Layout.alignment: Qt.AlignHCenter
-            width: 56
-            height: 56
-            radius: 8
-            color: Qt.rgba(root.flagColor.r,
-                           root.flagColor.g,
-                           root.flagColor.b, 0.15)
-            border.width: 2
-            border.color: Qt.rgba(root.flagColor.r,
-                                  root.flagColor.g,
-                                  root.flagColor.b, 0.40)
+            Layout.preferredWidth: parent.width * 0.7
+            Layout.preferredHeight: 3
+            radius: 1.5
+            color: root.flagColor
+            opacity: root.isActive ? 0.8 : 0.2
 
-            Behavior on color { ColorAnimation { duration: 300 } }
-            Behavior on border.color { ColorAnimation { duration: 300 } }
+            Behavior on color   { ColorAnimation { duration: 300; easing.type: Easing.OutCubic } }
+            Behavior on opacity { NumberAnimation { duration: 300 } }
+        }
+
+        Item { Layout.preferredHeight: 4 }
+
+        // -- Flag symbol + name row ------------------------------------------
+        RowLayout {
+            Layout.alignment: Qt.AlignHCenter
+            spacing: 4
 
             Text {
-                anchors.centerIn: parent
                 text: root.flagSymbol
-                font.pixelSize: 24
+                font.pixelSize: 12
                 color: root.flagColor
+
+                Behavior on color { ColorAnimation { duration: 300 } }
+            }
+
+            Text {
+                text: root.flagName
+                font.family: Theme.Typography.monoFamily
+                font.pixelSize: 10
+                font.weight: Font.Bold
+                font.letterSpacing: 1.2
+                color: root.flagColor
+                horizontalAlignment: Text.AlignHCenter
 
                 Behavior on color { ColorAnimation { duration: 300 } }
             }
         }
 
-        Item { Layout.preferredHeight: 4 }
+        Item { Layout.preferredHeight: 2 }
 
-        // ── Flag name ──────────────────────────────────────────────
+        // -- Message text ----------------------------------------------------
         Text {
-            text: root.flag === "none" ? "CLEAR" : root.flag.toUpperCase()
-            font.family: Theme.Typography.monoFamily
-            font.pixelSize: 10
-            font.weight: Font.Bold
-            font.letterSpacing: 1.2
-            color: root.flagColor
-            horizontalAlignment: Text.AlignHCenter
-            Layout.fillWidth: true
-
-            Behavior on color { ColorAnimation { duration: 300 } }
-        }
-
-        // ── Message ────────────────────────────────────────────────
-        Text {
-            visible: root.message.length > 0
-            text: root.message
+            visible: root.safeMessage.length > 0
+            text: root.safeMessage
             font.family: Theme.Typography.monoFamily
             font.pixelSize: 8
             font.weight: Font.DemiBold
             color: Theme.Tokens.steel
             horizontalAlignment: Text.AlignHCenter
             Layout.fillWidth: true
-            Layout.topMargin: 2
             elide: Text.ElideRight
+            maximumLineCount: 1
+            opacity: visible ? 0.8 : 0.0
+
+            Behavior on opacity { NumberAnimation { duration: 200 } }
         }
+
+        Item { Layout.fillHeight: true }
     }
 }
