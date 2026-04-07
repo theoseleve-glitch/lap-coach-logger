@@ -1,0 +1,6 @@
+module Overlay.widgets
+GlassSurface 1.0 GlassSurface.qml
+DeltaTimeWidget 1.0 DeltaTimeWidget.qml
+InputsWidget 1.0 InputsWidget.qml
+FuelWidget 1.0 FuelWidget.qml
+CoachingWidget 1.0 CoachingWidget.qml

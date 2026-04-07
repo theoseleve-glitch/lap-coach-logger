@@ -1,3 +1,8 @@
 module Overlay
 OverlayWindow 1.0 OverlayWindow.qml
 OverlayContent 1.0 OverlayContent.qml
+GlassSurface 1.0 widgets/GlassSurface.qml
+DeltaTimeWidget 1.0 widgets/DeltaTimeWidget.qml
+InputsWidget 1.0 widgets/InputsWidget.qml
+FuelWidget 1.0 widgets/FuelWidget.qml
+CoachingWidget 1.0 widgets/CoachingWidget.qml
