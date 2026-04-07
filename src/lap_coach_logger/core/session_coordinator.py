@@ -133,6 +133,9 @@ class SessionCoordinator:
             "session_time_s": d.get("session_time_s"),
             "is_on_track": d.get("is_on_track"),
             "is_in_pits": d.get("is_in_pits"),
+            "fuel_level": d.get("fuel_level"),
+            "lat_accel_g": d.get("lat_accel_g"),
+            "long_accel_g": d.get("long_accel_g"),
         }
 
     # -- detection callbacks (called from ProcessWatcher) ------------------
