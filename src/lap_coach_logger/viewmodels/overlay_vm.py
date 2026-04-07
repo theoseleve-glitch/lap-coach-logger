@@ -109,6 +109,14 @@ class OverlayViewModel(QObject):
             "delta_bar": {"enabled": False, "width": 300, "height": 60, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
             "flags": {"enabled": False, "width": 160, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "digiflag": {"enabled": False, "width": 120, "height": 120, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "radar": {"enabled": False, "width": 200, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "radar_bars": {"enabled": False, "width": 200, "height": 120, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "blind_spot": {"enabled": False, "width": 160, "height": 80, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "overtake_alert": {"enabled": False, "width": 240, "height": 60, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "relatives": {"enabled": False, "width": 280, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "standings_table": {"enabled": False, "width": 280, "height": 300, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "leaderboard": {"enabled": False, "width": 260, "height": 280, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "head_to_head": {"enabled": False, "width": 300, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
         }
         self._widget_defaults: dict[str, dict] = {
             k: dict(v) for k, v in self._widget_settings.items()

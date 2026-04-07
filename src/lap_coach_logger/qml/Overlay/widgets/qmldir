@@ -12,3 +12,11 @@ SessionTimerWidget 1.0 SessionTimerWidget.qml
 DeltaBarWidget 1.0 DeltaBarWidget.qml
 FlagsWidget 1.0 FlagsWidget.qml
 DigiflagWidget 1.0 DigiflagWidget.qml
+RadarWidget 1.0 RadarWidget.qml
+RadarBarsWidget 1.0 RadarBarsWidget.qml
+BlindSpotWidget 1.0 BlindSpotWidget.qml
+OvertakeAlertWidget 1.0 OvertakeAlertWidget.qml
+RelativesWidget 1.0 RelativesWidget.qml
+StandingsWidget 1.0 StandingsWidget.qml
+LeaderboardWidget 1.0 LeaderboardWidget.qml
+HeadToHeadWidget 1.0 HeadToHeadWidget.qml

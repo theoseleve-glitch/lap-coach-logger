@@ -107,6 +107,54 @@ Item {
             category: "awareness"
             description: "Digital marshal post indicator with flag symbol, sector number, and optional message. Compact flag display with sector-specific context."
         }
+        ListElement {
+            widgetId: "radar"
+            name: "Radar"
+            category: "awareness"
+            description: "Top-down proximity radar showing nearby cars as dots around your centre car icon. Range-configurable canvas display for spatial awareness."
+        }
+        ListElement {
+            widgetId: "radar_bars"
+            name: "Radar Bars"
+            category: "awareness"
+            description: "Horizontal proximity bars showing how close cars are on your left and right. Bars shift to red when a car enters the danger zone."
+        }
+        ListElement {
+            widgetId: "blind_spot"
+            name: "Blind Spot"
+            category: "awareness"
+            description: "Simple left/right blind spot indicators. Rectangles flash red when a car is alongside, giving instant awareness of cars in your mirrors."
+        }
+        ListElement {
+            widgetId: "overtake_alert"
+            name: "Overtake Alert"
+            category: "awareness"
+            description: "Animated OVERTAKE or DEFEND alert with direction arrow and car number. Flashes to grab attention during close racing situations."
+        }
+        ListElement {
+            widgetId: "relatives"
+            name: "Relatives"
+            category: "awareness"
+            description: "Cars sorted by track position relative to you. Shows gap, name, position, and class colour for quick situational awareness in traffic."
+        }
+        ListElement {
+            widgetId: "standings_table"
+            name: "Standings Table"
+            category: "awareness"
+            description: "Full race standings with position, driver name, gap to leader, last lap time, and class badge. Your row highlighted for quick reference."
+        }
+        ListElement {
+            widgetId: "leaderboard"
+            name: "Leaderboard"
+            category: "awareness"
+            description: "Simplified leaderboard with alternating row backgrounds, podium-highlighted position badges, and gap to leader for each driver."
+        }
+        ListElement {
+            widgetId: "head_to_head"
+            name: "Head to Head"
+            category: "awareness"
+            description: "Side-by-side comparison of two drivers. Shows sector times, lap times, and top speed with colour-coded faster/slower indicators."
+        }
     }
 
     property int selectedIndex: 0
