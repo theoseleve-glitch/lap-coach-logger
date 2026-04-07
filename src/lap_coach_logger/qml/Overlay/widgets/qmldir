@@ -36,3 +36,10 @@ HeartRateWidget 1.0 HeartRateWidget.qml
 InputTelemetryWidget 1.0 InputTelemetryWidget.qml
 ChatWidget 1.0 ChatWidget.qml
 ChatHighlightWidget 1.0 ChatHighlightWidget.qml
+ChatRaceGameWidget 1.0 ChatRaceGameWidget.qml
+ChatRaceStandingWidget 1.0 ChatRaceStandingWidget.qml
+CustomTextWidget 1.0 CustomTextWidget.qml
+CustomUrlWidget 1.0 CustomUrlWidget.qml
+GarageCoverWidget 1.0 GarageCoverWidget.qml
+MicVisualizerWidget 1.0 MicVisualizerWidget.qml
+PromoCodeAlertWidget 1.0 PromoCodeAlertWidget.qml

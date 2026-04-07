@@ -251,6 +251,48 @@ Item {
             category: "streaming"
             description: "Single highlighted chat message for stream display. Large text with username colour accent, fade in/out animation, and streaming indicator."
         }
+        ListElement {
+            widgetId: "chat_race_game"
+            name: "Race Prediction Game"
+            category: "streaming"
+            description: "Interactive race prediction game for stream viewers. Shows prediction question, viewer entries with picks, and results with point scores."
+        }
+        ListElement {
+            widgetId: "chat_race_standing"
+            name: "Prediction Standings"
+            category: "streaming"
+            description: "Streaming leaderboard showing viewer race prediction standings. Displays rank, player name, total points, and current win streak per round."
+        }
+        ListElement {
+            widgetId: "custom_text"
+            name: "Custom Text Banner"
+            category: "streaming"
+            description: "Customisable text banner for streams. Supports static or scrolling text with configurable font size and colour. Ideal for sponsor messages."
+        }
+        ListElement {
+            widgetId: "custom_url"
+            name: "Custom URL Content"
+            category: "streaming"
+            description: "Placeholder for loading custom URL content as a browser widget. Shows URL, label, and a custom content area for embedded web resources."
+        }
+        ListElement {
+            widgetId: "garage_cover"
+            name: "Garage Cover"
+            category: "streaming"
+            description: "Be right back and intermission screen with branding. Shows a customisable garage message, subtitle, logo placeholder, and breathing animation."
+        }
+        ListElement {
+            widgetId: "mic_visualizer"
+            name: "Mic Visualiser"
+            category: "streaming"
+            description: "Audio level visualiser with 16 vertical bars that react to microphone input. Configurable bar colour with active indicator for stream audio."
+        }
+        ListElement {
+            widgetId: "promo_code_alert"
+            name: "Promo Code Alert"
+            category: "streaming"
+            description: "Animated promo code display for sponsors. Shows sponsor name, large promo code with copy indicator, description, and pulsing border glow."
+        }
     }
 
     property int selectedIndex: 0
