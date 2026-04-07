@@ -6,6 +6,7 @@ import "Components" as Components
 import "Pages" as Pages
 import "Panels" as Panels
 import "Onboarding" as Onboarding
+import "Overlay" as Overlay
 
 Item {
     id: root
@@ -48,6 +49,10 @@ Item {
 
         onPauseRequested: {
             serviceVM.pauseMonitoring()
+        }
+
+        onOverlayToggleRequested: {
+            root.toggleOverlay()
         }
 
         onResumeRequested: {
@@ -247,6 +252,15 @@ Item {
     // === 5. Onboarding overlay (shown on first launch) ===
     Onboarding.OnboardingFlow {
         id: onboarding
+    }
+
+    // === 6. Overlay HUD window (separate floating window) ===
+    Overlay.OverlayWindow {
+        id: overlayWindow
+    }
+
+    function toggleOverlay() {
+        overlayWindow.visible = !overlayWindow.visible
     }
 
     // === Page components ===

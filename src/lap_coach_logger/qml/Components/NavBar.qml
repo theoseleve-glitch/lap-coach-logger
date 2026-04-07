@@ -15,6 +15,7 @@ Rectangle {
     signal settingsRequested()
     signal pauseRequested()
     signal resumeRequested()
+    signal overlayToggleRequested()
 
     height: 52
     color: Theme.Tokens.subtle(Theme.Tokens.surface, 0.85)
@@ -167,7 +168,38 @@ Rectangle {
             }
         }
 
-        // === 6. Gear icon button ===
+        // === 6. Overlay toggle button ===
+        Rectangle {
+            width: overlayLabel.implicitWidth + Theme.Tokens.lg * 2
+            height: 26
+            radius: Theme.Tokens.radiusSm
+            color: overlayBtnArea.containsMouse
+                   ? Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.15)
+                   : Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.08)
+            border.width: 1
+            border.color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.20)
+
+            Text {
+                id: overlayLabel
+                anchors.centerIn: parent
+                text: "OVERLAY"
+                font.family: Theme.Typography.monoFamily
+                font.pixelSize: 10
+                font.weight: Font.Bold
+                color: Theme.Tokens.racingPurple
+                font.letterSpacing: 1
+            }
+
+            MouseArea {
+                id: overlayBtnArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.overlayToggleRequested()
+            }
+        }
+
+        // === 7. Gear icon button ===
         Rectangle {
             id: gearBtn
             width: 36
