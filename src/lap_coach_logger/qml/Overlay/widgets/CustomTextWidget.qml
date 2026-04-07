@@ -2,48 +2,56 @@ import QtQuick
 import QtQuick.Layouts
 import "../../Theme" as Theme
 
-/*  CustomTextWidget — customisable text banner for streams (280x60).
+/*  CustomTextWidget -- customisable text banner for streams (280x60).
     Static or scrolling text with configurable size and colour.
-    Category: streaming — uses racingPurple accent.                     */
+    Category: streaming -- uses racingPurple accent.                     */
 Rectangle {
     id: root
     width: 280
     height: 60
     color: "transparent"
 
-    // ── public API ──────────────────────────────────────────────────
+    // -- public API ----------------------------------------------------------
     property string displayText: "YOUR TEXT HERE"
     property bool   scrolling: false
     property int    fontSize: 16
-    property string textColor: Theme.Tokens.chalk.toString()
+    property string textColor: ""
 
-    // ── content ─────────────────────────────────────────────────────
+    // -- internal ------------------------------------------------------------
+    readonly property string _safeText: (displayText || "").length > 0
+                                        ? displayText : ""
+    readonly property color  _color: textColor.length > 0
+                                     ? textColor : Theme.Tokens.chalk
+
+    // -- content -------------------------------------------------------------
     Rectangle {
         anchors.fill: parent
-        radius: 8
+        radius: Theme.Tokens.radiusSm
         color: Qt.rgba(0, 0, 0, 0.55)
         border.width: 1
-        border.color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                              Theme.Tokens.racingPurple.g,
-                              Theme.Tokens.racingPurple.b, 0.15)
+        border.color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.15)
         clip: true
 
-        // ── Static text mode ────────────────────────────────────────
+        // -- Static text mode ------------------------------------------------
         Text {
             id: staticText
             visible: !root.scrolling
             anchors.centerIn: parent
-            text: root.displayText
+            text: root._safeText
             font.family: Theme.Typography.monoFamily
             font.pixelSize: root.fontSize
             font.weight: Font.Bold
-            color: root.textColor
+            color: root._color
             elide: Text.ElideRight
-            width: parent.width - 20
+            width: parent.width - Theme.Tokens.xl - 4   // account for accent bar
             horizontalAlignment: Text.AlignHCenter
+
+            Behavior on opacity {
+                NumberAnimation { duration: 250; easing.type: Easing.InOutQuad }
+            }
         }
 
-        // ── Scrolling text mode ─────────────────────────────────────
+        // -- Scrolling text mode ---------------------------------------------
         Item {
             visible: root.scrolling
             anchors.fill: parent
@@ -51,11 +59,11 @@ Rectangle {
 
             Text {
                 id: scrollText
-                text: root.displayText + "          " + root.displayText
+                text: root._safeText + "          " + root._safeText
                 font.family: Theme.Typography.monoFamily
                 font.pixelSize: root.fontSize
                 font.weight: Font.Bold
-                color: root.textColor
+                color: root._color
                 y: (parent.height - height) / 2
 
                 NumberAnimation on x {
@@ -63,14 +71,17 @@ Rectangle {
                     loops: Animation.Infinite
                     from: 0
                     to: -scrollText.implicitWidth / 2
-                    duration: Math.max(3000, root.displayText.length * 150)
+                    duration: Math.max(3000, root._safeText.length * 150)
                 }
             }
         }
 
         // Subtle racingPurple edge accent
         Rectangle {
-            anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: 1 }
+            anchors {
+                left: parent.left; top: parent.top; bottom: parent.bottom
+                leftMargin: 1
+            }
             width: 2
             radius: 1
             color: Theme.Tokens.racingPurple

@@ -2,43 +2,45 @@ import QtQuick
 import QtQuick.Layouts
 import "../../Theme" as Theme
 
-/*  CustomUrlWidget — browser widget placeholder for streams (300x200).
+/*  CustomUrlWidget -- browser widget placeholder for streams (300x200).
     Shows a URL label and "CUSTOM CONTENT" placeholder area.
-    Category: streaming — uses racingPurple accent.                      */
+    Category: streaming -- uses racingPurple accent.                      */
 Rectangle {
     id: root
     width: 300
     height: 200
     color: "transparent"
 
-    // ── public API ──────────────────────────────────────────────────
+    // -- public API ----------------------------------------------------------
     property string url: "https://example.com"
     property string label: "Custom Content"
 
-    // ── content ─────────────────────────────────────────────────────
+    // -- internal ------------------------------------------------------------
+    readonly property string _safeUrl:   (url || "").length > 0   ? url   : "---"
+    readonly property string _safeLabel: (label || "").length > 0 ? label : "---"
+
+    // -- content -------------------------------------------------------------
     Rectangle {
         anchors.fill: parent
-        radius: 8
+        radius: Theme.Tokens.radiusSm
         color: Qt.rgba(0, 0, 0, 0.55)
         border.width: 1
-        border.color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                              Theme.Tokens.racingPurple.g,
-                              Theme.Tokens.racingPurple.b, 0.15)
+        border.color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.15)
 
         ColumnLayout {
             anchors {
                 fill: parent
-                topMargin: 8
-                bottomMargin: 8
-                leftMargin: 10
-                rightMargin: 10
+                topMargin: Theme.Tokens.sm
+                bottomMargin: Theme.Tokens.sm
+                leftMargin: Theme.Tokens.md - 2
+                rightMargin: Theme.Tokens.md - 2
             }
             spacing: 0
 
-            // ── Header ─────────────────────────────────────────────
+            // -- Header ------------------------------------------------------
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 6
+                spacing: Theme.Tokens.xs + 2
 
                 Text {
                     text: "URL"
@@ -51,16 +53,12 @@ Rectangle {
 
                 // Streaming badge
                 Rectangle {
-                    implicitWidth: urlBadge.implicitWidth + 8
+                    implicitWidth: urlBadge.implicitWidth + Theme.Tokens.sm
                     implicitHeight: 14
                     radius: 3
-                    color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                                   Theme.Tokens.racingPurple.g,
-                                   Theme.Tokens.racingPurple.b, 0.15)
+                    color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.15)
                     border.width: 1
-                    border.color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                                          Theme.Tokens.racingPurple.g,
-                                          Theme.Tokens.racingPurple.b, 0.30)
+                    border.color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.30)
 
                     Text {
                         id: urlBadge
@@ -76,10 +74,10 @@ Rectangle {
                 Item { Layout.fillWidth: true }
             }
 
-            // ── URL display ────────────────────────────────────────
+            // -- URL display -------------------------------------------------
             Text {
                 Layout.fillWidth: true
-                text: root.url
+                text: root._safeUrl
                 font.family: Theme.Typography.monoFamily
                 font.pixelSize: 8
                 color: Theme.Tokens.racingPurple
@@ -87,46 +85,41 @@ Rectangle {
                 opacity: 0.7
             }
 
-            // ── Separator ──────────────────────────────────────────
+            // -- Separator ---------------------------------------------------
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 6
+                Layout.preferredHeight: Theme.Tokens.xs + 2
                 Rectangle {
                     anchors.centerIn: parent
                     width: parent.width; height: 1
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
                         GradientStop { position: 0.0; color: "transparent" }
-                        GradientStop { position: 0.5; color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                                                                      Theme.Tokens.racingPurple.g,
-                                                                      Theme.Tokens.racingPurple.b, 0.12) }
+                        GradientStop { position: 0.5;
+                                       color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.12) }
                         GradientStop { position: 1.0; color: "transparent" }
                     }
                 }
             }
 
-            // ── Placeholder content area ───────────────────────────
+            // -- Placeholder content area ------------------------------------
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                radius: 6
-                color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                               Theme.Tokens.racingPurple.g,
-                               Theme.Tokens.racingPurple.b, 0.04)
+                radius: Theme.Tokens.radiusSm
+                color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.04)
                 border.width: 1
-                border.color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                                      Theme.Tokens.racingPurple.g,
-                                      Theme.Tokens.racingPurple.b, 0.08)
+                border.color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.08)
 
                 ColumnLayout {
                     anchors.centerIn: parent
-                    spacing: 6
+                    spacing: Theme.Tokens.xs + 2
 
                     Text {
                         Layout.alignment: Qt.AlignHCenter
                         text: "CUSTOM CONTENT"
                         font.family: Theme.Typography.monoFamily
-                        font.pixelSize: 10
+                        font.pixelSize: Theme.Typography.microSize
                         font.weight: Font.Bold
                         font.letterSpacing: 1.0
                         color: Theme.Tokens.racingPurple
@@ -135,9 +128,9 @@ Rectangle {
 
                     Text {
                         Layout.alignment: Qt.AlignHCenter
-                        text: root.label
+                        text: root._safeLabel
                         font.family: Theme.Typography.monoFamily
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.Typography.captionSize
                         font.weight: Font.Bold
                         color: Theme.Tokens.chalk
                     }
@@ -146,18 +139,14 @@ Rectangle {
                     Rectangle {
                         Layout.alignment: Qt.AlignHCenter
                         width: 24; height: 24; radius: 12
-                        color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                                       Theme.Tokens.racingPurple.g,
-                                       Theme.Tokens.racingPurple.b, 0.10)
+                        color: Theme.Tokens.medium(Theme.Tokens.racingPurple)
                         border.width: 1
-                        border.color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                                              Theme.Tokens.racingPurple.g,
-                                              Theme.Tokens.racingPurple.b, 0.20)
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.20)
 
                         Text {
                             anchors.centerIn: parent
                             text: "\u25CB"
-                            font.pixelSize: 14
+                            font.pixelSize: Theme.Typography.bodySize
                             color: Theme.Tokens.racingPurple
                             opacity: 0.5
                         }

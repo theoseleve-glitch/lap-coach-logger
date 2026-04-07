@@ -2,52 +2,51 @@ import QtQuick
 import QtQuick.Layouts
 import "../../Theme" as Theme
 
-/*  PromoCodeAlertWidget — animated promo code display for streams (300x100).
+/*  PromoCodeAlertWidget -- animated promo code display for streams (300x100).
     Shows sponsor name, promo code with copy indicator, and description.
-    Category: streaming — uses racingPurple accent.                          */
+    Category: streaming -- uses racingPurple accent.                          */
 Rectangle {
     id: root
     width: 300
     height: 100
     color: "transparent"
 
-    // ── public API ──────────────────────────────────────────────────
+    // -- public API ----------------------------------------------------------
     property string code: "RACEFAN20"
     property string sponsor: "Sponsor"
     property string description: "20% off racing gear"
     property bool   isActive: true
 
-    // ── fade in/out ─────────────────────────────────────────────────
+    // -- internal ------------------------------------------------------------
+    readonly property string _safeCode:    (code || "").length > 0    ? code    : "---"
+    readonly property string _safeSponsor: (sponsor || "").length > 0 ? sponsor : "---"
+    readonly property string _safeDesc:    description || ""
+
+    // -- fade in/out ---------------------------------------------------------
     opacity: isActive ? 1.0 : 0.0
     Behavior on opacity {
         NumberAnimation { duration: 400; easing.type: Easing.InOutQuad }
     }
 
-    // ── content ─────────────────────────────────────────────────────
+    // -- content -------------------------------------------------------------
     Rectangle {
         id: card
         anchors.fill: parent
-        radius: 8
+        radius: Theme.Tokens.radiusSm
         color: Qt.rgba(0, 0, 0, 0.65)
         border.width: 1
-        border.color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                              Theme.Tokens.racingPurple.g,
-                              Theme.Tokens.racingPurple.b, 0.25)
+        border.color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.25)
 
         // Pulse glow animation on the border
         SequentialAnimation on border.color {
             running: root.isActive
             loops: Animation.Infinite
             ColorAnimation {
-                to: Qt.rgba(Theme.Tokens.racingPurple.r,
-                            Theme.Tokens.racingPurple.g,
-                            Theme.Tokens.racingPurple.b, 0.50)
+                to: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.50)
                 duration: 1200
             }
             ColorAnimation {
-                to: Qt.rgba(Theme.Tokens.racingPurple.r,
-                            Theme.Tokens.racingPurple.g,
-                            Theme.Tokens.racingPurple.b, 0.15)
+                to: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.15)
                 duration: 1200
             }
         }
@@ -55,20 +54,20 @@ Rectangle {
         ColumnLayout {
             anchors {
                 fill: parent
-                topMargin: 8
-                bottomMargin: 8
-                leftMargin: 12
-                rightMargin: 12
+                topMargin: Theme.Tokens.sm
+                bottomMargin: Theme.Tokens.sm
+                leftMargin: Theme.Tokens.md
+                rightMargin: Theme.Tokens.md
             }
-            spacing: 4
+            spacing: Theme.Tokens.xs
 
-            // ── Sponsor row ────────────────────────────────────────
+            // -- Sponsor row -------------------------------------------------
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 6
+                spacing: Theme.Tokens.xs + 2
 
                 Text {
-                    text: root.sponsor.toUpperCase()
+                    text: root._safeSponsor.toUpperCase()
                     font.family: Theme.Typography.monoFamily
                     font.pixelSize: 9
                     font.weight: Font.Bold
@@ -78,16 +77,12 @@ Rectangle {
 
                 // PROMO badge
                 Rectangle {
-                    implicitWidth: promoBadge.implicitWidth + 8
+                    implicitWidth: promoBadge.implicitWidth + Theme.Tokens.sm
                     implicitHeight: 14
                     radius: 3
-                    color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                                   Theme.Tokens.racingPurple.g,
-                                   Theme.Tokens.racingPurple.b, 0.15)
+                    color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.15)
                     border.width: 1
-                    border.color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                                          Theme.Tokens.racingPurple.g,
-                                          Theme.Tokens.racingPurple.b, 0.30)
+                    border.color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.30)
 
                     Text {
                         id: promoBadge
@@ -116,25 +111,25 @@ Rectangle {
                 }
             }
 
-            // ── Code display ───────────────────────────────────────
+            // -- Code display ------------------------------------------------
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 32
-                radius: 6
-                color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                               Theme.Tokens.racingPurple.g,
-                               Theme.Tokens.racingPurple.b, 0.08)
+                radius: Theme.Tokens.radiusSm
+                color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.08)
                 border.width: 1
-                border.color: Qt.rgba(Theme.Tokens.racingPurple.r,
-                                      Theme.Tokens.racingPurple.g,
-                                      Theme.Tokens.racingPurple.b, 0.12)
+                border.color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.12)
 
                 RowLayout {
-                    anchors { fill: parent; leftMargin: 10; rightMargin: 10 }
-                    spacing: 8
+                    anchors {
+                        fill: parent
+                        leftMargin: Theme.Tokens.md - 2
+                        rightMargin: Theme.Tokens.md - 2
+                    }
+                    spacing: Theme.Tokens.sm
 
                     Text {
-                        text: root.code
+                        text: root._safeCode
                         font.family: Theme.Typography.monoFamily
                         font.pixelSize: 18
                         font.weight: Font.Bold
@@ -143,7 +138,9 @@ Rectangle {
                         Layout.fillWidth: true
 
                         // Subtle pulse on the code
-                        SequentialAnimation on opacity {
+                        property real _pulse: 1.0
+                        opacity: root.isActive ? _pulse : 1.0
+                        SequentialAnimation on _pulse {
                             running: root.isActive
                             loops: Animation.Infinite
                             NumberAnimation { from: 1.0; to: 0.8; duration: 1500 }
@@ -164,12 +161,12 @@ Rectangle {
                 }
             }
 
-            // ── Description ────────────────────────────────────────
+            // -- Description -------------------------------------------------
             Text {
                 Layout.fillWidth: true
-                text: root.description
+                text: root._safeDesc
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 10
+                font.pixelSize: Theme.Typography.microSize
                 color: Theme.Tokens.steel
                 elide: Text.ElideRight
                 opacity: 0.7
