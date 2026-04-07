@@ -220,6 +220,53 @@ class OverlayViewModel(QObject):
             self._last_time = last_fmt
         self.deltaChanged.emit()
 
+        # Map sector split rows from the processor into the QML format
+        # expected by DeltaTimeWidget: [{id, delta, status}].
+        raw_sectors = result.get("sector_rows", [])
+        dist_pct = self._lap_dist_pct  # 0.0 .. 1.0
+        new_sectors: list[dict] = []
+        for i, row in enumerate(raw_sectors):
+            sector_index = i + 1  # 1-based
+            delta = row.get("delta_s") or 0
+            current_time = row.get("current_time_s")
+            marker = row.get("marker")  # "GAIN", "LOSS", "HOLD", or None
+
+            # A sector is "active" when the car is currently inside it
+            # (based on lap_dist_pct) and no split time has been recorded.
+            sector_start = i / 3.0
+            sector_end = (i + 1) / 3.0
+            in_sector = sector_start <= dist_pct < sector_end
+
+            if current_time is not None and marker is not None:
+                # Sector has a completed split -- use the marker to
+                # decide gain/loss/hold.
+                if marker == "GAIN":
+                    status = "gain"
+                elif marker == "LOSS":
+                    status = "loss"
+                else:
+                    status = "gain"  # HOLD treated as neutral-gain
+            elif in_sector:
+                status = "active"
+            else:
+                status = "pending"
+
+            new_sectors.append({
+                "id": sector_index,
+                "delta": round(delta, 3),
+                "status": status,
+            })
+
+        # Fall back to 3 pending sectors when tracker has no data yet.
+        if not new_sectors:
+            new_sectors = [
+                {"id": k, "delta": 0, "status": "pending"} for k in range(1, 4)
+            ]
+
+        if new_sectors != self._sector_states:
+            self._sector_states = new_sectors
+            self.timesChanged.emit()
+
         # Context
         self._track = str(live.get("track_name") or snap.get("track") or snap.get("sim") or "")
         self._car = str(live.get("car_name") or snap.get("car") or "")
