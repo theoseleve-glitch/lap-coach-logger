@@ -11,7 +11,7 @@ import math
 from collections import deque
 from statistics import mean, stdev
 
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import Property, QObject, Signal, Slot
 
 log = logging.getLogger(__name__)
 
@@ -86,63 +86,63 @@ class SessionViewModel(QObject):
 
     # -- QML properties ----------------------------------------------------
 
-    @property
+    @Property(str, notify=trackChanged)
     def track(self) -> str:
         return self._track
 
-    @property
+    @Property(str, notify=trackChanged)
     def car(self) -> str:
         return self._car
 
-    @property
+    @Property(str, notify=trackChanged)
     def sim(self) -> str:
         return self._sim
 
-    @property
+    @Property(int, notify=lapChanged)
     def currentLap(self) -> int:  # noqa: N802
         return self._current_lap
 
-    @property
+    @Property(str, notify=timesChanged)
     def lastLapTime(self) -> str:  # noqa: N802
         return self._last_lap_time
 
-    @property
+    @Property(str, notify=timesChanged)
     def bestLapTime(self) -> str:  # noqa: N802
         return self._best_lap_time
 
-    @property
+    @Property(int, notify=timesChanged)
     def bestLapNumber(self) -> int:  # noqa: N802
         return self._best_lap_number
 
-    @property
+    @Property(str, notify=timesChanged)
     def lastLapDelta(self) -> str:  # noqa: N802
         return self._last_lap_delta
 
-    @property
+    @Property(float, notify=timesChanged)
     def consistencyPct(self) -> float:  # noqa: N802
         return self._consistency_pct
 
-    @property
+    @Property(str, notify=timesChanged)
     def consistencySigma(self) -> str:  # noqa: N802
         return self._consistency_sigma
 
-    @property
+    @Property(float, notify=telemetryChanged)
     def speedKph(self) -> float:  # noqa: N802
         return self._speed_kph
 
-    @property
+    @Property(float, notify=telemetryChanged)
     def throttlePct(self) -> float:  # noqa: N802
         return self._throttle_pct
 
-    @property
+    @Property(float, notify=telemetryChanged)
     def brakePct(self) -> float:  # noqa: N802
         return self._brake_pct
 
-    @property
+    @Property("QVariant", notify=lapsChanged)
     def laps(self) -> list[dict]:
         return self._laps
 
-    @property
+    @Property("QVariant", notify=lapsChanged)
     def speedHistory(self) -> deque[float]:  # noqa: N802
         return self._speed_history
 

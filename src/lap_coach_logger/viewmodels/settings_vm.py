@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import Property, QObject, Signal, Slot
 
 log = logging.getLogger(__name__)
 
@@ -34,17 +34,17 @@ class SettingsViewModel(QObject):
 
     # -- QML properties --------------------------------------------------------
 
-    @property
+    @Property("QVariant", notify=valuesChanged)
     def values(self) -> dict:
         """The full config values dict."""
         return self._values
 
-    @property
+    @Property(bool, notify=isFirstRunChanged)
     def isFirstRun(self) -> bool:  # noqa: N802
         """Whether the app is running for the first time."""
         return self._is_first_run
 
-    @isFirstRun.setter
+    @isFirstRun.setter  # type: ignore[attr-defined]
     def isFirstRun(self, value: bool) -> None:  # noqa: N802
         if value != self._is_first_run:
             self._is_first_run = value

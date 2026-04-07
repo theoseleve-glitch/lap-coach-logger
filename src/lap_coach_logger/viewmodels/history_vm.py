@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import Property, QObject, Signal, Slot
 
 log = logging.getLogger(__name__)
 
@@ -34,22 +34,22 @@ class HistoryViewModel(QObject):
 
     # -- QML properties --------------------------------------------------------
 
-    @property
+    @Property("QVariant", notify=sessionsChanged)
     def sessions(self) -> list[dict]:
         """The filtered session list."""
         return self._filtered
 
-    @property
+    @Property(int, notify=sessionsChanged)
     def count(self) -> int:
         """Total number of sessions (unfiltered)."""
         return len(self._all_sessions)
 
-    @property
+    @Property(str, notify=searchTextChanged)
     def searchText(self) -> str:  # noqa: N802
         """Current search text."""
         return self._search_text
 
-    @property
+    @Property(str, notify=simFilterChanged)
     def simFilter(self) -> str:  # noqa: N802
         """Current sim filter value."""
         return self._sim_filter
