@@ -5,10 +5,12 @@ It runs as a PySide6 desktop app with tray behavior, saves sessions to local
 storage, and is designed to be cloned, run, packaged, installed, and used as a
 personal Windows application without cloud services.
 
-Version: `1.1.0`
+Version: `2.0.0`
 
 ## What Ships
 
+- **QML declarative frontend** with GPU-accelerated animations, unified top navigation, and Apple Health/Tesla-inspired design language (replaces PySide6 QWidgets shell).
+- 44 modular overlay widgets (RaceLab-style floating windows) with layout presets, per-widget settings, and borderless fullscreen game overlay support.
 - Native-feeling Windows desktop shell with dashboard, live view, logs, history, settings, and About dialog.
 - Single-instance behavior with restore-on-second-launch.
 - Start-with-Windows integration using the current-user Run key.
@@ -75,7 +77,7 @@ release.bat
 Artifacts:
 
 - `dist\LapCoachLogger\LapCoachLogger.exe`
-- `LapCoachLogger-Setup-1.1.0.exe`
+- `LapCoachLogger-Setup-2.0.0.exe`
 
 ## Project Scripts
 

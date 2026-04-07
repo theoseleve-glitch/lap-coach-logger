@@ -2,6 +2,48 @@
 
 All notable changes to Lap Coach Logger are documented here.
 
+## 2.0.0 — QML Frontend Rewrite
+
+### Major Changes
+- Complete UI rewrite from PySide6 QWidgets to QML declarative frontend
+- GPU-accelerated animations and page transitions (60fps)
+- Unified top navigation bar (replaces sidebar + top bar + workspace strip)
+- Apple Health/Tesla-inspired design language with progressive disclosure
+
+### Overlay System
+- 44 modular overlay widgets (RaceLab-style independent floating windows)
+- Overlay management page with per-widget settings (size, opacity, font scale, refresh rate)
+- Layout presets: Qualifying Focus, Race Focus, Streaming, Minimal
+- Windows TOPMOST+NOACTIVATE flags for borderless fullscreen game overlay
+- Live widget previews in the overlay manager
+
+### New Features
+- 3-step onboarding flow for first-time users
+- Keyboard shortcuts: Ctrl+O (overlay), Ctrl+L (lock), Ctrl+1-4 (nav), Esc (close settings)
+- Settings slide-over panel (replaces dialog)
+- Overlay position lock with visual indicator
+- Persistent overlay settings (positions, sizes, enabled state saved to disk)
+
+### Overlay Widgets Added
+- **Timing**: Delta/Time, Delta Bar, Lap Timing, Laptime Graph, Laptime Log, Laptime Spread, Session Timer
+- **Inputs**: Inputs/Grip, G-Force Meter, Input Telemetry, Boost Box, Advanced Panel, Data Blocks, Heart Rate
+- **Awareness**: Radar, Radar Bars, Blind Spot, Overtake Alert, Flags, Digiflag, Track Map, Mini Map, Flat Map, Relatives, Standings, Leaderboard, Head to Head, Weather Monitor, World Map, Race Schedule
+- **Strategy**: Fuel Strategy, Fuel Calculator, Pitbox Helper, Coaching Alerts
+- **Streaming**: Chat, Chat Highlight, Chat Race Game, Chat Race Standing, Custom Text, Custom URL, Garage Cover, Mic Visualizer, Promo Code Alert
+
+### Backend
+- LiveTelemetryProcessor composing 4 trackers: lap comparison, coaching, input diagnostics, corner analysis
+- Real-time fuel consumption tracking with SAFE/TIGHT/SAVE/BOX state
+- Lockup and wheelspin detection
+- Input smoothness scoring
+- Live lap delta calculation with sector splits
+
+### Technical
+- 8 Python ViewModels bridging backend to QML via @Property/@Signal/@Slot
+- Design token system: colors, typography, spacing, motion curves
+- Glass surface material system for overlay widgets
+- 541+ tests
+
 ## [1.1.0] – 2026-03-22
 
 ### Added
