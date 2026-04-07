@@ -10,6 +10,7 @@ import logging
 from typing import Any
 
 from lap_coach_logger.core.live_coach import LiveCoachTracker
+from lap_coach_logger.core.live_dashboard import LiveCornerTracker
 from lap_coach_logger.core.live_input_diagnostics import LiveInputDiagnosticsTracker
 from lap_coach_logger.core.live_lap_compare import LiveLapComparisonTracker
 from lap_coach_logger.core.schema import TelemetrySample
@@ -68,6 +69,7 @@ class LiveTelemetryProcessor:
         self._lap_tracker = LiveLapComparisonTracker()
         self._coach_tracker = LiveCoachTracker()
         self._input_tracker = LiveInputDiagnosticsTracker()
+        self._corner_tracker = LiveCornerTracker()
 
     def process(self, live_dict: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
         """Process a raw snapshot, return aggregated overlay state.
@@ -118,6 +120,10 @@ class LiveTelemetryProcessor:
         coaching_prompts = coach_snap.get("coaching", [])
         coaching_cards = self._build_coaching_cards(coaching_alerts, coaching_prompts)
 
+        # -- Corner tracker (uses raw snapshot dict, not TelemetrySample) ------
+        self._corner_tracker.push_snapshot(live_dict)
+        corner_rows = self._corner_tracker.rows()
+
         # -- Input diagnostics -----------------------------------------------
         self._input_tracker.push_sample(
             sample,
@@ -140,6 +146,7 @@ class LiveTelemetryProcessor:
             "wheelspin_active": wheelspin_active,
             "coaching_cards": coaching_cards,
             "input_smoothness": input_smoothness,
+            "corner_rows": corner_rows,
         }
 
     # -- heuristic helpers -----------------------------------------------------
@@ -216,6 +223,7 @@ class LiveTelemetryProcessor:
         self._lap_tracker.reset()
         self._coach_tracker.reset()
         self._input_tracker.reset()
+        self._corner_tracker.reset()
 
 
 # -- tiny helpers (avoid importing from other modules) -------------------------

@@ -68,6 +68,9 @@ class OverlayViewModel(QObject):
         self._wheelspin_active: bool = False
         self._input_smoothness: float = 0.75
 
+        # Corner analysis
+        self._corner_rows: list[dict] = []
+
         # Coaching
         self._coaching_cards: list[dict] = []
         self._coaching_visible: bool = False
@@ -217,6 +220,10 @@ class OverlayViewModel(QObject):
     def coachingSector(self) -> str:  # noqa: N802
         return self._coaching_sector
 
+    @Property("QVariant", notify=deltaChanged)
+    def cornerRows(self) -> list:  # noqa: N802
+        return self._corner_rows
+
     @Property(float, notify=deltaChanged)
     def liveDelta(self) -> float:  # noqa: N802
         """Real-time delta vs best lap in seconds (from processor)."""
@@ -296,6 +303,8 @@ class OverlayViewModel(QObject):
         last_fmt = result.get("last_lap_time_fmt", "")
         if last_fmt:
             self._last_time = last_fmt
+        # Corner analysis rows
+        self._corner_rows = result.get("corner_rows", [])
         self.deltaChanged.emit()
 
         # Map sector split rows from the processor into the QML format
