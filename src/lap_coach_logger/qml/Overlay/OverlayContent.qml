@@ -31,7 +31,7 @@ Item {
                 bestTime: overlayVM ? overlayVM.bestTime || "—" : "—"
                 lapNumber: overlayVM ? overlayVM.lapNumber : 0
                 totalLaps: 0
-                lapProgress: 0
+                lapProgress: overlayVM ? overlayVM.lapProgress : 0
                 sectors: overlayVM ? overlayVM.sectorStates || [] : []
             }
 

@@ -34,6 +34,8 @@ class OverlayViewModel(QObject):
         self._steering_deg: float = 0.0
         self._lat_accel_g: float = 0.0
         self._long_accel_g: float = 0.0
+        self._lap_progress: float = 0.0
+        self._lap_dist_pct: float = 0.0
 
         # Lap timing
         self._last_time: str = ""
@@ -139,6 +141,14 @@ class OverlayViewModel(QObject):
     def car(self) -> str:
         return self._car
 
+    @Property(float, notify=inputsChanged)
+    def lapProgress(self) -> float:  # noqa: N802
+        return self._lap_progress
+
+    @Property(float, notify=inputsChanged)
+    def lapDistPct(self) -> float:  # noqa: N802
+        return self._lap_dist_pct
+
     @Property(float, notify=fuelChanged)
     def fuelLevel(self) -> float:  # noqa: N802
         return self._fuel_level
@@ -168,6 +178,8 @@ class OverlayViewModel(QObject):
         self._steering_deg = float(live.get("steering_deg", 0.0))
         self._lat_accel_g = float(live.get("lat_accel_g", 0.0))
         self._long_accel_g = float(live.get("long_accel_g", 0.0))
+        self._lap_dist_pct = float(live.get("lap_dist_pct") or 0.0)
+        self._lap_progress = self._lap_dist_pct * 100.0
         self._lap_number = int(live.get("lap_number") or live.get("current_lap", 0))
         self._gear = int(live.get("gear", 0))
         self._rpm = int(live.get("rpm", 0))
