@@ -393,6 +393,60 @@ Item {
                     Item { Layout.fillWidth: true }
                 }
 
+                // ── Presets ──
+                Text {
+                    text: "PRESETS"
+                    font.family: Theme.Typography.monoFamily
+                    font.pixelSize: Theme.Typography.microSize
+                    font.weight: Theme.Typography.microWeight
+                    font.letterSpacing: 2
+                    color: Theme.Tokens.steel
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    Repeater {
+                        model: overlayVM ? overlayVM.getPresetList() : []
+
+                        delegate: Rectangle {
+                            width: presetLabel.implicitWidth + 16
+                            height: 26
+                            radius: 6
+                            color: presetArea.containsMouse
+                                   ? Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.18)
+                                   : Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.10)
+                            border.width: 1
+                            border.color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.20)
+
+                            Behavior on color {
+                                ColorAnimation { duration: Theme.Motion.hoverDuration }
+                            }
+
+                            Text {
+                                id: presetLabel
+                                anchors.centerIn: parent
+                                text: modelData.name
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: 10
+                                font.weight: Font.DemiBold
+                                color: Theme.Tokens.pitOrange
+                            }
+
+                            MouseArea {
+                                id: presetArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (overlayVM) overlayVM.loadPreset(modelData.id)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // ── Search bar ──
                 Components.SearchBar {
                     id: searchBar

@@ -29,10 +29,39 @@ class OverlayViewModel(QObject):
     widgetSettingsChanged = Signal()
     selectedWidgetChanged = Signal()
     overlayLockChanged = Signal()
+    settingsSaveRequested = Signal()
+
+    # -- layout presets --------------------------------------------------------
+
+    _PRESETS: dict[str, dict[str, dict]] = {
+        "qualifying": {
+            "delta_timing": {"enabled": True, "x": 500, "y": 20, "width": 320, "height": 200},
+            "lap_timing": {"enabled": True, "x": 830, "y": 20, "width": 280, "height": 120},
+            "inputs_grip": {"enabled": True, "x": 20, "y": 400, "width": 240, "height": 260},
+            "gforce_meter": {"enabled": True, "x": 20, "y": 20, "width": 200, "height": 200},
+        },
+        "race": {
+            "delta_timing": {"enabled": True, "x": 500, "y": 20},
+            "fuel_strategy": {"enabled": True, "x": 20, "y": 20, "width": 180, "height": 240},
+            "radar": {"enabled": True, "x": 830, "y": 400, "width": 200, "height": 200},
+            "standings": {"enabled": True, "x": 830, "y": 20, "width": 280, "height": 300},
+            "blind_spot": {"enabled": True, "x": 500, "y": 680, "width": 160, "height": 80},
+        },
+        "streaming": {
+            "delta_bar": {"enabled": True, "x": 400, "y": 20, "width": 300, "height": 60},
+            "leaderboard": {"enabled": True, "x": 20, "y": 20, "width": 260, "height": 280},
+            "chat": {"enabled": True, "x": 20, "y": 400, "width": 280, "height": 200},
+            "chat_highlight": {"enabled": True, "x": 400, "y": 620, "width": 320, "height": 80},
+            "custom_text": {"enabled": True, "x": 400, "y": 700, "width": 280, "height": 60},
+        },
+        "minimal": {
+            "delta_timing": {"enabled": True, "x": 500, "y": 20, "width": 310, "height": 200},
+        },
+    }
 
     # -- construction ----------------------------------------------------------
 
-    def __init__(self) -> None:
+    def __init__(self, saved_settings: dict | None = None) -> None:
         super().__init__()
 
         # Live telemetry processor (lap delta pipeline)
@@ -146,6 +175,13 @@ class OverlayViewModel(QObject):
         self._widget_defaults: dict[str, dict] = {
             k: dict(v) for k, v in self._widget_settings.items()
         }
+
+        # Merge persisted settings over defaults (saved values win)
+        if saved_settings:
+            for wid, saved in saved_settings.items():
+                if wid in self._widget_settings and isinstance(saved, dict):
+                    self._widget_settings[wid].update(saved)
+
         self._selected_widget: str = "delta_timing"
         self._overlay_locked: bool = False
 
@@ -345,12 +381,13 @@ class OverlayViewModel(QObject):
         """Update a single setting for a widget and notify QML."""
         if widget_id in self._widget_settings:
             # Coerce numeric types for clean storage
-            if key in ("width", "height", "refresh_hz", "border_radius"):
+            if key in ("width", "height", "refresh_hz", "border_radius", "x", "y"):
                 value = int(value)
             elif key in ("opacity", "font_scale"):
                 value = float(value)
             self._widget_settings[widget_id][key] = value
             self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
 
     @Slot(str)
     def toggleWidget(self, widget_id: str) -> None:  # noqa: N802
@@ -360,6 +397,7 @@ class OverlayViewModel(QObject):
                 not self._widget_settings[widget_id]["enabled"]
             )
             self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
 
     # -- Slot-based getters (QML can't access nested dict properties) --------
 
@@ -438,6 +476,47 @@ class OverlayViewModel(QObject):
         if widget_id in self._widget_defaults:
             self._widget_settings[widget_id] = dict(self._widget_defaults[widget_id])
             self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
+
+    @Slot(str)
+    def loadPreset(self, preset_id: str) -> None:  # noqa: N802
+        """Apply a layout preset, disabling all widgets first."""
+        preset = self._PRESETS.get(preset_id)
+        if not preset:
+            return
+        # Disable every widget
+        for wid in self._widget_settings:
+            self._widget_settings[wid]["enabled"] = False
+        # Apply preset overrides
+        for wid, settings in preset.items():
+            if wid in self._widget_settings:
+                self._widget_settings[wid].update(settings)
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @Slot(result="QVariant")
+    def getPresetList(self) -> list:  # noqa: N802
+        """Return the list of available layout presets for QML."""
+        return [
+            {"id": "qualifying", "name": "Qualifying Focus", "description": "Delta, timing, inputs, G-force"},
+            {"id": "race", "name": "Race Focus", "description": "Delta, fuel, radar, standings, blind spot"},
+            {"id": "streaming", "name": "Streaming", "description": "Delta bar, leaderboard, chat, highlights"},
+            {"id": "minimal", "name": "Minimal", "description": "Delta timing only"},
+        ]
+
+    @Slot(str, result=int)
+    def getWidgetX(self, widget_id: str) -> int:  # noqa: N802
+        s = self._widget_settings.get(widget_id)
+        return int(s.get("x", 100)) if s else 100
+
+    @Slot(str, result=int)
+    def getWidgetY(self, widget_id: str) -> int:  # noqa: N802
+        s = self._widget_settings.get(widget_id)
+        return int(s.get("y", 80)) if s else 80
+
+    def export_settings(self) -> dict[str, dict]:
+        """Return a serialisable copy of all widget settings for persistence."""
+        return {wid: dict(s) for wid, s in self._widget_settings.items()}
 
     # -- public API ------------------------------------------------------------
 
