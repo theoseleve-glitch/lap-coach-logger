@@ -351,6 +351,22 @@ Item {
     Shortcut { sequence: "Ctrl+3"; onActivated: navBar.pageRequested("history") }
     Shortcut { sequence: "Ctrl+4"; onActivated: navBar.pageRequested("overlays") }
 
+    // Ctrl+Up — increase all overlay opacity by 5%
+    Shortcut {
+        sequence: "Ctrl+Up"
+        onActivated: {
+            if (overlayVM) overlayVM.adjustAllOpacity(0.05)
+        }
+    }
+
+    // Ctrl+Down — decrease all overlay opacity by 5%
+    Shortcut {
+        sequence: "Ctrl+Down"
+        onActivated: {
+            if (overlayVM) overlayVM.adjustAllOpacity(-0.05)
+        }
+    }
+
     // Escape — close settings slide-over if open
     Shortcut {
         sequence: "Escape"

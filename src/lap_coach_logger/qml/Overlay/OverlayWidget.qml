@@ -110,4 +110,49 @@ Window {
             }
         }
     }
+
+    // Resize handle — bottom-right corner
+    MouseArea {
+        id: resizeHandle
+        width: 16; height: 16
+        anchors { right: parent.right; bottom: parent.bottom }
+        cursorShape: Qt.SizeFDiagCursor
+        visible: overlayVM ? !overlayVM.overlayLocked : true
+
+        property point startPos
+        property real startW
+        property real startH
+
+        onPressed: function(mouse) {
+            startPos = Qt.point(mouse.x, mouse.y)
+            startW = root.width
+            startH = root.height
+        }
+        onPositionChanged: function(mouse) {
+            var dx = mouse.x - startPos.x
+            var dy = mouse.y - startPos.y
+            root.width = Math.max(100, startW + dx)
+            root.height = Math.max(60, startH + dy)
+        }
+        onReleased: {
+            if (root.widgetId && overlayVM) {
+                overlayVM.setWidgetSetting(root.widgetId, "width", Math.round(root.width))
+                overlayVM.setWidgetSetting(root.widgetId, "height", Math.round(root.height))
+            }
+        }
+
+        // Grip visual
+        Rectangle {
+            anchors { right: parent.right; bottom: parent.bottom; margins: 2 }
+            width: 8; height: 8
+            color: "transparent"
+            // Three diagonal dots
+            Column {
+                anchors.fill: parent; spacing: 2
+                Row { spacing: 2; Item{width:2;height:2} Item{width:2;height:2} Rectangle{width:2;height:2;radius:1;color:Qt.rgba(1,1,1,0.3)} }
+                Row { spacing: 2; Item{width:2;height:2} Rectangle{width:2;height:2;radius:1;color:Qt.rgba(1,1,1,0.3)} Rectangle{width:2;height:2;radius:1;color:Qt.rgba(1,1,1,0.3)} }
+                Row { spacing: 2; Rectangle{width:2;height:2;radius:1;color:Qt.rgba(1,1,1,0.3)} Rectangle{width:2;height:2;radius:1;color:Qt.rgba(1,1,1,0.3)} Rectangle{width:2;height:2;radius:1;color:Qt.rgba(1,1,1,0.3)} }
+            }
+        }
+    }
 }

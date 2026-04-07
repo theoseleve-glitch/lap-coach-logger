@@ -432,6 +432,16 @@ class OverlayViewModel(QObject):
         self._overlay_locked = not self._overlay_locked
         self.overlayLockChanged.emit()
 
+    @Slot(float)
+    def adjustAllOpacity(self, delta: float) -> None:  # noqa: N802
+        """Increase or decrease opacity for every widget by *delta*."""
+        for wid in self._widget_settings:
+            current = self._widget_settings[wid].get("opacity", 0.92)
+            new_val = max(0.3, min(1.0, current + delta))
+            self._widget_settings[wid]["opacity"] = round(new_val, 2)
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
     @Property(str, notify=selectedWidgetChanged)
     def selectedWidget(self) -> str:  # noqa: N802
         """Currently selected widget id in the overlay manager."""
