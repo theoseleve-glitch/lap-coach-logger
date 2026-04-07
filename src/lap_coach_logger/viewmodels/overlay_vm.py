@@ -10,6 +10,8 @@ import logging
 
 from PySide6.QtCore import Property, QObject, Signal
 
+from lap_coach_logger.core.live_telemetry_processor import LiveTelemetryProcessor
+
 log = logging.getLogger(__name__)
 
 
@@ -21,11 +23,15 @@ class OverlayViewModel(QObject):
     inputsChanged = Signal()
     contextChanged = Signal()
     fuelChanged = Signal()
+    deltaChanged = Signal()
 
     # -- construction ----------------------------------------------------------
 
     def __init__(self) -> None:
         super().__init__()
+
+        # Live telemetry processor (lap delta pipeline)
+        self._processor = LiveTelemetryProcessor()
 
         # Telemetry inputs
         self._speed_kph: float = 0.0
@@ -42,6 +48,10 @@ class OverlayViewModel(QObject):
         self._best_time: str = ""
         self._last_delta: str = ""
         self._sector_states: list = []
+
+        # Live delta (processor-driven)
+        self._live_delta: float = 0.0
+        self._current_lap_time: str = ""
 
         # Context
         self._lap_number: int = 0
@@ -149,6 +159,16 @@ class OverlayViewModel(QObject):
     def lapDistPct(self) -> float:  # noqa: N802
         return self._lap_dist_pct
 
+    @Property(float, notify=deltaChanged)
+    def liveDelta(self) -> float:  # noqa: N802
+        """Real-time delta vs best lap in seconds (from processor)."""
+        return self._live_delta
+
+    @Property(str, notify=deltaChanged)
+    def currentLapTime(self) -> str:  # noqa: N802
+        """Formatted elapsed time for the current lap (from processor)."""
+        return self._current_lap_time
+
     @Property(float, notify=fuelChanged)
     def fuelLevel(self) -> float:  # noqa: N802
         return self._fuel_level
@@ -184,6 +204,21 @@ class OverlayViewModel(QObject):
         self._gear = int(live.get("gear", 0))
         self._rpm = int(live.get("rpm", 0))
         self.inputsChanged.emit()
+
+        # Live telemetry processor -- delta, timing, sectors
+        result = self._processor.process(live, snap)
+        self._live_delta = float(result.get("live_delta_s", 0.0))
+        self._current_lap_time = result.get("current_lap_time_fmt", "")
+
+        # Use processor output for best/last when available, keep
+        # existing values as fallback so the overlay never blanks out.
+        best_fmt = result.get("best_lap_time_fmt", "")
+        if best_fmt:
+            self._best_time = best_fmt
+        last_fmt = result.get("last_lap_time_fmt", "")
+        if last_fmt:
+            self._last_time = last_fmt
+        self.deltaChanged.emit()
 
         # Context
         self._track = str(live.get("track_name") or snap.get("track") or snap.get("sim") or "")

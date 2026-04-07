@@ -22,13 +22,9 @@ Item {
             // Delta/Time Widget (primary timing overlay)
             Widgets.DeltaTimeWidget {
                 Layout.fillWidth: true
-                delta: {
-                    if (!overlayVM || !overlayVM.lastDelta) return 0
-                    var v = parseFloat(overlayVM.lastDelta)
-                    return isNaN(v) ? 0 : v
-                }
-                lapTime: overlayVM ? overlayVM.elapsed || "0:00.000" : "0:00.000"
-                bestTime: overlayVM ? overlayVM.bestTime || "—" : "—"
+                delta: overlayVM ? overlayVM.liveDelta : 0
+                lapTime: overlayVM ? overlayVM.currentLapTime || "0:00.000" : "0:00.000"
+                bestTime: overlayVM ? overlayVM.bestTime || "\u2014" : "\u2014"
                 lapNumber: overlayVM ? overlayVM.lapNumber : 0
                 totalLaps: 0
                 lapProgress: overlayVM ? overlayVM.lapProgress : 0
