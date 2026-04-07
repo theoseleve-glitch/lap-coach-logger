@@ -310,9 +310,8 @@ Item {
     }
 
     function widgetEnabled(wid) {
-        if (!overlayVM || !overlayVM.widgetSettings) return false
-        var s = overlayVM.widgetSettings[wid]
-        return s ? s.enabled : false
+        if (!overlayVM) return false
+        return overlayVM.isWidgetEnabled(wid)
     }
 
     function selectedWidget() {
@@ -322,8 +321,8 @@ Item {
 
     function selectedSettings() {
         var w = selectedWidget()
-        if (!w || !overlayVM || !overlayVM.widgetSettings) return null
-        return overlayVM.widgetSettings[w.widgetId] || null
+        if (!w || !overlayVM) return null
+        return overlayVM.getWidgetSettingsMap(w.widgetId)
     }
 
     // Background

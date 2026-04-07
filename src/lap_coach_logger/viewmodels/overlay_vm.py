@@ -347,6 +347,58 @@ class OverlayViewModel(QObject):
             )
             self.widgetSettingsChanged.emit()
 
+    # -- Slot-based getters (QML can't access nested dict properties) --------
+
+    @Slot(str, result=bool)
+    def isWidgetEnabled(self, widget_id: str) -> bool:  # noqa: N802
+        s = self._widget_settings.get(widget_id)
+        return bool(s.get("enabled")) if s else False
+
+    @Slot(str, result=int)
+    def getWidgetWidth(self, widget_id: str) -> int:  # noqa: N802
+        s = self._widget_settings.get(widget_id)
+        return int(s.get("width", 300)) if s else 300
+
+    @Slot(str, result=int)
+    def getWidgetHeight(self, widget_id: str) -> int:  # noqa: N802
+        s = self._widget_settings.get(widget_id)
+        return int(s.get("height", 200)) if s else 200
+
+    @Slot(str, result=float)
+    def getWidgetOpacity(self, widget_id: str) -> float:  # noqa: N802
+        s = self._widget_settings.get(widget_id)
+        return float(s.get("opacity", 0.92)) if s else 0.92
+
+    @Slot(str, result=float)
+    def getWidgetFontScale(self, widget_id: str) -> float:  # noqa: N802
+        s = self._widget_settings.get(widget_id)
+        return float(s.get("font_scale", 1.0)) if s else 1.0
+
+    @Slot(str, result=int)
+    def getWidgetRefreshHz(self, widget_id: str) -> int:  # noqa: N802
+        s = self._widget_settings.get(widget_id)
+        return int(s.get("refresh_hz", 60)) if s else 60
+
+    @Slot(str, result=int)
+    def getWidgetBorderRadius(self, widget_id: str) -> int:  # noqa: N802
+        s = self._widget_settings.get(widget_id)
+        return int(s.get("border_radius", 12)) if s else 12
+
+    @Slot(str, result="QVariant")
+    def getWidgetSettingsMap(self, widget_id: str) -> dict:  # noqa: N802
+        """Return a single widget's full settings as a flat dict."""
+        return dict(self._widget_settings.get(widget_id, {}))
+
+    @Slot(result="QVariant")
+    def getEnabledWidgetIds(self) -> list:  # noqa: N802
+        """Return list of widget IDs that are currently enabled."""
+        return [wid for wid, s in self._widget_settings.items() if s.get("enabled")]
+
+    @Slot(result="QVariant")
+    def getAllWidgetIds(self) -> list:  # noqa: N802
+        """Return list of all widget IDs."""
+        return list(self._widget_settings.keys())
+
     @Slot(str)
     def resetWidget(self, widget_id: str) -> None:  # noqa: N802
         """Reset a widget's settings to factory defaults."""

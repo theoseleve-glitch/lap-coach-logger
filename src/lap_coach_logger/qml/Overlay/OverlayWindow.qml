@@ -75,23 +75,25 @@ Item {
     }
 
     function _syncWindows() {
-        var ws = overlayVM ? overlayVM.widgetSettings : {}
-        var ids = Object.keys(ws)
+        if (!overlayVM) return
+        var ids = overlayVM.getAllWidgetIds()
+        if (!ids || !ids.length) return
 
         for (var i = 0; i < ids.length; i++) {
             var wid = ids[i]
-            var settings = ws[wid]
-            var enabled = root.overlayVisible && settings && settings.enabled
+            var enabled = root.overlayVisible && overlayVM.isWidgetEnabled(wid)
 
             if (enabled && !_windows[wid]) {
                 var comp = _componentMap[wid]
                 if (comp) {
+                    var w = overlayVM.getWidgetWidth(wid)
+                    var h = overlayVM.getWidgetHeight(wid)
+                    var o = overlayVM.getWidgetOpacity(wid)
+                    var idx = Object.keys(_windows).length
                     var win = comp.createObject(root, {
-                        width:   settings.width   || 300,
-                        height:  settings.height  || 200,
-                        opacity: settings.opacity || 0.92,
-                        x: 100 + (Object.keys(_windows).length % 6) * 40,
-                        y:  80 + (Object.keys(_windows).length % 6) * 40
+                        width: w, height: h, opacity: o,
+                        x: 100 + (idx % 6) * 50,
+                        y:  80 + (idx % 6) * 50
                     })
                     if (win) {
                         win.visible = true
@@ -102,9 +104,9 @@ Item {
                 _windows[wid].destroy()
                 delete _windows[wid]
             } else if (enabled && _windows[wid]) {
-                _windows[wid].width   = settings.width   || 300
-                _windows[wid].height  = settings.height  || 200
-                _windows[wid].opacity = settings.opacity || 0.92
+                _windows[wid].width   = overlayVM.getWidgetWidth(wid)
+                _windows[wid].height  = overlayVM.getWidgetHeight(wid)
+                _windows[wid].opacity = overlayVM.getWidgetOpacity(wid)
             }
         }
     }
