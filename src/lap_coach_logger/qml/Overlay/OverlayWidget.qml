@@ -52,8 +52,10 @@ Window {
         anchors.fill: parent
         radius: 12
         color: Qt.rgba(0, 0, 0, 0.78)
-        border.width: 1
-        border.color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.06)
+        border.width: (overlayVM && overlayVM.overlayLocked) ? 2 : 1
+        border.color: (overlayVM && overlayVM.overlayLocked)
+            ? Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.25)
+            : Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.06)
 
         // Top refraction highlight
         Rectangle {
@@ -76,9 +78,20 @@ Window {
         }
     }
 
+    // Lock indicator — shown when overlays are locked
+    Text {
+        anchors { top: parent.top; right: parent.right; margins: 6 }
+        text: "\uD83D\uDD12"
+        font.pixelSize: 12
+        color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.5)
+        visible: overlayVM ? overlayVM.overlayLocked : false
+        z: 10
+    }
+
     // Drag support — grabs anywhere on the window
     MouseArea {
         anchors.fill: parent
+        enabled: overlayVM ? !overlayVM.overlayLocked : true
         property point clickPos
         z: -1  // below content so widget buttons still work
         onPressed: function(mouse) { clickPos = Qt.point(mouse.x, mouse.y) }

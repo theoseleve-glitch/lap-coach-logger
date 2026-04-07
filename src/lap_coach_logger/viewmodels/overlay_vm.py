@@ -28,6 +28,7 @@ class OverlayViewModel(QObject):
     coachingChanged = Signal()
     widgetSettingsChanged = Signal()
     selectedWidgetChanged = Signal()
+    overlayLockChanged = Signal()
 
     # -- construction ----------------------------------------------------------
 
@@ -146,6 +147,7 @@ class OverlayViewModel(QObject):
             k: dict(v) for k, v in self._widget_settings.items()
         }
         self._selected_widget: str = "delta_timing"
+        self._overlay_locked: bool = False
 
     # -- QML properties --------------------------------------------------------
 
@@ -314,6 +316,17 @@ class OverlayViewModel(QObject):
     def widgetSettings(self) -> dict:  # noqa: N802
         """Full dict of widget_id -> settings for QML binding."""
         return self._widget_settings
+
+    @Property(bool, notify=overlayLockChanged)
+    def overlayLocked(self) -> bool:  # noqa: N802
+        """Whether overlay widgets are locked (non-draggable)."""
+        return self._overlay_locked
+
+    @Slot()
+    def toggleOverlayLock(self) -> None:  # noqa: N802
+        """Toggle the overlay lock state."""
+        self._overlay_locked = not self._overlay_locked
+        self.overlayLockChanged.emit()
 
     @Property(str, notify=selectedWidgetChanged)
     def selectedWidget(self) -> str:  # noqa: N802

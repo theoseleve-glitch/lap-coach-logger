@@ -264,6 +264,36 @@ Item {
         overlayManager.overlayVisible = !overlayManager.overlayVisible
     }
 
+    // === Keyboard shortcuts ===
+
+    // Ctrl+O — toggle all overlay widgets on/off
+    Shortcut {
+        sequence: "Ctrl+O"
+        onActivated: root.toggleOverlay()
+    }
+
+    // Ctrl+L — lock/unlock overlay positions
+    Shortcut {
+        sequence: "Ctrl+L"
+        onActivated: {
+            if (overlayVM) overlayVM.toggleOverlayLock()
+        }
+    }
+
+    // Ctrl+1/2/3/4 — switch tabs
+    Shortcut { sequence: "Ctrl+1"; onActivated: navBar.pageRequested("dashboard") }
+    Shortcut { sequence: "Ctrl+2"; onActivated: navBar.pageRequested("live") }
+    Shortcut { sequence: "Ctrl+3"; onActivated: navBar.pageRequested("history") }
+    Shortcut { sequence: "Ctrl+4"; onActivated: navBar.pageRequested("overlays") }
+
+    // Escape — close settings slide-over if open
+    Shortcut {
+        sequence: "Escape"
+        onActivated: {
+            if (settingsSlideOver.isOpen) settingsSlideOver.isOpen = false
+        }
+    }
+
     // === Page components ===
     Component {
         id: dashboardComponent
