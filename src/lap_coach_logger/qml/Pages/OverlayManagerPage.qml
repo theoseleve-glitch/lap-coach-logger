@@ -155,6 +155,54 @@ Item {
             category: "awareness"
             description: "Side-by-side comparison of two drivers. Shows sector times, lap times, and top speed with colour-coded faster/slower indicators."
         }
+        ListElement {
+            widgetId: "track_map_canvas"
+            name: "Track Map (Canvas)"
+            category: "awareness"
+            description: "Canvas-based track outline with live car position dot and nearby car markers. Draws from normalised track points or falls back to a placeholder oval."
+        }
+        ListElement {
+            widgetId: "mini_map"
+            name: "Mini Map"
+            category: "awareness"
+            description: "Compact track outline with car position dot. A smaller, label-free version of the track map for minimal screen space usage."
+        }
+        ListElement {
+            widgetId: "flat_map"
+            name: "Flat Map"
+            category: "awareness"
+            description: "Horizontal flattened track strip with car position marker and sector boundary lines. A linear view of your progress around the circuit."
+        }
+        ListElement {
+            widgetId: "fuel_calculator"
+            name: "Fuel Calculator"
+            category: "strategy"
+            description: "Extended fuel info showing current level, consumption rate, laps remaining, fuel to add at pit stop, stint length and target laps."
+        }
+        ListElement {
+            widgetId: "pitbox_helper"
+            name: "Pitbox Helper"
+            category: "strategy"
+            description: "Pit stop planning assistant showing estimated pit entry lap, fuel to add, tyre change recommendation, estimated pit time, and pit window status."
+        }
+        ListElement {
+            widgetId: "weather_monitor"
+            name: "Weather Monitor"
+            category: "awareness"
+            description: "Track conditions display with air and track temperature, humidity, wind speed and direction, rain probability, and surface state (dry/damp/wet)."
+        }
+        ListElement {
+            widgetId: "boost_box"
+            name: "Boost Box"
+            category: "inputs"
+            description: "ERS/KERS boost level arc gauge showing available energy, deployment mode (deploy/harvest/off), and percentage remaining."
+        }
+        ListElement {
+            widgetId: "gforce_meter_full"
+            name: "G-Force Meter (Full)"
+            category: "inputs"
+            description: "Dedicated G-force circle visualisation with current G dot, historical trail, reference rings, and lateral/longitudinal axis labels."
+        }
     }
 
     property int selectedIndex: 0
