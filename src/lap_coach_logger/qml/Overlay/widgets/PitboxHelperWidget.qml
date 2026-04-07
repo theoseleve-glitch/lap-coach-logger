@@ -2,9 +2,10 @@ import QtQuick
 import QtQuick.Layouts
 import "../../Theme" as Theme
 
-/*  PitboxHelperWidget — pit stop planning display (240x160).
+/*  PitboxHelperWidget -- pit stop planning display (240x160).
     Shows estimated pit entry lap, fuel to add, tire change
-    recommendation, and pit time estimate.                          */
+    recommendation, and pit time estimate.
+    PIT WINDOW badge: green OPEN / red CLOSED with glow animation.   */
 Rectangle {
     id: root
     width: 240
@@ -18,18 +19,28 @@ Rectangle {
     property string estimatedPitTime: "--"
     property bool   pitWindowOpen: false
 
-    // ── derived ─────────────────────────────────────────────────────
-    readonly property color windowColor: root.pitWindowOpen
+    // ── null-safe helpers ───────────────────────────────────────────
+    readonly property int    safePitLap: isFinite(pitLap) ? pitLap : 0
+    readonly property real   safeFuelToAdd: isFinite(fuelToAdd) ? Math.max(0, fuelToAdd) : 0
+    readonly property string safePitTime: (typeof estimatedPitTime === "string" && estimatedPitTime.length > 0)
+                                           ? estimatedPitTime : "--"
+    readonly property bool   needsFuel: safeFuelToAdd > 0
+
+    // ── derived colors ──────────────────────────────────────────────
+    readonly property color windowColor: pitWindowOpen
                                          ? Theme.Tokens.acidGreen
-                                         : Theme.Tokens.steel
+                                         : Theme.Tokens.safetyRed
+    readonly property color tireColor: tireChange
+                                       ? Theme.Tokens.marshalYellow
+                                       : Theme.Tokens.acidGreen
 
     ColumnLayout {
         anchors {
             fill: parent
-            topMargin: 10
-            bottomMargin: 10
-            leftMargin: 12
-            rightMargin: 12
+            topMargin: Theme.Tokens.md
+            bottomMargin: Theme.Tokens.md
+            leftMargin: Theme.Tokens.md
+            rightMargin: Theme.Tokens.md
         }
         spacing: 0
 
@@ -41,24 +52,41 @@ Rectangle {
             Text {
                 text: "PITBOX"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
-                font.weight: Font.Bold
-                font.letterSpacing: 1.2
+                font.pixelSize: Theme.Typography.microSize
+                font.weight: Theme.Typography.microWeight
+                font.letterSpacing: Theme.Typography.microSpacing
                 color: Theme.Tokens.steel
             }
 
-            // Pit window badge
+            // Pit window badge with animated glow
             Rectangle {
-                implicitWidth: windowLabel.implicitWidth + 10
+                id: windowBadge
+                implicitWidth: windowLabel.implicitWidth + 12
                 implicitHeight: 16
                 radius: 4
-                color: Qt.rgba(root.windowColor.r,
-                               root.windowColor.g,
-                               root.windowColor.b, 0.12)
+                color: Theme.Tokens.subtle(root.windowColor, 0.12)
                 border.width: 1
-                border.color: Qt.rgba(root.windowColor.r,
-                                      root.windowColor.g,
-                                      root.windowColor.b, 0.25)
+                border.color: Theme.Tokens.subtle(root.windowColor, 0.25)
+
+                Behavior on color        { ColorAnimation { duration: Theme.Motion.statusColorDuration } }
+                Behavior on border.color { ColorAnimation { duration: Theme.Motion.statusColorDuration } }
+
+                // Glow pulse when OPEN
+                property real glowOpacity: 0
+                SequentialAnimation on glowOpacity {
+                    running: root.pitWindowOpen
+                    loops: Animation.Infinite
+                    NumberAnimation { to: 0.35; duration: Theme.Motion.recordingPulseDuration; easing.type: Easing.InOutSine }
+                    NumberAnimation { to: 0.10; duration: Theme.Motion.recordingPulseDuration; easing.type: Easing.InOutSine }
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: parent.radius
+                    color: root.windowColor
+                    opacity: root.pitWindowOpen ? windowBadge.glowOpacity : 0
+                    visible: root.pitWindowOpen
+                }
 
                 Text {
                     id: windowLabel
@@ -69,6 +97,7 @@ Rectangle {
                     font.weight: Font.Bold
                     font.letterSpacing: 0.8
                     color: root.windowColor
+                    Behavior on color { ColorAnimation { duration: Theme.Motion.statusColorDuration } }
                 }
             }
 
@@ -76,48 +105,70 @@ Rectangle {
         }
 
         // ── Separator ──────────────────────────────────────────────
-        Item {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 8
-            Rectangle {
-                anchors.centerIn: parent
-                width: parent.width; height: 1
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: "transparent" }
-                    GradientStop { position: 0.5; color: Qt.rgba(Theme.Tokens.chalk.r,
-                                                                  Theme.Tokens.chalk.g,
-                                                                  Theme.Tokens.chalk.b, 0.08) }
-                    GradientStop { position: 1.0; color: "transparent" }
-                }
-            }
-        }
+        GradientSep {}
 
         // ── Data rows ──────────────────────────────────────────────
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 6
 
-            PitRow { label: "PIT LAP"; value: root.pitLap > 0 ? "L" + root.pitLap : "--" }
-            PitRow { label: "FUEL ADD"; value: root.fuelToAdd.toFixed(1) + " L"; valueColor: Theme.Tokens.pitOrange }
-            PitRow { label: "TYRES"; value: root.tireChange ? "CHANGE" : "KEEP"; valueColor: root.tireChange ? Theme.Tokens.marshalYellow : Theme.Tokens.acidGreen }
-            PitRow { label: "PIT TIME"; value: root.estimatedPitTime }
+            DataRow {
+                label: "PIT LAP"
+                value: root.safePitLap > 0 ? ("L" + root.safePitLap) : "--"
+            }
+
+            DataRow {
+                label: "FUEL ADD"
+                value: root.safeFuelToAdd.toFixed(1) + " L"
+                valueColor: Theme.Tokens.pitOrange
+                prominent: root.needsFuel
+            }
+
+            GradientSep { Layout.preferredHeight: 6 }
+
+            DataRow {
+                label: "TYRES"
+                value: root.tireChange ? "CHANGE" : "KEEP"
+                valueColor: root.tireColor
+            }
+
+            DataRow {
+                label: "PIT TIME"
+                value: root.safePitTime
+            }
+        }
+    }
+
+    // ── Gradient separator component ───────────────────────────────
+    component GradientSep: Item {
+        Layout.fillWidth: true
+        Layout.preferredHeight: 8
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width; height: 1
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 0.5; color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.08) }
+                GradientStop { position: 1.0; color: "transparent" }
+            }
         }
     }
 
     // ── Reusable data row ──────────────────────────────────────────
-    component PitRow: RowLayout {
+    component DataRow: RowLayout {
         property string label
         property string value
         property color  valueColor: Theme.Tokens.chalk
+        property bool   prominent: false
 
         Layout.fillWidth: true
 
         Text {
             text: label
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 9
-            font.weight: Font.Bold
+            font.pixelSize: Theme.Typography.microSize
+            font.weight: Theme.Typography.microWeight
             font.letterSpacing: 1.0
             color: Theme.Tokens.steel
         }
@@ -125,9 +176,11 @@ Rectangle {
         Text {
             text: value
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 13
+            font.pixelSize: prominent ? 16 : 13
             font.weight: Font.Bold
             color: valueColor
+            Behavior on color     { ColorAnimation { duration: Theme.Motion.statusColorDuration } }
+            Behavior on font.pixelSize { NumberAnimation { duration: 150 } }
         }
     }
 }
