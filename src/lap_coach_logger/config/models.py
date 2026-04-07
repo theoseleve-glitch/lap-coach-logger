@@ -80,6 +80,26 @@ class QualityConfig:
 
 
 @dataclass
+class OverlayWidgetConfig:
+    """Per-widget overlay settings persisted to disk."""
+    enabled: bool = False
+    x: int = 100
+    y: int = 80
+    width: int = 300
+    height: int = 200
+    opacity: float = 0.92
+    font_scale: float = 1.0
+    refresh_hz: int = 60
+    border_radius: int = 12
+
+
+@dataclass
+class OverlayConfig:
+    """Overlay HUD settings."""
+    widget_settings: dict[str, dict] = field(default_factory=dict)
+
+
+@dataclass
 class SyncConfig:
     """Remote sync settings for Lap Coach webapp."""
     enabled: bool = False
@@ -105,6 +125,7 @@ class AppConfig:
     quality: QualityConfig = field(default_factory=QualityConfig)
     lap_analysis: LapAnalysisConfig = field(default_factory=LapAnalysisConfig)
     sync: SyncConfig = field(default_factory=SyncConfig)
+    overlay: OverlayConfig = field(default_factory=OverlayConfig)
 
     # --- helpers -----------------------------------------------------------
 
@@ -129,6 +150,7 @@ class AppConfig:
         quality = QualityConfig(**data.pop("quality", {}))
         lap_analysis = LapAnalysisConfig(**data.pop("lap_analysis", {}))
         sync = SyncConfig(**data.pop("sync", {}))
+        overlay = OverlayConfig(**data.pop("overlay", {}))
         # Strip unknown keys that might exist in old config files
         known = {f.name for f in dataclasses.fields(cls)}
         filtered = {k: v for k, v in data.items() if k in known}
@@ -140,6 +162,7 @@ class AppConfig:
             quality=quality,
             lap_analysis=lap_analysis,
             sync=sync,
+            overlay=overlay,
             **filtered,
         )
 

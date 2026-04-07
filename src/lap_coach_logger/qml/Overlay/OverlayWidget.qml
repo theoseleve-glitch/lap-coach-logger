@@ -21,6 +21,9 @@ Window {
     color: "transparent"
     visible: false
 
+    // Widget identity — set by OverlayWindow to link back to VM settings
+    property string widgetId: ""
+
     // Content injected by parent
     default property alias content: contentArea.data
 
@@ -98,6 +101,13 @@ Window {
         onPositionChanged: function(mouse) {
             root.x += mouse.x - clickPos.x
             root.y += mouse.y - clickPos.y
+        }
+        onReleased: {
+            // Persist final position when drag ends
+            if (root.widgetId && overlayVM) {
+                overlayVM.setWidgetSetting(root.widgetId, "x", root.x)
+                overlayVM.setWidgetSetting(root.widgetId, "y", root.y)
+            }
         }
     }
 }

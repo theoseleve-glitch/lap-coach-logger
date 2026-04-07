@@ -89,11 +89,16 @@ Item {
                     var w = overlayVM.getWidgetWidth(wid)
                     var h = overlayVM.getWidgetHeight(wid)
                     var o = overlayVM.getWidgetOpacity(wid)
+                    var sx = overlayVM.getWidgetX(wid)
+                    var sy = overlayVM.getWidgetY(wid)
+                    // Fall back to cascade positioning when no saved position
                     var idx = Object.keys(_windows).length
+                    var posX = (sx !== 100 || sy !== 80) ? sx : 100 + (idx % 6) * 50
+                    var posY = (sx !== 100 || sy !== 80) ? sy :  80 + (idx % 6) * 50
                     var win = comp.createObject(root, {
+                        widgetId: wid,
                         width: w, height: h, opacity: o,
-                        x: 100 + (idx % 6) * 50,
-                        y:  80 + (idx % 6) * 50
+                        x: posX, y: posY
                     })
                     if (win) {
                         win.visible = true

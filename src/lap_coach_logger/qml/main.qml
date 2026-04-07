@@ -19,12 +19,10 @@ ApplicationWindow {
     }
 
     onClosing: function(close) {
-        if (!forceClose) {
+        if (!forceClose && typeof trayVM !== "undefined" && trayVM !== null) {
             close.accepted = false
             root.hide()
-            if (typeof trayVM !== "undefined") {
-                trayVM.showMessage("Running in tray. Use the tray icon to reopen or exit.")
-            }
+            trayVM.showMessage("Running in tray. Use the tray icon to reopen or exit.")
         }
     }
 }

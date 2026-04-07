@@ -62,7 +62,9 @@ def build_view_models(service: DesktopService) -> dict:
     history_vm = HistoryViewModel()
     review_vm = ReviewViewModel()
     settings_vm = SettingsViewModel()
-    overlay_vm = OverlayViewModel()
+    overlay_vm = OverlayViewModel(
+        saved_settings=service.config.overlay.widget_settings or None,
+    )
     onboarding_vm = OnboardingViewModel()
 
     # -- Wire service signals to child VMs ---------------------------------
@@ -79,6 +81,13 @@ def build_view_models(service: DesktopService) -> dict:
 
     # -- Initial settings load ---------------------------------------------
     settings_vm.load(service.settings_snapshot())
+
+    # -- Persist overlay widget settings on change -------------------------
+    def _save_overlay_settings() -> None:
+        service.config.overlay.widget_settings = overlay_vm.export_settings()
+        service.config_manager.save(service.config)
+
+    overlay_vm.settingsSaveRequested.connect(_save_overlay_settings)
 
     return {
         "service": svc_vm,
@@ -163,22 +172,20 @@ def run_qml_shell(
         return
 
     # 10b. Wire tray signals (after QML load so rootObjects exist)
+    root_window = engine.rootObjects()[0]
+
     def _show_window():
-        roots = engine.rootObjects()
-        if roots:
-            roots[0].showNormal()
-            roots[0].raise_()
-            roots[0].requestActivate()
+        root_window.showNormal()
+        root_window.raise_()
+        root_window.requestActivate()
+
+    def _force_quit():
+        root_window.setProperty("forceClose", True)
+        app.quit()
 
     tray.showRequested.connect(_show_window)
-    tray.exitRequested.connect(
-        lambda: (
-            setattr(engine.rootObjects()[0], "forceClose", True)
-            if engine.rootObjects()
-            else None,
-            app.quit(),
-        )
-    )
+    tray.exitRequested.connect(_force_quit)
+    # overlayToggleRequested is wired QML-side via Connections in AppShell.qml
     tray.show()
 
     # 11. Wire app exit

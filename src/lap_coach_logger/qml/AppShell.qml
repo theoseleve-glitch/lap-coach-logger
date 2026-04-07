@@ -264,6 +264,12 @@ Item {
         overlayManager.overlayVisible = !overlayManager.overlayVisible
     }
 
+    // === Tray integration ===
+    Connections {
+        target: typeof trayVM !== "undefined" && trayVM !== null ? trayVM : null
+        function onOverlayToggleRequested() { root.toggleOverlay() }
+    }
+
     // === Keyboard shortcuts ===
 
     // Ctrl+O — toggle all overlay widgets on/off

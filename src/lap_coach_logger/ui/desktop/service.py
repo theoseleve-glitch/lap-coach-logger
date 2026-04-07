@@ -197,7 +197,18 @@ class DesktopService(QObject):
             self.log_event.emit,
             self._get_current_session_epoch,
         )
+
         self._log_handler.setLevel(logging.INFO)
+
+    # -- public accessors for config persistence ----------------------------
+
+    @property
+    def config(self) -> AppConfig:
+        return self._config
+
+    @property
+    def config_manager(self) -> ConfigManager:
+        return self._config_manager
 
     # -- lifecycle -----------------------------------------------------
 
