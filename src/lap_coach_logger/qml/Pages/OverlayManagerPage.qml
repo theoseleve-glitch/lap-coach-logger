@@ -65,6 +65,48 @@ Item {
             category: "awareness"
             description: "Track and ambient temperature, grip level, and weather forecast. Helps anticipate changing conditions that affect tyre performance."
         }
+        ListElement {
+            widgetId: "laptime_graph"
+            name: "Lap Time Graph"
+            category: "timing"
+            description: "Bar chart of recent lap times. Fastest lap highlighted in gold, current lap in white. Quickly spot trends and consistency across your stint."
+        }
+        ListElement {
+            widgetId: "laptime_log"
+            name: "Lap Time Log"
+            category: "timing"
+            description: "Scrollable list of completed laps with time, delta, and status. A compact table view of your full session history at a glance."
+        }
+        ListElement {
+            widgetId: "laptime_spread"
+            name: "Lap Time Spread"
+            category: "timing"
+            description: "Horizontal range bar showing the spread between your fastest and slowest laps. Includes average and current time markers for consistency tracking."
+        }
+        ListElement {
+            widgetId: "session_timer"
+            name: "Session Timer"
+            category: "awareness"
+            description: "Simple session elapsed time display with session type badge (Practice, Qualifying, Race) and optional remaining time countdown."
+        }
+        ListElement {
+            widgetId: "delta_bar"
+            name: "Delta Bar"
+            category: "timing"
+            description: "Horizontal bar showing delta vs best lap. Green extends left when faster, red extends right when slower. A quick visual reference for live pace."
+        }
+        ListElement {
+            widgetId: "flags"
+            name: "Flags"
+            category: "awareness"
+            description: "Current flag status displayed as a large coloured panel. Supports green, yellow, red, blue, white, and checkered flags for instant recognition."
+        }
+        ListElement {
+            widgetId: "digiflag"
+            name: "Digital Flag"
+            category: "awareness"
+            description: "Digital marshal post indicator with flag symbol, sector number, and optional message. Compact flag display with sector-specific context."
+        }
     }
 
     property int selectedIndex: 0

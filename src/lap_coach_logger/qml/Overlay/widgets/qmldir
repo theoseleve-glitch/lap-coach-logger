@@ -4,3 +4,11 @@ DeltaTimeWidget 1.0 DeltaTimeWidget.qml
 InputsWidget 1.0 InputsWidget.qml
 FuelWidget 1.0 FuelWidget.qml
 CoachingWidget 1.0 CoachingWidget.qml
+LapTimingWidget 1.0 LapTimingWidget.qml
+LaptimeGraphWidget 1.0 LaptimeGraphWidget.qml
+LaptimeLogWidget 1.0 LaptimeLogWidget.qml
+LaptimeSpreadWidget 1.0 LaptimeSpreadWidget.qml
+SessionTimerWidget 1.0 SessionTimerWidget.qml
+DeltaBarWidget 1.0 DeltaBarWidget.qml
+FlagsWidget 1.0 FlagsWidget.qml
+DigiflagWidget 1.0 DigiflagWidget.qml

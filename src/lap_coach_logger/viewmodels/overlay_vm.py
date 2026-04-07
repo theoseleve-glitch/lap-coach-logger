@@ -102,6 +102,13 @@ class OverlayViewModel(QObject):
             "track_map": {"enabled": False, "width": 240, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "standings": {"enabled": False, "width": 300, "height": 300, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "weather": {"enabled": False, "width": 200, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "laptime_graph": {"enabled": False, "width": 320, "height": 180, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "laptime_log": {"enabled": False, "width": 280, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "laptime_spread": {"enabled": False, "width": 300, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "session_timer": {"enabled": False, "width": 200, "height": 80, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "delta_bar": {"enabled": False, "width": 300, "height": 60, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "flags": {"enabled": False, "width": 160, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "digiflag": {"enabled": False, "width": 120, "height": 120, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
         }
         self._widget_defaults: dict[str, dict] = {
             k: dict(v) for k, v in self._widget_settings.items()
