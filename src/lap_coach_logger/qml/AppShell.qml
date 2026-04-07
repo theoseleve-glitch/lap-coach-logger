@@ -68,7 +68,7 @@ Item {
             top: navBar.bottom
             left: parent.left
             right: parent.right
-            bottom: parent.bottom
+            bottom: statusBar.top
         }
         initialItem: dashboardComponent
 
@@ -169,6 +169,65 @@ Item {
                     from: 1; to: 0
                     duration: Theme.Motion.pushDuration
                 }
+            }
+        }
+    }
+
+    // === 2b. Status bar ===
+    Rectangle {
+        id: statusBar
+        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+        height: 28
+        color: Theme.Tokens.surface
+        z: 5
+
+        Rectangle {
+            anchors { left: parent.left; right: parent.right; top: parent.top }
+            height: 1
+            color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.06)
+        }
+
+        RowLayout {
+            anchors { fill: parent; leftMargin: 16; rightMargin: 16 }
+            spacing: 16
+
+            // Connection status
+            Row {
+                spacing: 6
+                Rectangle {
+                    width: 6; height: 6; radius: 3
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: serviceVM && serviceVM.sim ? Theme.Tokens.acidGreen : Theme.Tokens.steel
+                }
+                Text {
+                    text: serviceVM && serviceVM.sim ? serviceVM.sim + " Connected" : "No Simulator"
+                    font { family: Theme.Typography.monoFamily; pixelSize: 10; weight: Font.Bold }
+                    color: Theme.Tokens.steel
+                }
+            }
+
+            Item { Layout.fillWidth: true }
+
+            // Session info
+            Text {
+                text: serviceVM && serviceVM.statusDetail ? serviceVM.statusDetail : "\u2014"
+                font { family: Theme.Typography.monoFamily; pixelSize: 10 }
+                color: Qt.rgba(Theme.Tokens.steel.r, Theme.Tokens.steel.g, Theme.Tokens.steel.b, 0.6)
+            }
+
+            Item { Layout.fillWidth: true }
+
+            // Overlay info
+            Text {
+                text: {
+                    if (!overlayVM) return ""
+                    var ids = overlayVM.getEnabledWidgetIds()
+                    var count = ids ? ids.length : 0
+                    var lockText = overlayVM.overlayLocked ? " \u00b7 \ud83d\udd12" : ""
+                    return count + " overlay" + (count !== 1 ? "s" : "") + lockText
+                }
+                font { family: Theme.Typography.monoFamily; pixelSize: 10 }
+                color: Theme.Tokens.steel
             }
         }
     }
