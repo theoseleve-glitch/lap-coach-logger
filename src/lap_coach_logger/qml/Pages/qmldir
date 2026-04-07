@@ -1,0 +1,5 @@
+module Pages
+DashboardPage 1.0 DashboardPage.qml
+LivePage 1.0 LivePage.qml
+HistoryPage 1.0 HistoryPage.qml
+ReviewPage 1.0 ReviewPage.qml

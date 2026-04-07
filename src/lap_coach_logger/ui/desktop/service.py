@@ -32,7 +32,7 @@ from lap_coach_logger.core.sync_queue import SyncQueueManager
 from lap_coach_logger.core.sync_service import DisabledSyncService, SyncService
 from lap_coach_logger.detection.process_watcher import ProcessWatcher
 from lap_coach_logger.ui.desktop.session_index import SessionIndex
-from lap_coach_logger.ui.status_text import build_status_detail
+from lap_coach_logger.ui.desktop.status_text import build_status_detail
 from lap_coach_logger.utils.paths import config_dir, logs_dir
 from lap_coach_logger.utils.win_autostart import is_autostart_enabled, set_autostart
 

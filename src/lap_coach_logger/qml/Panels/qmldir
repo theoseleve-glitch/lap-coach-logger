@@ -1,0 +1,4 @@
+module Panels
+SettingsPanel 1.0 SettingsPanel.qml
+DiagnosticsPanel 1.0 DiagnosticsPanel.qml
+AboutPanel 1.0 AboutPanel.qml

@@ -1,0 +1,4 @@
+module Theme
+singleton Tokens 1.0 Tokens.qml
+singleton Typography 1.0 Typography.qml
+singleton Motion 1.0 Motion.qml
