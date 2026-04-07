@@ -28,3 +28,11 @@ PitboxHelperWidget 1.0 PitboxHelperWidget.qml
 WeatherMonitorWidget 1.0 WeatherMonitorWidget.qml
 BoostBoxWidget 1.0 BoostBoxWidget.qml
 GForceMeterWidget 1.0 GForceMeterWidget.qml
+AdvancedPanelWidget 1.0 AdvancedPanelWidget.qml
+DataBlocksWidget 1.0 DataBlocksWidget.qml
+RaceScheduleWidget 1.0 RaceScheduleWidget.qml
+WorldMapWidget 1.0 WorldMapWidget.qml
+HeartRateWidget 1.0 HeartRateWidget.qml
+InputTelemetryWidget 1.0 InputTelemetryWidget.qml
+ChatWidget 1.0 ChatWidget.qml
+ChatHighlightWidget 1.0 ChatHighlightWidget.qml

@@ -125,6 +125,14 @@ class OverlayViewModel(QObject):
             "weather_monitor": {"enabled": False, "width": 200, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "boost_box": {"enabled": False, "width": 160, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "gforce_meter_full": {"enabled": False, "width": 200, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "advanced_panel": {"enabled": False, "width": 360, "height": 280, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "data_blocks": {"enabled": False, "width": 320, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "race_schedule": {"enabled": False, "width": 300, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "world_map": {"enabled": False, "width": 280, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "heart_rate": {"enabled": False, "width": 180, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "input_telemetry": {"enabled": False, "width": 280, "height": 180, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "chat": {"enabled": False, "width": 280, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "chat_highlight": {"enabled": False, "width": 320, "height": 80, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
         }
         self._widget_defaults: dict[str, dict] = {
             k: dict(v) for k, v in self._widget_settings.items()

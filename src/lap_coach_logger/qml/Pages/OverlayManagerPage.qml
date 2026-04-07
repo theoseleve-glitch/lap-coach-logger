@@ -203,6 +203,54 @@ Item {
             category: "inputs"
             description: "Dedicated G-force circle visualisation with current G dot, historical trail, reference rings, and lateral/longitudinal axis labels."
         }
+        ListElement {
+            widgetId: "advanced_panel"
+            name: "Advanced Panel"
+            category: "inputs"
+            description: "Multi-row configurable telemetry data panel. Grid of label+value pairs showing speed, RPM, gear, brake temp, tyre temp, fuel, position, and gap."
+        }
+        ListElement {
+            widgetId: "data_blocks"
+            name: "Data Blocks"
+            category: "inputs"
+            description: "Compact data blocks in a configurable grid layout. Each block displays a labeled value with optional colour coding for quick data scanning."
+        }
+        ListElement {
+            widgetId: "race_schedule"
+            name: "Race Schedule"
+            category: "awareness"
+            description: "Upcoming race sessions with time, series name, duration, and registration deadline. Highlights the next session for quick reference."
+        }
+        ListElement {
+            widgetId: "world_map"
+            name: "World Map"
+            category: "awareness"
+            description: "Simplified world map outline showing the current track location as a glowing dot. Displays track name and coordinates for geographic context."
+        }
+        ListElement {
+            widgetId: "heart_rate"
+            name: "Heart Rate"
+            category: "inputs"
+            description: "Heart rate display with BPM number, pulse sparkline animation, and zone indicator (rest/warm/cardio/max). Monitor driver biometrics in real time."
+        }
+        ListElement {
+            widgetId: "input_telemetry"
+            name: "Input Telemetry"
+            category: "inputs"
+            description: "Detailed input view with throttle, brake, and clutch vertical bars, steering angle arc, gear display, and RPM bar. Full pedal and wheel overview."
+        }
+        ListElement {
+            widgetId: "chat"
+            name: "Stream Chat"
+            category: "streaming"
+            description: "Live chat display for streaming. Dark scrolling text area with colour-coded usernames, timestamps, and auto-scroll to latest messages."
+        }
+        ListElement {
+            widgetId: "chat_highlight"
+            name: "Chat Highlight"
+            category: "streaming"
+            description: "Single highlighted chat message for stream display. Large text with username colour accent, fade in/out animation, and streaming indicator."
+        }
     }
 
     property int selectedIndex: 0
@@ -213,6 +261,7 @@ Item {
             case "inputs":    return Theme.Tokens.acidGreen
             case "strategy":  return Theme.Tokens.marshalYellow
             case "awareness": return Theme.Tokens.racingPurple
+            case "streaming": return Theme.Tokens.racingPurple
             default:          return Theme.Tokens.steel
         }
     }
