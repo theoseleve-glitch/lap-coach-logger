@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import "../Theme" as Theme
 import "../Components" as Components
+import "../Overlay/widgets" as Widgets
 
 Item {
     id: root
@@ -548,23 +549,43 @@ Item {
                         }
                     }
 
-                    // ── Preview placeholder ──
+                    // ── Live widget preview ──
                     Rectangle {
                         Layout.leftMargin: Theme.Tokens.xxxl
                         Layout.rightMargin: Theme.Tokens.xxxl
                         Layout.fillWidth: true
                         Layout.preferredHeight: 220
-                        radius: Theme.Tokens.radiusMd
-                        color: Theme.Tokens.void_
-                        border.width: 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Qt.rgba(0, 0, 0, 0.4)
+                        clip: true
+                        border.width: 1
                         border.color: {
                             var w = root.selectedWidget()
                             return w ? Theme.Tokens.subtle(root.categoryColor(w.category), 0.25)
                                      : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.08)
                         }
 
+                        // Scale down the widget to fit the preview
+                        Item {
+                            anchors.centerIn: parent
+                            width: previewLoader.item ? previewLoader.item.implicitWidth || 300 : 300
+                            height: previewLoader.item ? previewLoader.item.implicitHeight || 200 : 200
+                            scale: Math.min(1.0, Math.min(
+                                (parent.width - 40) / Math.max(1, width),
+                                (parent.height - 20) / Math.max(1, height)
+                            ))
+
+                            Loader {
+                                id: previewLoader
+                                anchors.fill: parent
+                                sourceComponent: root._previewComponent()
+                            }
+                        }
+
+                        // Fallback label when no preview available
                         Text {
                             anchors.centerIn: parent
+                            visible: !previewLoader.item
                             text: "PREVIEW"
                             font.family: Theme.Typography.monoFamily
                             font.pixelSize: Theme.Typography.microSize
@@ -1060,6 +1081,450 @@ Item {
                 overlayList.positionViewAtIndex(i, ListView.Center)
                 return
             }
+        }
+    }
+
+    // ================================================================
+    //  Preview component resolver
+    // ================================================================
+
+    property var _previewMap: ({
+        "delta_timing":       pvDeltaTiming,
+        "inputs_grip":        pvInputsGrip,
+        "fuel_strategy":      pvFuelStrategy,
+        "coaching":           pvCoaching,
+        "gforce_meter":       pvGforceMeter,
+        "lap_timing":         pvLapTiming,
+        "track_map":          pvTrackMap,
+        "standings":          pvStandings,
+        "weather":            pvWeather,
+        "laptime_graph":      pvLaptimeGraph,
+        "laptime_log":        pvLaptimeLog,
+        "laptime_spread":     pvLaptimeSpread,
+        "session_timer":      pvSessionTimer,
+        "delta_bar":          pvDeltaBar,
+        "flags":              pvFlags,
+        "digiflag":           pvDigiflag,
+        "radar":              pvRadar,
+        "radar_bars":         pvRadarBars,
+        "blind_spot":         pvBlindSpot,
+        "overtake_alert":     pvOvertakeAlert,
+        "relatives":          pvRelatives,
+        "standings_table":    pvStandingsTable,
+        "leaderboard":        pvLeaderboard,
+        "head_to_head":       pvHeadToHead,
+        "track_map_canvas":   pvTrackMapCanvas,
+        "mini_map":           pvMiniMap,
+        "flat_map":           pvFlatMap,
+        "fuel_calculator":    pvFuelCalculator,
+        "pitbox_helper":      pvPitboxHelper,
+        "weather_monitor":    pvWeatherMonitor,
+        "boost_box":          pvBoostBox,
+        "gforce_meter_full":  pvGforceMeterFull,
+        "advanced_panel":     pvAdvancedPanel,
+        "data_blocks":        pvDataBlocks,
+        "race_schedule":      pvRaceSchedule,
+        "world_map":          pvWorldMap,
+        "heart_rate":         pvHeartRate,
+        "input_telemetry":    pvInputTelemetry,
+        "chat":               pvChat,
+        "chat_highlight":     pvChatHighlight,
+        "chat_race_game":     pvChatRaceGame,
+        "chat_race_standing": pvChatRaceStanding,
+        "custom_text":        pvCustomText,
+        "custom_url":         pvCustomUrl,
+        "garage_cover":       pvGarageCover,
+        "mic_visualizer":     pvMicVisualizer,
+        "promo_code_alert":   pvPromoCodeAlert
+    })
+
+    function _previewComponent() {
+        var w = selectedWidget()
+        if (!w) return null
+        return _previewMap[w.widgetId] || null
+    }
+
+    // ================================================================
+    //  Preview Component blocks (no OverlayWidget wrapper)
+    // ================================================================
+
+    Component {
+        id: pvDeltaTiming
+        Widgets.DeltaTimeWidget {
+            implicitWidth: 320; implicitHeight: 200
+            delta: overlayVM ? overlayVM.liveDelta : 0
+            lapTime: overlayVM ? overlayVM.currentLapTime || "0:00.000" : "0:00.000"
+            bestTime: overlayVM ? overlayVM.bestTime || "\u2014" : "\u2014"
+            lapNumber: overlayVM ? overlayVM.lapNumber : 0
+            totalLaps: 0
+            lapProgress: overlayVM ? overlayVM.lapProgress : 0
+            sectors: overlayVM ? overlayVM.sectorStates || [] : []
+        }
+    }
+
+    Component {
+        id: pvInputsGrip
+        Widgets.InputsWidget {
+            implicitWidth: 240; implicitHeight: 260
+            throttle: overlayVM ? overlayVM.throttlePct : 0
+            brake: overlayVM ? overlayVM.brakePct : 0
+            steering: overlayVM ? overlayVM.steeringDeg / 450.0 : 0
+            gForceX: overlayVM ? overlayVM.latAccelG : 0
+            gForceY: overlayVM ? overlayVM.longAccelG : 0
+            lockup: overlayVM ? overlayVM.lockupActive : false
+            wheelspin: overlayVM ? overlayVM.wheelspinActive : false
+            smoothness: overlayVM ? overlayVM.inputSmoothness : 0.75
+        }
+    }
+
+    Component {
+        id: pvFuelStrategy
+        Widgets.FuelWidget {
+            implicitWidth: 180; implicitHeight: 240
+            remaining: overlayVM ? overlayVM.fuelLevel : 0
+            lapsLeft: overlayVM ? overlayVM.fuelLapsLeft : 0
+            fuelPerLap: overlayVM ? overlayVM.fuelPerLap : 0
+            state: overlayVM ? overlayVM.fuelState || "SAFE" : "SAFE"
+            pitWindow: ""
+            totalLaps: 0
+            currentLap: overlayVM ? overlayVM.lapNumber : 0
+        }
+    }
+
+    Component {
+        id: pvCoaching
+        Widgets.CoachingWidget {
+            implicitWidth: 290; implicitHeight: 200
+            headline: overlayVM ? overlayVM.coachingHeadline : ""
+            sub: overlayVM ? overlayVM.coachingSub : ""
+            category: overlayVM ? overlayVM.coachingCategory : ""
+            severity: overlayVM ? overlayVM.coachingSeverity : "positive"
+            confidence: overlayVM ? overlayVM.coachingConfidence : 0
+            sector: overlayVM ? overlayVM.coachingSector : ""
+        }
+    }
+
+    Component {
+        id: pvGforceMeter
+        Widgets.GForceMeterWidget {
+            implicitWidth: 200; implicitHeight: 200
+            latG: overlayVM ? overlayVM.latAccelG : 0
+            longG: overlayVM ? overlayVM.longAccelG : 0
+        }
+    }
+
+    Component {
+        id: pvLapTiming
+        Widgets.LapTimingWidget {
+            implicitWidth: 280; implicitHeight: 120
+            currentTime: overlayVM ? overlayVM.currentLapTime : ""
+            lastTime: overlayVM ? overlayVM.lastTime : ""
+            bestTime: overlayVM ? overlayVM.bestTime : ""
+            deltaVsBest: overlayVM ? overlayVM.lastDelta : ""
+        }
+    }
+
+    Component {
+        id: pvTrackMap
+        Widgets.TrackMapWidget {
+            implicitWidth: 240; implicitHeight: 240
+            carPosition: overlayVM ? overlayVM.lapDistPct : 0
+        }
+    }
+
+    Component {
+        id: pvStandings
+        Widgets.StandingsWidget {
+            implicitWidth: 300; implicitHeight: 300
+        }
+    }
+
+    Component {
+        id: pvWeather
+        Widgets.WeatherMonitorWidget {
+            implicitWidth: 200; implicitHeight: 160
+        }
+    }
+
+    Component {
+        id: pvLaptimeGraph
+        Widgets.LaptimeGraphWidget {
+            implicitWidth: 320; implicitHeight: 180
+        }
+    }
+
+    Component {
+        id: pvLaptimeLog
+        Widgets.LaptimeLogWidget {
+            implicitWidth: 280; implicitHeight: 200
+        }
+    }
+
+    Component {
+        id: pvLaptimeSpread
+        Widgets.LaptimeSpreadWidget {
+            implicitWidth: 300; implicitHeight: 160
+        }
+    }
+
+    Component {
+        id: pvSessionTimer
+        Widgets.SessionTimerWidget {
+            implicitWidth: 200; implicitHeight: 80
+            elapsed: overlayVM ? overlayVM.elapsed || "0:00:00" : "0:00:00"
+        }
+    }
+
+    Component {
+        id: pvDeltaBar
+        Widgets.DeltaBarWidget {
+            implicitWidth: 300; implicitHeight: 60
+            delta: overlayVM ? overlayVM.liveDelta : 0
+        }
+    }
+
+    Component {
+        id: pvFlags
+        Widgets.FlagsWidget {
+            implicitWidth: 160; implicitHeight: 100
+        }
+    }
+
+    Component {
+        id: pvDigiflag
+        Widgets.DigiflagWidget {
+            implicitWidth: 120; implicitHeight: 120
+        }
+    }
+
+    Component {
+        id: pvRadar
+        Widgets.RadarWidget {
+            implicitWidth: 200; implicitHeight: 200
+        }
+    }
+
+    Component {
+        id: pvRadarBars
+        Widgets.RadarBarsWidget {
+            implicitWidth: 200; implicitHeight: 120
+        }
+    }
+
+    Component {
+        id: pvBlindSpot
+        Widgets.BlindSpotWidget {
+            implicitWidth: 160; implicitHeight: 80
+        }
+    }
+
+    Component {
+        id: pvOvertakeAlert
+        Widgets.OvertakeAlertWidget {
+            implicitWidth: 240; implicitHeight: 60
+        }
+    }
+
+    Component {
+        id: pvRelatives
+        Widgets.RelativesWidget {
+            implicitWidth: 280; implicitHeight: 240
+        }
+    }
+
+    Component {
+        id: pvStandingsTable
+        Widgets.StandingsWidget {
+            implicitWidth: 280; implicitHeight: 300
+        }
+    }
+
+    Component {
+        id: pvLeaderboard
+        Widgets.LeaderboardWidget {
+            implicitWidth: 260; implicitHeight: 280
+        }
+    }
+
+    Component {
+        id: pvHeadToHead
+        Widgets.HeadToHeadWidget {
+            implicitWidth: 300; implicitHeight: 160
+        }
+    }
+
+    Component {
+        id: pvTrackMapCanvas
+        Widgets.TrackMapWidget {
+            implicitWidth: 240; implicitHeight: 240
+            carPosition: overlayVM ? overlayVM.lapDistPct : 0
+        }
+    }
+
+    Component {
+        id: pvMiniMap
+        Widgets.MiniMapWidget {
+            implicitWidth: 180; implicitHeight: 180
+            carPosition: overlayVM ? overlayVM.lapDistPct : 0
+        }
+    }
+
+    Component {
+        id: pvFlatMap
+        Widgets.FlatMapWidget {
+            implicitWidth: 300; implicitHeight: 100
+            carPosition: overlayVM ? overlayVM.lapDistPct : 0
+        }
+    }
+
+    Component {
+        id: pvFuelCalculator
+        Widgets.FuelCalculatorWidget {
+            implicitWidth: 220; implicitHeight: 200
+            fuelLevel: overlayVM ? overlayVM.fuelLevel : 0
+            fuelPerLap: overlayVM ? overlayVM.fuelPerLap : 0
+            lapsLeft: overlayVM ? overlayVM.fuelLapsLeft : 0
+        }
+    }
+
+    Component {
+        id: pvPitboxHelper
+        Widgets.PitboxHelperWidget {
+            implicitWidth: 240; implicitHeight: 160
+        }
+    }
+
+    Component {
+        id: pvWeatherMonitor
+        Widgets.WeatherMonitorWidget {
+            implicitWidth: 200; implicitHeight: 160
+        }
+    }
+
+    Component {
+        id: pvBoostBox
+        Widgets.BoostBoxWidget {
+            implicitWidth: 160; implicitHeight: 100
+        }
+    }
+
+    Component {
+        id: pvGforceMeterFull
+        Widgets.GForceMeterWidget {
+            implicitWidth: 200; implicitHeight: 200
+            latG: overlayVM ? overlayVM.latAccelG : 0
+            longG: overlayVM ? overlayVM.longAccelG : 0
+        }
+    }
+
+    Component {
+        id: pvAdvancedPanel
+        Widgets.AdvancedPanelWidget {
+            implicitWidth: 360; implicitHeight: 280
+        }
+    }
+
+    Component {
+        id: pvDataBlocks
+        Widgets.DataBlocksWidget {
+            implicitWidth: 320; implicitHeight: 200
+        }
+    }
+
+    Component {
+        id: pvRaceSchedule
+        Widgets.RaceScheduleWidget {
+            implicitWidth: 300; implicitHeight: 240
+        }
+    }
+
+    Component {
+        id: pvWorldMap
+        Widgets.WorldMapWidget {
+            implicitWidth: 280; implicitHeight: 160
+            trackName: overlayVM ? overlayVM.track : ""
+        }
+    }
+
+    Component {
+        id: pvHeartRate
+        Widgets.HeartRateWidget {
+            implicitWidth: 180; implicitHeight: 100
+        }
+    }
+
+    Component {
+        id: pvInputTelemetry
+        Widgets.InputTelemetryWidget {
+            implicitWidth: 280; implicitHeight: 180
+            throttle: overlayVM ? overlayVM.throttlePct : 0
+            brake: overlayVM ? overlayVM.brakePct : 0
+            steering: overlayVM ? overlayVM.steeringDeg / 450.0 : 0
+            gear: overlayVM ? overlayVM.gear : 0
+            rpm: overlayVM ? overlayVM.rpm : 0
+        }
+    }
+
+    Component {
+        id: pvChat
+        Widgets.ChatWidget {
+            implicitWidth: 280; implicitHeight: 200
+        }
+    }
+
+    Component {
+        id: pvChatHighlight
+        Widgets.ChatHighlightWidget {
+            implicitWidth: 320; implicitHeight: 80
+        }
+    }
+
+    Component {
+        id: pvChatRaceGame
+        Widgets.ChatRaceGameWidget {
+            implicitWidth: 280; implicitHeight: 200
+        }
+    }
+
+    Component {
+        id: pvChatRaceStanding
+        Widgets.ChatRaceStandingWidget {
+            implicitWidth: 260; implicitHeight: 240
+        }
+    }
+
+    Component {
+        id: pvCustomText
+        Widgets.CustomTextWidget {
+            implicitWidth: 280; implicitHeight: 60
+        }
+    }
+
+    Component {
+        id: pvCustomUrl
+        Widgets.CustomUrlWidget {
+            implicitWidth: 300; implicitHeight: 200
+        }
+    }
+
+    Component {
+        id: pvGarageCover
+        Widgets.GarageCoverWidget {
+            implicitWidth: 320; implicitHeight: 180
+        }
+    }
+
+    Component {
+        id: pvMicVisualizer
+        Widgets.MicVisualizerWidget {
+            implicitWidth: 200; implicitHeight: 60
+        }
+    }
+
+    Component {
+        id: pvPromoCodeAlert
+        Widgets.PromoCodeAlertWidget {
+            implicitWidth: 300; implicitHeight: 100
         }
     }
 }
