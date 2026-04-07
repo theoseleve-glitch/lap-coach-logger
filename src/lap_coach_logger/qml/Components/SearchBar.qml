@@ -8,7 +8,7 @@ Rectangle {
     property alias text: input.text
     property string placeholder: "Search tracks, sims..."
 
-    signal textChanged(string text)
+    signal searchTextChanged(string searchText)
 
     implicitWidth: Math.max(200, searchRow.implicitWidth + 28)
     implicitHeight: searchRow.implicitHeight + 16
@@ -56,7 +56,7 @@ Rectangle {
                 clip: true
                 selectByMouse: true
 
-                onTextChanged: root.textChanged(text)
+                onTextChanged: root.searchTextChanged(text)
             }
 
             // Placeholder text

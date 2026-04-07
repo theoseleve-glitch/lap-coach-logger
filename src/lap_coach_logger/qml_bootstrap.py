@@ -3,7 +3,7 @@
 Provides two public entry points:
 
 * ``build_view_models(service)`` -- testable wiring of all ViewModels.
-* ``run_qml_shell(...)`` -- full QGuiApplication lifecycle (not unit-tested).
+* ``run_qml_shell(...)`` -- full QApplication lifecycle (not unit-tested).
 """
 
 from __future__ import annotations
@@ -14,7 +14,8 @@ import sys
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QUrl
-from PySide6.QtGui import QGuiApplication, QIcon
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
 from lap_coach_logger import APP_NAME, __version__
@@ -105,7 +106,7 @@ def run_qml_shell(
     """Launch the QML-based desktop shell.
 
     This replaces ``run_desktop_shell`` from the QWidgets implementation.
-    It blocks until the QGuiApplication event loop exits.
+    It blocks until the QApplication event loop exits.
     """
     # 1. Windows taskbar grouping
     try:
@@ -113,8 +114,8 @@ def run_qml_shell(
     except Exception:
         pass  # Non-Windows or missing API -- harmless
 
-    # 2. QGuiApplication
-    app = QGuiApplication(sys.argv)
+    # 2. QApplication
+    app = QApplication(sys.argv)
 
     # 3. App identity
     app.setApplicationName(APP_NAME)

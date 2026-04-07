@@ -54,3 +54,11 @@ def about_art_path() -> Path | None:
 
 def monogram_path() -> Path | None:
     return resolve_asset(*MONOGRAM_CANDIDATES)
+
+
+def qml_dir() -> Path:
+    """Return the root QML directory (for QQmlApplicationEngine import paths)."""
+    candidate = bundle_resource_path("src/lap_coach_logger/qml")
+    if candidate.exists():
+        return candidate
+    return Path(__file__).parent / "qml"

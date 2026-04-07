@@ -13,7 +13,7 @@ Item {
     anchors.fill: parent
 
     // Block interaction when closed
-    visible: dimBg.opacity > 0 || panel.x < parent.width
+    visible: root.isOpen
 
     // Dim background
     Rectangle {

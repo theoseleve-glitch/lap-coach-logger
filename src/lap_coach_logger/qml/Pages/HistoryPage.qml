@@ -46,8 +46,8 @@ Item {
             Components.SearchBar {
                 Layout.preferredWidth: 240
                 placeholder: "Search tracks, sims..."
-                onTextChanged: function(text) {
-                    historyVM.setSearchText(text)
+                onSearchTextChanged: function(searchText) {
+                    historyVM.setSearchText(searchText)
                 }
             }
 

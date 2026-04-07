@@ -12,7 +12,7 @@ Item {
     signal cancelled()
 
     anchors.fill: parent
-    visible: dimBg.opacity > 0 || dialogBox.scale > 0
+    visible: root.isOpen
 
     // Dim background
     Rectangle {

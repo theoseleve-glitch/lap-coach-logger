@@ -36,7 +36,10 @@ Item {
         onPageRequested: function(pageId) {
             if (root.currentPage === pageId) return
             root.currentPage = pageId
-            pageStack.replace(null, root.pageComponents[pageId])
+            var component = root.pageComponents[pageId]
+            if (component) {
+                pageStack.replace(pageStack.currentItem, component, StackView.Transition)
+            }
         }
 
         onSettingsRequested: {
