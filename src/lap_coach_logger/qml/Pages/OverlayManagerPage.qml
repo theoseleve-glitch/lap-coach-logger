@@ -560,7 +560,11 @@ Item {
                         width: exportLabel.implicitWidth + 12; height: 22; radius: 6
                         color: exportArea.containsMouse ? Theme.Tokens.subtle(Theme.Tokens.acidGreen, 0.15) : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.04)
                         border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.acidGreen, 0.2)
-                        Text { id: exportLabel; anchors.centerIn: parent; text: "EXPORT"; font { family: Theme.Typography.monoFamily; pixelSize: 8; weight: Font.Bold; letterSpacing: 1 }; color: Theme.Tokens.acidGreen }
+                        Text {
+                            id: exportLabel; anchors.centerIn: parent; text: "EXPORT"
+                            font { family: Theme.Typography.monoFamily; pixelSize: 8; weight: Font.Bold; letterSpacing: 1 }
+                            color: Theme.Tokens.acidGreen
+                        }
                         MouseArea { id: exportArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 if (!overlayVM) return
@@ -576,7 +580,11 @@ Item {
                         width: importLabel.implicitWidth + 12; height: 22; radius: 6
                         color: importArea.containsMouse ? Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.15) : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.04)
                         border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.2)
-                        Text { id: importLabel; anchors.centerIn: parent; text: "IMPORT"; font { family: Theme.Typography.monoFamily; pixelSize: 8; weight: Font.Bold; letterSpacing: 1 }; color: Theme.Tokens.pitOrange }
+                        Text {
+                            id: importLabel; anchors.centerIn: parent; text: "IMPORT"
+                            font { family: Theme.Typography.monoFamily; pixelSize: 8; weight: Font.Bold; letterSpacing: 1 }
+                            color: Theme.Tokens.pitOrange
+                        }
                         MouseArea { id: importArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 if (!overlayVM) return
