@@ -211,7 +211,7 @@ Window {
         height: 20
         radius: root.borderRadius
         color: Qt.rgba(0, 0, 0, 0.5)
-        opacity: titleHoverArea.containsMouse || (overlayVM && overlayVM.overlayLocked) ? 0.9 : 0
+        opacity: titleHoverArea.containsMouse || dragArea.containsMouse || (overlayVM && overlayVM.overlayLocked) ? 0.9 : 0.3
         z: 10
 
         Behavior on opacity { NumberAnimation { duration: 150 } }
@@ -253,6 +253,37 @@ Window {
                 text: overlayVM && overlayVM.overlayLocked ? "\uD83D\uDD12" : ""
                 font.pixelSize: 10
                 color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.5)
+                visible: overlayVM && overlayVM.overlayLocked
+            }
+
+            // Close button (X)
+            Rectangle {
+                width: 16; height: 16; radius: 8
+                anchors.verticalCenter: parent.verticalCenter
+                color: closeBtnArea.containsMouse
+                       ? Qt.rgba(Theme.Tokens.safetyRed.r, Theme.Tokens.safetyRed.g, Theme.Tokens.safetyRed.b, 0.3)
+                       : Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.1)
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "\u2715"
+                    font.pixelSize: 9
+                    color: closeBtnArea.containsMouse ? Theme.Tokens.safetyRed : Theme.Tokens.steel
+                }
+
+                MouseArea {
+                    id: closeBtnArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (root.widgetId && overlayVM) {
+                            overlayVM.toggleWidget(root.widgetId)
+                        } else {
+                            root.visible = false
+                        }
+                    }
+                }
             }
         }
 
