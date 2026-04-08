@@ -447,6 +447,46 @@ Item {
                     }
                 }
 
+                // ── Accent colour selector ──
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Text {
+                        text: "ACCENT"
+                        font.family: Theme.Typography.monoFamily
+                        font.pixelSize: Theme.Typography.microSize
+                        font.weight: Theme.Typography.microWeight
+                        font.letterSpacing: 2
+                        color: Theme.Tokens.steel
+                    }
+
+                    Repeater {
+                        model: overlayVM ? overlayVM.getAccentOptions() : []
+
+                        delegate: Rectangle {
+                            width: 20; height: 20; radius: 10
+                            color: modelData.hex
+                            border.width: overlayVM && overlayVM.overlayAccent === modelData.id ? 2 : 0
+                            border.color: Theme.Tokens.chalk
+
+                            Behavior on border.width {
+                                NumberAnimation { duration: Theme.Motion.hoverDuration }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (overlayVM) overlayVM.setOverlayAccent(modelData.id)
+                                }
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+                }
+
                 // ── Search bar ──
                 Components.SearchBar {
                     id: searchBar

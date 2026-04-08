@@ -440,6 +440,31 @@ class OverlayViewModel(QObject):
         """Whether overlay widgets are locked (non-draggable)."""
         return self._overlay_locked
 
+    # -- Accent colour properties ----------------------------------------------
+
+    @Property(str, notify=accentChanged)
+    def overlayAccent(self) -> str:  # noqa: N802
+        """Active accent colour key (e.g. 'purple', 'orange')."""
+        return self._overlay_accent
+
+    @Slot(str)
+    def setOverlayAccent(self, accent: str) -> None:  # noqa: N802
+        """Switch the overlay accent colour."""
+        if accent in self._ACCENT_COLORS and accent != self._overlay_accent:
+            self._overlay_accent = accent
+            self.accentChanged.emit()
+            self.settingsSaveRequested.emit()
+
+    @Slot(result=str)
+    def getAccentHex(self) -> str:  # noqa: N802
+        """Return the hex value for the current accent colour."""
+        return self._ACCENT_COLORS.get(self._overlay_accent, "#8B5CF6")
+
+    @Slot(result="QVariant")
+    def getAccentOptions(self) -> list:  # noqa: N802
+        """Return the full palette as a list of {id, hex} dicts for QML."""
+        return [{"id": k, "hex": v} for k, v in self._ACCENT_COLORS.items()]
+
     @Slot()
     def toggleOverlayLock(self) -> None:  # noqa: N802
         """Toggle the overlay lock state."""
