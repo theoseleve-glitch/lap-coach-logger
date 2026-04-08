@@ -102,11 +102,12 @@ Item {
                     if (clamped) { posX = clamped.x; posY = clamped.y }
                     var fs = overlayVM.getWidgetFontScale(wid)
                     var br = overlayVM.getWidgetBorderRadius(wid)
+                    var rh = overlayVM.getWidgetRefreshHz(wid)
                     var win = comp.createObject(root, {
                         widgetId: wid,
                         width: w, height: h, opacity: o,
                         x: posX, y: posY,
-                        fontScale: fs, borderRadius: br
+                        fontScale: fs, borderRadius: br, refreshHz: rh
                     })
                     if (win) {
                         win.visible = true
@@ -122,6 +123,7 @@ Item {
                 _windows[wid].opacity      = overlayVM.getWidgetOpacity(wid)
                 _windows[wid].fontScale    = overlayVM.getWidgetFontScale(wid)
                 _windows[wid].borderRadius = overlayVM.getWidgetBorderRadius(wid)
+                _windows[wid].refreshHz    = overlayVM.getWidgetRefreshHz(wid)
             }
         }
     }

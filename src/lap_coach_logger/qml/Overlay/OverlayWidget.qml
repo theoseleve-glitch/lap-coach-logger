@@ -27,9 +27,21 @@ Window {
     // Customization settings — applied from VM
     property real fontScale: 1.0
     property int borderRadius: 12
+    property int refreshHz: 60
 
     // Content injected by parent
     default property alias content: contentArea.data
+
+    // Refresh rate control — throttles content updates
+    // Widgets that use Canvas requestPaint() will be gated by this timer
+    property bool _refreshTick: true
+    Timer {
+        id: refreshTimer
+        interval: root.refreshHz > 0 ? Math.round(1000 / root.refreshHz) : 16
+        running: root.visible
+        repeat: true
+        onTriggered: { root._refreshTick = !root._refreshTick }
+    }
 
     // Apply native overlay flags when window becomes visible
     onVisibleChanged: {
