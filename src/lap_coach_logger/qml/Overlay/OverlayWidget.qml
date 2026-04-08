@@ -19,6 +19,9 @@ Window {
          | Qt.WindowDoesNotAcceptFocus
          | Qt.Tool
 
+    // Detach from main window so minimizing the app doesn't hide overlays
+    transientParent: null
+
     color: "transparent"
     visible: false
 
