@@ -708,6 +708,16 @@ class OverlayViewModel(QObject):
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
+    @Slot(int)
+    def toggleWidgetByIndex(self, index: int) -> None:  # noqa: N802
+        """Toggle the Nth enabled-capable widget (1-based, for keyboard shortcuts)."""
+        ids = list(self._widget_settings.keys())
+        if 0 < index <= len(ids):
+            wid = ids[index - 1]
+            self._widget_settings[wid]["enabled"] = not self._widget_settings[wid]["enabled"]
+            self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
+
     @Slot(str, result="QVariant")
     def getWidgetSettingsMap(self, widget_id: str) -> dict:  # noqa: N802
         """Return a single widget's full settings as a flat dict."""

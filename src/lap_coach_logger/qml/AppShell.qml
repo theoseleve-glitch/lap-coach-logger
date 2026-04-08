@@ -399,6 +399,16 @@ Item {
         onActivated: shortcutHelp.visible = !shortcutHelp.visible
     }
 
+    // Alt+1 through Alt+9 — quick-toggle individual overlay widgets
+    Repeater {
+        model: 9
+        Shortcut {
+            required property int index
+            sequence: "Alt+" + (index + 1)
+            onActivated: if (overlayVM) overlayVM.toggleWidgetByIndex(index + 1)
+        }
+    }
+
     // Shortcut help overlay
     Components.ShortcutHelpOverlay {
         id: shortcutHelp
