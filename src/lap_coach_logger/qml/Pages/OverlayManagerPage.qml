@@ -311,6 +311,15 @@ Item {
     property string searchQuery: ""
     property string categoryFilter: ""
 
+    // Revision counter — incremented on ANY settings change to force QML
+    // slider/toggle bindings to re-evaluate (QML can't track Slot return values)
+    property int _rev: 0
+    Connections {
+        target: overlayVM
+        function onWidgetSettingsChanged() { root._rev++ }
+        function onSelectedWidgetChanged() { root._rev++ }
+    }
+
     // Count of currently visible (filtered) widgets
     readonly property int visibleCount: {
         var n = 0
@@ -335,6 +344,7 @@ Item {
     }
 
     function widgetEnabled(wid) {
+        void(_rev)  // force re-evaluation when settings change
         if (!overlayVM) return false
         return overlayVM.isWidgetEnabled(wid)
     }
@@ -345,6 +355,7 @@ Item {
     }
 
     function selectedSettings() {
+        void(_rev)  // force re-evaluation when settings change
         var w = selectedWidget()
         if (!w || !overlayVM) return null
         return overlayVM.getWidgetSettingsMap(w.widgetId)
@@ -794,7 +805,7 @@ Item {
 
                             // Toggle switch
                             Components.ToggleSwitch {
-                                checked: root.widgetEnabled(widgetId)
+                                checked: { void(root._rev); return root.widgetEnabled(widgetId) }
                                 onToggled: function(val) {
                                     if (overlayVM) overlayVM.toggleWidget(widgetId)
                                 }
@@ -959,7 +970,7 @@ Item {
                                     Item { Layout.fillWidth: true }
                                     Text {
                                         text: {
-                                            var s = root.selectedSettings()
+                                            void(root._rev); var s = root.selectedSettings()
                                             return s ? Math.round(widthSlider.value) + " px" : "--"
                                         }
                                         font.family: Theme.Typography.monoFamily
@@ -973,7 +984,7 @@ Item {
                                     Layout.fillWidth: true
                                     from: 200; to: 800; stepSize: 10
                                     value: {
-                                        var s = root.selectedSettings()
+                                        void(root._rev); var s = root.selectedSettings()
                                         return s ? s.width : 320
                                     }
                                     onMoved: {
@@ -1024,7 +1035,7 @@ Item {
                                     Item { Layout.fillWidth: true }
                                     Text {
                                         text: {
-                                            var s = root.selectedSettings()
+                                            void(root._rev); var s = root.selectedSettings()
                                             return s ? Math.round(heightSlider.value) + " px" : "--"
                                         }
                                         font.family: Theme.Typography.monoFamily
@@ -1038,7 +1049,7 @@ Item {
                                     Layout.fillWidth: true
                                     from: 100; to: 500; stepSize: 10
                                     value: {
-                                        var s = root.selectedSettings()
+                                        void(root._rev); var s = root.selectedSettings()
                                         return s ? s.height : 200
                                     }
                                     onMoved: {
@@ -1089,7 +1100,7 @@ Item {
                                     Item { Layout.fillWidth: true }
                                     Text {
                                         text: {
-                                            var s = root.selectedSettings()
+                                            void(root._rev); var s = root.selectedSettings()
                                             return s ? fontScaleSlider.value.toFixed(1) + "x" : "--"
                                         }
                                         font.family: Theme.Typography.monoFamily
@@ -1103,7 +1114,7 @@ Item {
                                     Layout.fillWidth: true
                                     from: 0.7; to: 1.5; stepSize: 0.1
                                     value: {
-                                        var s = root.selectedSettings()
+                                        void(root._rev); var s = root.selectedSettings()
                                         return s ? s.font_scale : 1.0
                                     }
                                     onMoved: {
@@ -1154,7 +1165,7 @@ Item {
                                     Item { Layout.fillWidth: true }
                                     Text {
                                         text: {
-                                            var s = root.selectedSettings()
+                                            void(root._rev); var s = root.selectedSettings()
                                             return s ? Math.round(opacitySlider.value * 100) + "%" : "--"
                                         }
                                         font.family: Theme.Typography.monoFamily
@@ -1168,7 +1179,7 @@ Item {
                                     Layout.fillWidth: true
                                     from: 0.3; to: 1.0; stepSize: 0.01
                                     value: {
-                                        var s = root.selectedSettings()
+                                        void(root._rev); var s = root.selectedSettings()
                                         return s ? s.opacity : 0.92
                                     }
                                     onMoved: {
@@ -1227,7 +1238,7 @@ Item {
                                             width: 64; height: 30
                                             radius: Theme.Tokens.radiusSm
                                             color: {
-                                                var s = root.selectedSettings()
+                                                void(root._rev); var s = root.selectedSettings()
                                                 var active = s && s.refresh_hz === modelData
                                                 return active
                                                     ? Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.15)
@@ -1235,7 +1246,7 @@ Item {
                                             }
                                             border.width: 1
                                             border.color: {
-                                                var s = root.selectedSettings()
+                                                void(root._rev); var s = root.selectedSettings()
                                                 var active = s && s.refresh_hz === modelData
                                                 return active
                                                     ? Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.30)
@@ -1249,7 +1260,7 @@ Item {
                                                 font.pixelSize: 12
                                                 font.weight: Font.DemiBold
                                                 color: {
-                                                    var s = root.selectedSettings()
+                                                    void(root._rev); var s = root.selectedSettings()
                                                     var active = s && s.refresh_hz === modelData
                                                     return active ? Theme.Tokens.pitOrange : Theme.Tokens.steel
                                                 }
@@ -1284,7 +1295,7 @@ Item {
                                     Item { Layout.fillWidth: true }
                                     Text {
                                         text: {
-                                            var s = root.selectedSettings()
+                                            void(root._rev); var s = root.selectedSettings()
                                             return s ? Math.round(borderRadiusSlider.value) + " px" : "--"
                                         }
                                         font.family: Theme.Typography.monoFamily
@@ -1298,7 +1309,7 @@ Item {
                                     Layout.fillWidth: true
                                     from: 0; to: 20; stepSize: 1
                                     value: {
-                                        var s = root.selectedSettings()
+                                        void(root._rev); var s = root.selectedSettings()
                                         return s ? (s.border_radius !== undefined ? s.border_radius : 12) : 12
                                     }
                                     onMoved: {
