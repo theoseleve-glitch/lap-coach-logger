@@ -44,3 +44,4 @@ CustomUrlWidget 1.0 CustomUrlWidget.qml
 GarageCoverWidget 1.0 GarageCoverWidget.qml
 MicVisualizerWidget 1.0 MicVisualizerWidget.qml
 PromoCodeAlertWidget 1.0 PromoCodeAlertWidget.qml
+TireLifeWidget 1.0 TireLifeWidget.qml

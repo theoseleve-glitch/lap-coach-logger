@@ -14,6 +14,7 @@ from lap_coach_logger.core.live_dashboard import LiveCornerTracker
 from lap_coach_logger.core.live_input_diagnostics import LiveInputDiagnosticsTracker
 from lap_coach_logger.core.live_lap_compare import LiveLapComparisonTracker
 from lap_coach_logger.core.schema import TelemetrySample
+from lap_coach_logger.core.tire_model import TireDegradationTracker
 
 log = logging.getLogger(__name__)
 
@@ -70,6 +71,7 @@ class LiveTelemetryProcessor:
         self._coach_tracker = LiveCoachTracker()
         self._input_tracker = LiveInputDiagnosticsTracker()
         self._corner_tracker = LiveCornerTracker()
+        self._tire_tracker = TireDegradationTracker()
 
     def process(self, live_dict: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
         """Process a raw snapshot, return aggregated overlay state.
@@ -124,6 +126,18 @@ class LiveTelemetryProcessor:
         self._corner_tracker.push_snapshot(live_dict)
         corner_rows = self._corner_tracker.rows()
 
+        # -- Tire degradation tracker ------------------------------------------
+        tire_temps = (
+            _float(live_dict.get("tyre_temp_lf")) or 0,
+            _float(live_dict.get("tyre_temp_rf")) or 0,
+            _float(live_dict.get("tyre_temp_lr")) or 0,
+            _float(live_dict.get("tyre_temp_rr")) or 0,
+        )
+        lap_num = _int(live_dict.get("lap_number")) or 0
+        if any(t > 0 for t in tire_temps) and lap_num > 0:
+            self._tire_tracker.push_sample(tire_temps, lap_num)
+        tire_state = self._tire_tracker.state.to_dict()
+
         # -- Input diagnostics -----------------------------------------------
         self._input_tracker.push_sample(
             sample,
@@ -147,6 +161,7 @@ class LiveTelemetryProcessor:
             "coaching_cards": coaching_cards,
             "input_smoothness": input_smoothness,
             "corner_rows": corner_rows,
+            "tire_state": tire_state,
         }
 
     # -- heuristic helpers -----------------------------------------------------
@@ -224,6 +239,7 @@ class LiveTelemetryProcessor:
         self._coach_tracker.reset()
         self._input_tracker.reset()
         self._corner_tracker.reset()
+        self._tire_tracker.reset()
 
 
 # -- tiny helpers (avoid importing from other modules) -------------------------

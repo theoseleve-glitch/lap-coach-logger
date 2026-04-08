@@ -266,4 +266,25 @@ Item {
             lapsLeft: overlayVM ? overlayVM.fuelLapsLeft : 0
         }
     }
+
+    OW {
+        _wid: "tire_life"; widgetId: "tire_life"; category: "strategy"
+        visible: root.isOn("tire_life")
+        width: root.gw("tire_life","width",220)
+        height: root.gw("tire_life","height",180)
+        opacity: root.gw("tire_life","opacity",0.92)
+        fontScale: root.gw("tire_life","fontScale",1.0)
+        borderRadius: root.gw("tire_life","borderRadius",12)
+        Widgets.TireLifeWidget {
+            anchors.fill: parent; anchors.margins: 4
+            gripPct: overlayVM ? overlayVM.tireGripPct : 100
+            lapCount: overlayVM ? overlayVM.tireLapCount : 0
+            lapsRemaining: overlayVM ? overlayVM.tireLapsRemaining : 99
+            condition: overlayVM ? overlayVM.tireCondition : "good"
+            tempLF: overlayVM ? overlayVM.tireTempLF : 0
+            tempRF: overlayVM ? overlayVM.tireTempRF : 0
+            tempLR: overlayVM ? overlayVM.tireTempLR : 0
+            tempRR: overlayVM ? overlayVM.tireTempRR : 0
+        }
+    }
 }

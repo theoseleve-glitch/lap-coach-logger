@@ -33,6 +33,7 @@ class OverlayViewModel(QObject):
     settingsSaveRequested = Signal()
     accentChanged = Signal()
     strategyChanged = Signal()
+    tireChanged = Signal()
 
     # -- widget category mapping -----------------------------------------------
 
@@ -66,6 +67,7 @@ class OverlayViewModel(QObject):
         "flat_map": "awareness",
         "fuel_calculator": "strategy",
         "race_strategy": "strategy",
+        "tire_life": "strategy",
         "pitbox_helper": "strategy",
         "weather_monitor": "awareness",
         "boost_box": "inputs",
@@ -220,6 +222,16 @@ class OverlayViewModel(QObject):
         self._strategy_fuel_at_finish: float = 0.0
         self._strategy_prev_lap: int = -1
 
+        # Tire state
+        self._tire_grip_pct: float = 100.0
+        self._tire_lap_count: int = 0
+        self._tire_laps_remaining: int = 99
+        self._tire_condition: str = "good"
+        self._tire_temp_lf: float = 0.0
+        self._tire_temp_rf: float = 0.0
+        self._tire_temp_lr: float = 0.0
+        self._tire_temp_rr: float = 0.0
+
         # Per-widget settings (widget_id -> settings dict)
         self._widget_settings: dict[str, dict] = {
             "delta_timing": {"enabled": False, "width": 320, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
@@ -251,6 +263,7 @@ class OverlayViewModel(QObject):
             "flat_map": {"enabled": False, "width": 300, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "fuel_calculator": {"enabled": False, "width": 220, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "race_strategy": {"enabled": False, "width": 280, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "tire_life": {"enabled": False, "width": 220, "height": 180, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "pitbox_helper": {"enabled": False, "width": 240, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "weather_monitor": {"enabled": False, "width": 200, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "boost_box": {"enabled": False, "width": 160, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
@@ -533,6 +546,40 @@ class OverlayViewModel(QObject):
     def strategyTotalLaps(self) -> int:  # noqa: N802
         """Total laps in the current strategy."""
         return self._strategy_total_laps
+
+    # -- Tire properties -------------------------------------------------------
+
+    @Property(float, notify=tireChanged)
+    def tireGripPct(self) -> float:  # noqa: N802
+        return self._tire_grip_pct
+
+    @Property(int, notify=tireChanged)
+    def tireLapCount(self) -> int:  # noqa: N802
+        return self._tire_lap_count
+
+    @Property(int, notify=tireChanged)
+    def tireLapsRemaining(self) -> int:  # noqa: N802
+        return self._tire_laps_remaining
+
+    @Property(str, notify=tireChanged)
+    def tireCondition(self) -> str:  # noqa: N802
+        return self._tire_condition
+
+    @Property(float, notify=tireChanged)
+    def tireTempLF(self) -> float:  # noqa: N802
+        return self._tire_temp_lf
+
+    @Property(float, notify=tireChanged)
+    def tireTempRF(self) -> float:  # noqa: N802
+        return self._tire_temp_rf
+
+    @Property(float, notify=tireChanged)
+    def tireTempLR(self) -> float:  # noqa: N802
+        return self._tire_temp_lr
+
+    @Property(float, notify=tireChanged)
+    def tireTempRR(self) -> float:  # noqa: N802
+        return self._tire_temp_rr
 
     @Slot(int, float, float, int)
     def calculatePreRaceStrategy(self, total_laps: int, fuel_capacity: float, pit_time: float, tire_life: int) -> None:  # noqa: N802
@@ -1119,6 +1166,19 @@ class OverlayViewModel(QObject):
         # Corner analysis rows
         self._corner_rows = result.get("corner_rows", [])
         self.deltaChanged.emit()
+
+        # Tire state from processor
+        ts = result.get("tire_state", {})
+        if ts:
+            self._tire_grip_pct = float(ts.get("grip_pct", 100))
+            self._tire_lap_count = int(ts.get("lap_count", 0))
+            self._tire_laps_remaining = int(ts.get("laps_remaining", 99))
+            self._tire_condition = str(ts.get("condition", "good"))
+            self._tire_temp_lf = float(ts.get("avg_temp_lf", 0))
+            self._tire_temp_rf = float(ts.get("avg_temp_rf", 0))
+            self._tire_temp_lr = float(ts.get("avg_temp_lr", 0))
+            self._tire_temp_rr = float(ts.get("avg_temp_rr", 0))
+            self.tireChanged.emit()
 
         # Map sector split rows from the processor into the QML format
         # expected by DeltaTimeWidget: [{id, delta, status}].
