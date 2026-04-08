@@ -206,9 +206,9 @@ class OverlayViewModel(QObject):
 
         # Per-widget settings (widget_id -> settings dict)
         self._widget_settings: dict[str, dict] = {
-            "delta_timing": {"enabled": True, "width": 320, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
-            "inputs_grip": {"enabled": True, "width": 240, "height": 260, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
-            "fuel_strategy": {"enabled": True, "width": 180, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "delta_timing": {"enabled": False, "width": 320, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "inputs_grip": {"enabled": False, "width": 240, "height": 260, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
+            "fuel_strategy": {"enabled": False, "width": 180, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
             "coaching": {"enabled": False, "width": 290, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
             "gforce_meter": {"enabled": False, "width": 200, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
             "lap_timing": {"enabled": False, "width": 280, "height": 120, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
