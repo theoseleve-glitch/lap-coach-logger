@@ -99,8 +99,27 @@ Window {
         z: -1  // below content so widget buttons still work
         onPressed: function(mouse) { clickPos = Qt.point(mouse.x, mouse.y) }
         onPositionChanged: function(mouse) {
-            root.x += mouse.x - clickPos.x
-            root.y += mouse.y - clickPos.y
+            var newX = root.x + mouse.x - clickPos.x
+            var newY = root.y + mouse.y - clickPos.y
+
+            // Snap to screen edges (15px threshold)
+            if (overlayVM && overlayVM.snapEnabled) {
+                var snapThreshold = 15
+                var screenW = Screen.width
+                var screenH = Screen.height
+
+                // Left edge
+                if (Math.abs(newX) < snapThreshold) newX = 0
+                // Right edge
+                if (Math.abs(newX + root.width - screenW) < snapThreshold) newX = screenW - root.width
+                // Top edge
+                if (Math.abs(newY) < snapThreshold) newY = 0
+                // Bottom edge
+                if (Math.abs(newY + root.height - screenH) < snapThreshold) newY = screenH - root.height
+            }
+
+            root.x = newX
+            root.y = newY
         }
         onReleased: {
             // Persist final position when drag ends

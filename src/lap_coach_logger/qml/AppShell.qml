@@ -345,6 +345,14 @@ Item {
         }
     }
 
+    // Ctrl+G — toggle snap-to-edge for overlay dragging
+    Shortcut {
+        sequence: "Ctrl+G"
+        onActivated: {
+            if (overlayVM) overlayVM.toggleSnap()
+        }
+    }
+
     // Ctrl+1/2/3/4 — switch tabs
     Shortcut { sequence: "Ctrl+1"; onActivated: navBar.pageRequested("dashboard") }
     Shortcut { sequence: "Ctrl+2"; onActivated: navBar.pageRequested("live") }

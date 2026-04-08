@@ -30,6 +30,18 @@ class OverlayViewModel(QObject):
     selectedWidgetChanged = Signal()
     overlayLockChanged = Signal()
     settingsSaveRequested = Signal()
+    accentChanged = Signal()
+
+    # -- accent colour palette -------------------------------------------------
+
+    _ACCENT_COLORS: dict[str, str] = {
+        "purple": "#8B5CF6",
+        "orange": "#C9A84C",
+        "green": "#22C55E",
+        "red": "#FF2A2A",
+        "blue": "#3B82F6",
+        "cyan": "#06B6D4",
+    }
 
     # -- layout presets --------------------------------------------------------
 
@@ -202,6 +214,8 @@ class OverlayViewModel(QObject):
 
         self._selected_widget: str = "delta_timing"
         self._overlay_locked: bool = False
+        self._overlay_accent: str = "purple"  # default Racing Purple
+        self._snap_enabled: bool = True
 
     # -- QML properties --------------------------------------------------------
 
@@ -430,6 +444,17 @@ class OverlayViewModel(QObject):
     def toggleOverlayLock(self) -> None:  # noqa: N802
         """Toggle the overlay lock state."""
         self._overlay_locked = not self._overlay_locked
+        self.overlayLockChanged.emit()
+
+    @Property(bool, notify=overlayLockChanged)
+    def snapEnabled(self) -> bool:  # noqa: N802
+        """Whether overlay widgets snap to screen edges when dragged."""
+        return self._snap_enabled
+
+    @Slot()
+    def toggleSnap(self) -> None:  # noqa: N802
+        """Toggle the snap-to-edge behavior."""
+        self._snap_enabled = not self._snap_enabled
         self.overlayLockChanged.emit()
 
     @Slot(float)
