@@ -156,12 +156,14 @@ Window {
         }
     }
 
-    // Glass surface container
+    // Glass surface container — dims when not hovered for less distraction
     Rectangle {
         id: container
         anchors.fill: parent
         radius: root.borderRadius
         color: Qt.rgba(0, 0, 0, 0.78)
+        opacity: dragArea.containsMouse ? 1.0 : 0.75
+        Behavior on opacity { NumberAnimation { duration: 200 } }
         border.width: (overlayVM && overlayVM.overlayLocked) ? 2 : 1
         border.color: (overlayVM && overlayVM.overlayLocked)
             ? Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.25)
@@ -253,8 +255,11 @@ Window {
     }
 
     // Drag support — grabs anywhere on the window
+    // Also handles hover opacity boost
     MouseArea {
+        id: dragArea
         anchors.fill: parent
+        hoverEnabled: true
         enabled: overlayVM ? !overlayVM.overlayLocked : true
         property point clickPos
         z: -1  // below content so widget buttons still work
