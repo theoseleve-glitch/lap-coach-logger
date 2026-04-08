@@ -72,6 +72,7 @@ Item {
     Connections {
         target: overlayVM
         function onWidgetSettingsChanged() { root._syncWindows() }
+        function onContextChanged() { root._syncWindows() }
     }
 
     function _syncWindows() {
@@ -82,6 +83,7 @@ Item {
         for (var i = 0; i < ids.length; i++) {
             var wid = ids[i]
             var enabled = root.overlayVisible && overlayVM.isWidgetEnabled(wid)
+                          && overlayVM.shouldShowOverlays
 
             if (enabled && !_windows[wid]) {
                 var comp = _componentMap[wid]

@@ -269,6 +269,10 @@ class OverlayViewModel(QObject):
         self._overlay_accent: str = "purple"  # default Racing Purple
         self._snap_enabled: bool = True
 
+        # Auto-hide overlays when not on track
+        self._auto_hide_enabled: bool = True
+        self._should_show_overlays: bool = True
+
     # -- QML properties --------------------------------------------------------
 
     @Property(float, notify=inputsChanged)
@@ -533,6 +537,22 @@ class OverlayViewModel(QObject):
         """Toggle the snap-to-edge behavior."""
         self._snap_enabled = not self._snap_enabled
         self.overlayLockChanged.emit()
+
+    @Property(bool, notify=contextChanged)
+    def shouldShowOverlays(self) -> bool:  # noqa: N802
+        """Whether overlays should be visible (respects auto-hide logic)."""
+        return self._should_show_overlays
+
+    @Property(bool, notify=contextChanged)
+    def autoHideEnabled(self) -> bool:  # noqa: N802
+        """Whether auto-hide is active (hides overlays when not recording)."""
+        return self._auto_hide_enabled
+
+    @Slot()
+    def toggleAutoHide(self) -> None:  # noqa: N802
+        """Toggle the auto-hide behavior for overlays."""
+        self._auto_hide_enabled = not self._auto_hide_enabled
+        self.contextChanged.emit()
 
     @Slot(float)
     def adjustAllOpacity(self, delta: float) -> None:  # noqa: N802
@@ -946,6 +966,9 @@ class OverlayViewModel(QObject):
             self._current_flag = "green"
         else:
             self._current_flag = "none"
+
+        # Auto-hide: show overlays when on track or in pits during a recording session
+        self._should_show_overlays = not self._auto_hide_enabled or self._is_recording
 
         self.contextChanged.emit()
 

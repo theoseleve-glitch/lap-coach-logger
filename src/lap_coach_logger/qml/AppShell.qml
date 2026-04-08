@@ -224,7 +224,8 @@ Item {
                     var ids = overlayVM.getEnabledWidgetIds()
                     var count = ids ? ids.length : 0
                     var lockText = overlayVM.overlayLocked ? " \u00b7 \ud83d\udd12" : ""
-                    return count + " overlay" + (count !== 1 ? "s" : "") + lockText
+                    var hideMode = overlayVM.autoHideEnabled ? " \u00b7 AUTO" : " \u00b7 MANUAL"
+                    return count + " overlay" + (count !== 1 ? "s" : "") + hideMode + lockText
                 }
                 font { family: Theme.Typography.monoFamily; pixelSize: 10 }
                 color: Theme.Tokens.steel
@@ -350,6 +351,14 @@ Item {
         sequence: "Ctrl+G"
         onActivated: {
             if (overlayVM) overlayVM.toggleSnap()
+        }
+    }
+
+    // Ctrl+H — toggle auto-hide overlays when not on track
+    Shortcut {
+        sequence: "Ctrl+H"
+        onActivated: {
+            if (overlayVM) overlayVM.toggleAutoHide()
         }
     }
 
