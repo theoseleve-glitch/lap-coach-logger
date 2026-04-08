@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     CLEAR / CAR LEFT / CAR RIGHT, center divider, percentage.      */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 200
     height: 120
     color: "transparent"
@@ -69,7 +72,7 @@ Rectangle {
         Text {
             text: "PROXIMITY"
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 9
+            font.pixelSize: Math.round(9 * root.fontScale)
             font.weight: Font.Bold
             font.letterSpacing: 1.2
             color: Theme.Tokens.steel
@@ -87,7 +90,7 @@ Rectangle {
                 Text {
                     text: root.leftLabel
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
+                    font.pixelSize: Math.round(8 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 1.0
                     color: safeLeft < 0.01
@@ -103,7 +106,7 @@ Rectangle {
                 Text {
                     text: Math.round(root.safeLeft * 100) + "%"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
+                    font.pixelSize: Math.round(8 * root.fontScale)
                     font.weight: Font.DemiBold
                     color: Theme.Tokens.steel
                     opacity: safeLeft > 0.01 ? 0.8 : 0.3
@@ -160,7 +163,7 @@ Rectangle {
                 Text {
                     text: root.rightLabel
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
+                    font.pixelSize: Math.round(8 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 1.0
                     color: safeRight < 0.01
@@ -176,7 +179,7 @@ Rectangle {
                 Text {
                     text: Math.round(root.safeRight * 100) + "%"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
+                    font.pixelSize: Math.round(8 * root.fontScale)
                     font.weight: Font.DemiBold
                     color: Theme.Tokens.steel
                     opacity: safeRight > 0.01 ? 0.8 : 0.3

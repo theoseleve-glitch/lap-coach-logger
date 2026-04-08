@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     and a personal best indicator flash.                              */
 GlassSurface {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 280
     implicitHeight: col.implicitHeight + 20
 
@@ -60,7 +63,7 @@ GlassSurface {
     // ── Inline component: micro label ───────────────────────────────
     component MicroLabel: Text {
         font.family: Theme.Typography.monoFamily
-        font.pixelSize: 9
+        font.pixelSize: Math.round(9 * root.fontScale)
         font.weight: Font.Bold
         font.letterSpacing: 1.2
         color: Theme.Tokens.steel
@@ -113,7 +116,7 @@ GlassSurface {
             Text {
                 text: root.safeCurrentTime
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 32
+                font.pixelSize: Math.round(32 * root.fontScale)
                 font.weight: Font.Bold
                 color: Theme.Tokens.chalk
                 Layout.fillWidth: true
@@ -136,7 +139,7 @@ GlassSurface {
                 Text {
                     text: root.safeLastTime
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 13
+                    font.pixelSize: Math.round(13 * root.fontScale)
                     font.weight: Font.Bold
                     color: Theme.Tokens.chalk
                 }
@@ -159,7 +162,7 @@ GlassSurface {
                 Text {
                     text: root.safeDelta
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 13
+                    font.pixelSize: Math.round(13 * root.fontScale)
                     font.weight: Font.Bold
                     color: root.deltaColor
                     horizontalAlignment: Text.AlignRight
@@ -189,7 +192,7 @@ GlassSurface {
                 Text {
                     text: root.safeBestTime
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 13
+                    font.pixelSize: Math.round(13 * root.fontScale)
                     font.weight: Font.Bold
                     color: Theme.Tokens.pitOrange
                     horizontalAlignment: Text.AlignRight
@@ -211,7 +214,7 @@ GlassSurface {
             Text {
                 text: root.safeGap
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 13
+                font.pixelSize: Math.round(13 * root.fontScale)
                 font.weight: Font.Bold
                 color: Theme.Tokens.marshalYellow
             }

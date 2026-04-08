@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     and dimmer unit labels.  Header reads "TELEMETRY".                  */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 360
     height: 280
     color: "transparent"
@@ -62,7 +65,7 @@ Rectangle {
             Text {
                 text: chRow.chLabel
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
+                font.pixelSize: Math.round(8 * root.fontScale)
                 font.weight: Font.Bold
                 font.letterSpacing: 0.8
                 color: Theme.Tokens.steel
@@ -86,7 +89,7 @@ Rectangle {
                 visible: chRow.chUnit !== ""
                 text: chRow.chUnit
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
+                font.pixelSize: Math.round(8 * root.fontScale)
                 font.weight: Font.Normal
                 color: Theme.Tokens.steel
                 opacity: 0.5
@@ -130,7 +133,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: root.channelCount + " CH"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.weight: Font.Bold
                     color: Theme.Tokens.pitOrange
                 }

@@ -6,6 +6,9 @@ import "../../Theme" as Theme
     Category: streaming -- uses racingPurple accent.                      */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 200
     height: 60
     color: "transparent"
@@ -40,7 +43,7 @@ Rectangle {
             }
             text: "MIC"
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 7
+            font.pixelSize: Math.round(7 * root.fontScale)
             font.weight: Font.Bold
             font.letterSpacing: 1.0
             color: Theme.Tokens.steel

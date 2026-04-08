@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     direction indicators, animated sweep line.                      */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 200
     height: 200
     color: "transparent"
@@ -53,7 +56,7 @@ Rectangle {
             Text {
                 text: "RADAR"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
+                font.pixelSize: Math.round(9 * root.fontScale)
                 font.weight: Font.Bold
                 font.letterSpacing: 1.2
                 color: Theme.Tokens.steel
@@ -64,7 +67,7 @@ Rectangle {
             Text {
                 text: root.safeRange.toFixed(0) + " m"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
+                font.pixelSize: Math.round(9 * root.fontScale)
                 color: Theme.Tokens.steel
                 opacity: 0.7
             }
@@ -261,7 +264,7 @@ Rectangle {
                 Text {
                     text: "AHEAD"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.letterSpacing: 0.8
                     color: Theme.Tokens.steel
                     opacity: 0.6
@@ -279,7 +282,7 @@ Rectangle {
                 Text {
                     text: "BEHIND"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.letterSpacing: 0.8
                     color: Theme.Tokens.steel
                     opacity: 0.6

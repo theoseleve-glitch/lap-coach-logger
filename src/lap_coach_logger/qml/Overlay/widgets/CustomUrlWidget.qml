@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     Category: streaming -- uses racingPurple accent.                      */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 300
     height: 200
     color: "transparent"
@@ -45,7 +48,7 @@ Rectangle {
                 Text {
                     text: "URL"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 9
+                    font.pixelSize: Math.round(9 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 1.2
                     color: Theme.Tokens.steel
@@ -65,7 +68,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: "STREAM"
                         font.family: Theme.Typography.monoFamily
-                        font.pixelSize: 7
+                        font.pixelSize: Math.round(7 * root.fontScale)
                         font.weight: Font.Bold
                         color: Theme.Tokens.racingPurple
                     }
@@ -79,7 +82,7 @@ Rectangle {
                 Layout.fillWidth: true
                 text: root._safeUrl
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
+                font.pixelSize: Math.round(8 * root.fontScale)
                 color: Theme.Tokens.racingPurple
                 elide: Text.ElideMiddle
                 opacity: 0.7

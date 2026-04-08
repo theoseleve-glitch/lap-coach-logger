@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     Category: streaming -- uses racingPurple accent.                          */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 280
     height: 200
     color: "transparent"
@@ -42,7 +45,7 @@ Rectangle {
             Text {
                 text: "RACE GAME"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
+                font.pixelSize: Math.round(9 * root.fontScale)
                 font.weight: Font.Bold
                 font.letterSpacing: 1.2
                 color: Theme.Tokens.steel
@@ -69,7 +72,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: root.isActive ? "LIVE" : "ENDED"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.weight: Font.Bold
                     color: Theme.Tokens.racingPurple
                 }
@@ -80,7 +83,7 @@ Rectangle {
             Text {
                 text: root._count + " picks"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
+                font.pixelSize: Math.round(8 * root.fontScale)
                 color: Theme.Tokens.steel
                 opacity: 0.6
             }
@@ -169,7 +172,7 @@ Rectangle {
         Text {
             text: _user
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 9
+            font.pixelSize: Math.round(9 * root.fontScale)
             font.weight: Font.Bold
             color: Theme.Tokens.racingPurple
             Layout.preferredWidth: 70
@@ -179,7 +182,7 @@ Rectangle {
         Text {
             text: _pick
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 9
+            font.pixelSize: Math.round(9 * root.fontScale)
             color: Theme.Tokens.chalk
             Layout.fillWidth: true
             elide: Text.ElideRight
@@ -190,7 +193,7 @@ Rectangle {
                 : _result === "wrong"   ? "0"
                 : "..."
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 9
+            font.pixelSize: Math.round(9 * root.fontScale)
             font.weight: Font.Bold
             color: _result === "correct" ? Theme.Tokens.acidGreen
                  : _result === "wrong"   ? Theme.Tokens.safetyRed

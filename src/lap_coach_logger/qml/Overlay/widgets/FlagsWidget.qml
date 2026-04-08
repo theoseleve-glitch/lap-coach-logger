@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     Canvas checkered pattern, smooth color transitions.             */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 160
     height: 100
     color: "transparent"
@@ -111,7 +114,7 @@ Rectangle {
         Text {
             text: "FLAG"
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 9
+            font.pixelSize: Math.round(9 * root.fontScale)
             font.weight: Font.Bold
             font.letterSpacing: 1.2
             color: Theme.Tokens.steel
@@ -191,7 +194,7 @@ Rectangle {
 
                     Text {
                         text: root.flagIcon
-                        font.pixelSize: 16
+                        font.pixelSize: Math.round(16 * root.fontScale)
                         visible: safeFlag !== "none"
 
                         Behavior on opacity { NumberAnimation { duration: 200 } }
@@ -200,7 +203,7 @@ Rectangle {
                     Text {
                         text: root.flagLabel
                         font.family: Theme.Typography.monoFamily
-                        font.pixelSize: 16
+                        font.pixelSize: Math.round(16 * root.fontScale)
                         font.weight: Font.Bold
                         font.letterSpacing: 2
                         color: (safeFlag === "none" || safeFlag === "green")
@@ -217,7 +220,7 @@ Rectangle {
                     visible: root.flagSubtitle.length > 0
                     text: root.flagSubtitle
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 9
+                    font.pixelSize: Math.round(9 * root.fontScale)
                     font.weight: Font.DemiBold
                     font.letterSpacing: 1.5
                     color: Qt.rgba(root.flagColor.r, root.flagColor.g,

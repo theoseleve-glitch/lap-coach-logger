@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     time that flashes when low, and optional thin progress bar.      */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 200
     height: 80
     color: "transparent"
@@ -100,7 +103,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: root._safeType.toUpperCase()
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
+                    font.pixelSize: Math.round(8 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 1.0
                     color: root.sessionColor
@@ -116,7 +119,7 @@ Rectangle {
                 visible: root.hasRemaining
                 text: root.timeRemaining + " rem"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
+                font.pixelSize: Math.round(9 * root.fontScale)
                 font.weight: Font.DemiBold
                 color: root.lowTime ? Theme.Tokens.safetyRed : Theme.Tokens.steel
                 opacity: _flashAnim.running ? _flashAnim._opacity : 1.0
@@ -129,7 +132,7 @@ Rectangle {
         Text {
             text: root.elapsed
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 26
+            font.pixelSize: Math.round(26 * root.fontScale)
             font.weight: Font.Bold
             color: Theme.Tokens.chalk
             Layout.topMargin: 4
@@ -140,7 +143,7 @@ Rectangle {
             visible: root.hasRemaining
             text: root.timeRemaining + " remaining"
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 10
+            font.pixelSize: Math.round(10 * root.fontScale)
             font.weight: Font.DemiBold
             color: root.lowTime ? Theme.Tokens.safetyRed : Theme.Tokens.steel
             opacity: root.lowTime

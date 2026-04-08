@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     Category: streaming -- uses racingPurple accent.                       */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 260
     height: 240
     color: "transparent"
@@ -44,7 +47,7 @@ Rectangle {
             Text {
                 text: "PREDICTIONS"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
+                font.pixelSize: Math.round(9 * root.fontScale)
                 font.weight: Font.Bold
                 font.letterSpacing: 1.2
                 color: Theme.Tokens.steel
@@ -64,7 +67,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: "RD " + Math.max(1, root.roundNumber || 1)
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.weight: Font.Bold
                     color: Theme.Tokens.racingPurple
                 }
@@ -75,7 +78,7 @@ Rectangle {
             Text {
                 text: root._count + " players"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
+                font.pixelSize: Math.round(8 * root.fontScale)
                 color: Theme.Tokens.steel
                 opacity: 0.6
             }
@@ -152,7 +155,7 @@ Rectangle {
         Layout.fillWidth: fillW
         horizontalAlignment: hAlign
         font.family: Theme.Typography.monoFamily
-        font.pixelSize: 7
+        font.pixelSize: Math.round(7 * root.fontScale)
         font.weight: Font.Bold
         color: Theme.Tokens.steel
         opacity: 0.5
@@ -216,7 +219,7 @@ Rectangle {
             Text {
                 text: _streak > 0 ? _streak + "W" : "-"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
+                font.pixelSize: Math.round(9 * root.fontScale)
                 color: _streak > 0 ? Theme.Tokens.acidGreen : Theme.Tokens.steel
                 Layout.preferredWidth: 40
                 horizontalAlignment: Text.AlignRight

@@ -9,6 +9,9 @@ import "../../Theme" as Theme
     empty state.                                                       */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 260
     height: 280
     color: "transparent"
@@ -107,7 +110,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: _row._pos > 0 ? _row._pos.toString() : ""
                     font.family:    Theme.Typography.monoFamily
-                    font.pixelSize: 11
+                    font.pixelSize: Math.round(11 * root.fontScale)
                     font.weight:    Font.Bold
                     color: _row._isPlayer
                            ? Theme.Tokens.acidGreen
@@ -122,7 +125,7 @@ Rectangle {
                 Layout.fillWidth: true
                 text: _row._name
                 font.family:    Theme.Typography.monoFamily
-                font.pixelSize: 11
+                font.pixelSize: Math.round(11 * root.fontScale)
                 color: _row._isPlayer ? Theme.Tokens.acidGreen : Theme.Tokens.chalk
                 elide: Text.ElideRight
             }
@@ -182,7 +185,7 @@ Rectangle {
                 Layout.fillWidth: true
                 text: "DRIVER"
                 font.family:       Theme.Typography.monoFamily
-                font.pixelSize:    8
+                font.pixelSize:    Math.round(8 * root.fontScale)
                 font.weight:       Font.Bold
                 font.letterSpacing: 0.8
                 color: Theme.Tokens.steel
@@ -193,7 +196,7 @@ Rectangle {
                 Layout.preferredWidth: 64
                 text: "GAP"
                 font.family:       Theme.Typography.monoFamily
-                font.pixelSize:    8
+                font.pixelSize:    Math.round(8 * root.fontScale)
                 font.weight:       Font.Bold
                 font.letterSpacing: 0.8
                 color: Theme.Tokens.steel

@@ -9,6 +9,9 @@ import "../../Theme" as Theme
     animation (scale down + fade).                                           */
 GlassSurface {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 290
     implicitHeight: col.implicitHeight + 24
 
@@ -138,7 +141,7 @@ GlassSurface {
                     return parts.join(" \u00B7 ")
                 }
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
+                font.pixelSize: Math.round(9 * root.fontScale)
                 font.weight: Font.Bold
                 font.letterSpacing: 1.2
                 color: root.severityColor
@@ -157,7 +160,7 @@ GlassSurface {
                 Text {
                     anchors.centerIn: parent
                     text: "\u00D7"
-                    font.pixelSize: 12
+                    font.pixelSize: Math.round(12 * root.fontScale)
                     font.weight: Font.Bold
                     color: dismissArea.containsMouse
                           ? Theme.Tokens.chalk : Theme.Tokens.steel
@@ -180,7 +183,7 @@ GlassSurface {
         Text {
             text: root.headline || ""
             font.family: Theme.Typography.bodyFamily
-            font.pixelSize: 19
+            font.pixelSize: Math.round(19 * root.fontScale)
             font.weight: Font.DemiBold
             color: Theme.Tokens.chalk
             wrapMode: Text.WordWrap
@@ -193,7 +196,7 @@ GlassSurface {
             visible: (root.sub ? root.sub.length : 0) > 0
             text: root.sub || ""
             font.family: Theme.Typography.bodyFamily
-            font.pixelSize: 12
+            font.pixelSize: Math.round(12 * root.fontScale)
             color: Theme.Tokens.steel
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
@@ -236,7 +239,7 @@ GlassSurface {
             Text {
                 text: root.confidence + "%"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
+                font.pixelSize: Math.round(9 * root.fontScale)
                 font.weight: Font.Bold
                 color: Theme.Tokens.steel
                 Layout.alignment: Qt.AlignVCenter
@@ -248,7 +251,7 @@ GlassSurface {
             Text {
                 text: "Coach"
                 font.family: Theme.Typography.bodyFamily
-                font.pixelSize: 10
+                font.pixelSize: Math.round(10 * root.fontScale)
                 font.weight: Font.DemiBold
                 font.italic: true
                 color: Qt.rgba(Theme.Tokens.racingPurple.r,

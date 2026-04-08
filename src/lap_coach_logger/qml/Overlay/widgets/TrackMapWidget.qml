@@ -9,6 +9,9 @@ import "../../Theme" as Theme
     Repaint on carPosition, trackPoints, nearbyPositions change + resize.   */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 240
     height: 240
     color: "transparent"

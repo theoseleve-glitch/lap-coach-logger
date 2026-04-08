@@ -11,6 +11,9 @@ import "../../Theme" as Theme
 */
 GlassSurface {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 220
     implicitHeight: col.implicitHeight + 24
 
@@ -49,7 +52,7 @@ GlassSurface {
 
         Text {
             text: label
-            font { family: Theme.Typography.monoFamily; pixelSize: 8; weight: Font.Bold; letterSpacing: 1 }
+            font { family: Theme.Typography.monoFamily; pixelSize: Math.round(8 * root.fontScale); weight: Font.Bold; letterSpacing: 1 }
             color: barColor
             horizontalAlignment: Text.AlignHCenter
             Layout.alignment: Qt.AlignHCenter
@@ -88,7 +91,7 @@ GlassSurface {
 
         Text {
             text: Math.round(value * 100)
-            font { family: Theme.Typography.monoFamily; pixelSize: 10; weight: Font.Bold }
+            font { family: Theme.Typography.monoFamily; pixelSize: Math.round(10 * root.fontScale); weight: Font.Bold }
             color: Theme.Tokens.chalk
             horizontalAlignment: Text.AlignHCenter
             Layout.alignment: Qt.AlignHCenter
@@ -119,7 +122,7 @@ GlassSurface {
         }
         Text {
             text: label
-            font { family: Theme.Typography.monoFamily; pixelSize: 8; weight: Font.Bold; letterSpacing: 0.5 }
+            font { family: Theme.Typography.monoFamily; pixelSize: Math.round(8 * root.fontScale); weight: Font.Bold; letterSpacing: 0.5 }
             color: active ? dotColor : Theme.Tokens.steel
             Behavior on color { ColorAnimation { duration: 100 } }
         }
@@ -137,7 +140,7 @@ GlassSurface {
 
             Text {
                 text: "INPUTS"
-                font { family: Theme.Typography.monoFamily; pixelSize: 9; weight: Font.Bold; letterSpacing: 2 }
+                font { family: Theme.Typography.monoFamily; pixelSize: Math.round(9 * root.fontScale); weight: Font.Bold; letterSpacing: 2 }
                 color: Theme.Tokens.steel
             }
             Item { Layout.fillWidth: true }
@@ -325,7 +328,7 @@ GlassSurface {
                 Text {
                     id: overlapText; anchors.centerIn: parent
                     text: "OVERLAP"
-                    font { family: Theme.Typography.monoFamily; pixelSize: 7; weight: Font.Bold }
+                    font { family: Theme.Typography.monoFamily; pixelSize: Math.round(7 * root.fontScale); weight: Font.Bold }
                     color: Theme.Tokens.marshalYellow; opacity: 0.7
                 }
             }
@@ -334,7 +337,7 @@ GlassSurface {
 
             Text {
                 text: "G " + Math.sqrt(root.gForceX * root.gForceX + root.gForceY * root.gForceY).toFixed(1)
-                font { family: Theme.Typography.monoFamily; pixelSize: 9; weight: Font.Bold }
+                font { family: Theme.Typography.monoFamily; pixelSize: Math.round(9 * root.fontScale); weight: Font.Bold }
                 color: Theme.Tokens.steel
             }
         }

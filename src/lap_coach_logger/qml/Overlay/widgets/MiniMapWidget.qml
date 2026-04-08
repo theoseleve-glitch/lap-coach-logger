@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     Null safety on trackPoints and carPosition.                     */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 180
     height: 180
     color: "transparent"

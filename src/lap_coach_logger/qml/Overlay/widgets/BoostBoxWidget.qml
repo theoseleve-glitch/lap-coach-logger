@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     Colors: deploy = acidGreen, harvest = marshalYellow, off = steel.  */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 160
     height: 100
     color: "transparent"
@@ -73,7 +76,7 @@ Rectangle {
                     text: (typeof root.boostMode === "string")
                           ? root.boostMode.toUpperCase() : "OFF"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 0.8
                     color: root.modeColor

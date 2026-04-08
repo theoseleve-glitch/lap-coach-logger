@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     combined-G readout, and peak-G indicator.                       */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 200
     height: 200
     color: "transparent"

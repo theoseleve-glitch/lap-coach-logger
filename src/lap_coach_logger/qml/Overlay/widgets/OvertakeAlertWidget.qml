@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     and optional car-number badge.  Pulses when active, fades when idle. */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width:  240
     height: 60
     color: "transparent"
@@ -74,7 +77,7 @@ Rectangle {
             Text {
                 visible: root._active && root._left
                 text:    root._arrow
-                font.pixelSize: 18
+                font.pixelSize: Math.round(18 * root.fontScale)
                 font.weight: Font.Bold
                 color: root._color
                 Behavior on color { ColorAnimation { duration: Theme.Motion.statusColorDuration } }
@@ -84,7 +87,7 @@ Rectangle {
             Text {
                 text: root._active ? root._label : "NO ALERT"
                 font.family:       Theme.Typography.monoFamily
-                font.pixelSize:    root._active ? 18 : 11
+                font.pixelSize:    root._active ? Math.round(18 * root.fontScale) : Math.round(11 * root.fontScale)
                 font.weight:       Font.Bold
                 font.letterSpacing: root._active ? 2.0 : 1.2
                 color:   root._active ? root._color : Theme.Tokens.steel
@@ -109,7 +112,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: "#" + (root.carNumber || "")
                     font.family:    Theme.Typography.monoFamily
-                    font.pixelSize: 11
+                    font.pixelSize: Math.round(11 * root.fontScale)
                     font.weight:    Font.Bold
                     color: root._color
 
@@ -121,7 +124,7 @@ Rectangle {
             Text {
                 visible: root._active && !root._left
                 text:    root._arrow
-                font.pixelSize: 18
+                font.pixelSize: Math.round(18 * root.fontScale)
                 font.weight: Font.Bold
                 color: root._color
                 Behavior on color { ColorAnimation { duration: Theme.Motion.statusColorDuration } }

@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     with pulse on critical, and animated pit window text.                     */
 GlassSurface {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 164
     implicitHeight: col.implicitHeight + 24
 
@@ -64,7 +67,7 @@ GlassSurface {
         Text {
             text: parent.label
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 9
+            font.pixelSize: Math.round(9 * root.fontScale)
             font.weight: Font.Bold
             font.letterSpacing: 1.0
             color: Theme.Tokens.steel
@@ -73,7 +76,7 @@ GlassSurface {
         Text {
             text: parent.value
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 13
+            font.pixelSize: Math.round(13 * root.fontScale)
             font.weight: Font.Bold
             color: parent.valueColor
             Behavior on color { ColorAnimation { duration: 200 } }
@@ -99,7 +102,7 @@ GlassSurface {
             Text {
                 text: "FUEL"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
+                font.pixelSize: Math.round(9 * root.fontScale)
                 font.weight: Font.Bold
                 font.letterSpacing: 1.2
                 color: Theme.Tokens.steel
@@ -184,7 +187,7 @@ GlassSurface {
                 Text {
                     text: "LAPS LEFT"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 0.8
                     color: Theme.Tokens.steel
@@ -195,7 +198,7 @@ GlassSurface {
                     text: (root.lapsLeft !== undefined && !isNaN(root.lapsLeft))
                           ? root.lapsLeft.toFixed(1) : "--.-"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 20
+                    font.pixelSize: Math.round(20 * root.fontScale)
                     font.weight: Font.Bold
                     color: root.stateColor
                     horizontalAlignment: Text.AlignHCenter
@@ -238,7 +241,7 @@ GlassSurface {
                 anchors.centerIn: parent
                 text: Math.round(root.tankPercent * 100) + "%"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 7
+                font.pixelSize: Math.round(7 * root.fontScale)
                 font.weight: Font.Bold
                 color: Theme.Tokens.chalk
                 visible: parent.width >= 40
@@ -307,7 +310,7 @@ GlassSurface {
                     anchors.centerIn: parent
                     text: root.state || "SAFE"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 9
+                    font.pixelSize: Math.round(9 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 1.0
                     color: root.stateColor
@@ -320,7 +323,7 @@ GlassSurface {
                 id: pitWindowText
                 text: root.pitWindow || ""
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
+                font.pixelSize: Math.round(9 * root.fontScale)
                 font.weight: Font.DemiBold
                 color: Theme.Tokens.steel
                 elide: Text.ElideRight

@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     with glow: DRY=green, DAMP=yellow, WET=blue.                    */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 200
     height: 180
     color: "transparent"
@@ -122,7 +125,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: root.safeState
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
+                    font.pixelSize: Math.round(8 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 0.8
                     color: root.stateColor
@@ -174,7 +177,7 @@ Rectangle {
                 Text {
                     id: windArrow
                     text: "\u25B2"
-                    font.pixelSize: 10
+                    font.pixelSize: Math.round(10 * root.fontScale)
                     color: Theme.Tokens.chalk
                     visible: root.windRotation(root.safeWindDir) >= 0
                     rotation: root.windRotation(root.safeWindDir)
@@ -184,7 +187,7 @@ Rectangle {
                 Text {
                     text: root.safeFix(root.windSpeed, 0) + " km/h " + root.safeWindDir
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 13
+                    font.pixelSize: Math.round(13 * root.fontScale)
                     font.weight: Font.Bold
                     color: Theme.Tokens.chalk
                 }
@@ -210,7 +213,7 @@ Rectangle {
                     Text {
                         text: root.safeRain + "%"
                         font.family: Theme.Typography.monoFamily
-                        font.pixelSize: 13
+                        font.pixelSize: Math.round(13 * root.fontScale)
                         font.weight: Font.Bold
                         color: root.rainColor
                         Behavior on color { ColorAnimation { duration: Theme.Motion.statusColorDuration } }
@@ -273,7 +276,7 @@ Rectangle {
         Text {
             text: value
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 13
+            font.pixelSize: Math.round(13 * root.fontScale)
             font.weight: Font.Bold
             color: valueColor
             Behavior on color { ColorAnimation { duration: Theme.Motion.statusColorDuration } }

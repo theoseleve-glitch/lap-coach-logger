@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     Canvas LED digit display, null safety throughout.               */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 120
     height: 120
     color: "transparent"
@@ -68,7 +71,7 @@ Rectangle {
         Text {
             text: "MARSHAL POST"
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 8
+            font.pixelSize: Math.round(8 * root.fontScale)
             font.weight: Font.Bold
             font.letterSpacing: 1.0
             color: Theme.Tokens.steel
@@ -159,7 +162,7 @@ Rectangle {
 
             Text {
                 text: root.flagSymbol
-                font.pixelSize: 12
+                font.pixelSize: Math.round(12 * root.fontScale)
                 color: root.flagColor
 
                 Behavior on color { ColorAnimation { duration: 300 } }
@@ -168,7 +171,7 @@ Rectangle {
             Text {
                 text: root.flagName
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 10
+                font.pixelSize: Math.round(10 * root.fontScale)
                 font.weight: Font.Bold
                 font.letterSpacing: 1.2
                 color: root.flagColor
@@ -185,7 +188,7 @@ Rectangle {
             visible: root.safeMessage.length > 0
             text: root.safeMessage
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 8
+            font.pixelSize: Math.round(8 * root.fontScale)
             font.weight: Font.DemiBold
             color: Theme.Tokens.steel
             horizontalAlignment: Text.AlignHCenter

@@ -11,6 +11,9 @@ import "../../Theme" as Theme
     Null safety on all numeric inputs.                                */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 280
     height: 180
     color: "transparent"
@@ -54,7 +57,7 @@ Rectangle {
         Text {
             text: label
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 7
+            font.pixelSize: Math.round(7 * root.fontScale)
             font.weight: Font.Bold
             color: barColor
             horizontalAlignment: Text.AlignHCenter
@@ -87,7 +90,7 @@ Rectangle {
         Text {
             text: Math.round(clamped * 100) + "%"
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 8
+            font.pixelSize: Math.round(8 * root.fontScale)
             font.weight: Font.Bold
             color: Theme.Tokens.chalk
             horizontalAlignment: Text.AlignHCenter
@@ -125,7 +128,7 @@ Rectangle {
             Text {
                 text: root.gearText
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 18
+                font.pixelSize: Math.round(18 * root.fontScale)
                 font.weight: Font.Bold
                 color: Theme.Tokens.chalk
                 Behavior on text { SequentialAnimation {

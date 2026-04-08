@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     compact table layout.  Best lap highlighted with badge.         */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 280
     height: 200
     color: "transparent"
@@ -50,7 +53,7 @@ Rectangle {
         property string label: ""
         text: label
         font.family: Theme.Typography.monoFamily
-        font.pixelSize: 9
+        font.pixelSize: Math.round(9 * root.fontScale)
         font.weight: Font.Bold
         font.letterSpacing: 1.0
         color: Theme.Tokens.steel
@@ -105,7 +108,7 @@ Rectangle {
             visible: root._lapCount === 0
             text: "No laps recorded"
             font.family: Theme.Typography.bodyFamily
-            font.pixelSize: 11
+            font.pixelSize: Math.round(11 * root.fontScale)
             font.weight: Font.Normal
             color: Theme.Tokens.steel
             opacity: 0.6
@@ -162,7 +165,7 @@ Rectangle {
                     Text {
                         text: entry ? ("" + entry.lap) : ""
                         font.family: Theme.Typography.monoFamily
-                        font.pixelSize: 11
+                        font.pixelSize: Math.round(11 * root.fontScale)
                         font.weight: Font.Bold
                         color: Theme.Tokens.steel
                         Layout.preferredWidth: 32
@@ -181,7 +184,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: "BEST"
                             font.family: Theme.Typography.monoFamily
-                            font.pixelSize: 7
+                            font.pixelSize: Math.round(7 * root.fontScale)
                             font.weight: Font.Bold
                             font.letterSpacing: 0.8
                             color: Theme.Tokens.pitOrange
@@ -194,7 +197,7 @@ Rectangle {
                     Text {
                         text: entry ? (entry.time || "") : ""
                         font.family: Theme.Typography.monoFamily
-                        font.pixelSize: 12
+                        font.pixelSize: Math.round(12 * root.fontScale)
                         font.weight: Font.Bold
                         color: entry ? root._statusColor(entry.status)
                                      : Theme.Tokens.chalk
@@ -207,7 +210,7 @@ Rectangle {
                     Text {
                         text: entry ? (entry.delta || "") : ""
                         font.family: Theme.Typography.monoFamily
-                        font.pixelSize: 11
+                        font.pixelSize: Math.round(11 * root.fontScale)
                         font.weight: Font.Bold
                         color: entry ? root._deltaColor(entry.delta)
                                      : Theme.Tokens.steel

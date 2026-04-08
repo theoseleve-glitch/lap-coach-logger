@@ -10,6 +10,9 @@ import "../../Theme" as Theme
     Inline component: EventRow                                       */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 300
     height: 240
     color: "transparent"
@@ -67,7 +70,7 @@ Rectangle {
                 Text {
                     text: root.fmtTime(row.evt.time)
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 13
+                    font.pixelSize: Math.round(13 * root.fontScale)
                     font.weight: Font.Bold
                     color: row.isNext ? Theme.Tokens.acidGreen : Theme.Tokens.chalk
                     Behavior on color { ColorAnimation { duration: Theme.Motion.statusColorDuration } }
@@ -96,7 +99,7 @@ Rectangle {
                 Text {
                     text: row.evt.name || ""
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 11
+                    font.pixelSize: Math.round(11 * root.fontScale)
                     font.weight: Font.DemiBold
                     color: Theme.Tokens.chalk
                     elide: Text.ElideRight
@@ -106,7 +109,7 @@ Rectangle {
                     visible: (row.evt.registrationEnd || "").length > 0
                     text: "REG " + (row.evt.registrationEnd || "")
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.letterSpacing: 0.6
                     color: Theme.Tokens.steel
                 }
@@ -126,7 +129,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: "NEXT"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.weight: Font.Bold
                     color: Theme.Tokens.acidGreen
                 }
@@ -169,7 +172,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: Array.isArray(root.events) ? root.events.length : 0
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.weight: Font.Bold
                     color: Theme.Tokens.marshalYellow
                 }

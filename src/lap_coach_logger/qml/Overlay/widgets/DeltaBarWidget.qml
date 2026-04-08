@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     centered over the bar with scale markers.                       */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 300
     height: 60
     color: "transparent"
@@ -38,7 +41,7 @@ Rectangle {
         property string label: ""
         text: label
         font.family: Theme.Typography.monoFamily
-        font.pixelSize: 7
+        font.pixelSize: Math.round(7 * root.fontScale)
         font.weight: Font.Bold
         color: Theme.Tokens.steel
         opacity: 0.5
@@ -59,7 +62,7 @@ Rectangle {
         Text {
             text: root.formatDelta(root._safeDelta)
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 20
+            font.pixelSize: Math.round(20 * root.fontScale)
             font.weight: Font.Bold
             color: root.deltaColor
             horizontalAlignment: Text.AlignHCenter
@@ -197,7 +200,7 @@ Rectangle {
             Text {
                 text: "FASTER"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
+                font.pixelSize: Math.round(8 * root.fontScale)
                 font.weight: Font.Bold
                 font.letterSpacing: 1.0
                 color: Theme.Tokens.acidGreen
@@ -209,7 +212,7 @@ Rectangle {
             Text {
                 text: "SLOWER"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
+                font.pixelSize: Math.round(8 * root.fontScale)
                 font.weight: Font.Bold
                 font.letterSpacing: 1.0
                 color: Theme.Tokens.safetyRed

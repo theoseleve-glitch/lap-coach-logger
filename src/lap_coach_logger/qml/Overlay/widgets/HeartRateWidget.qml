@@ -10,6 +10,9 @@ import "../../Theme" as Theme
     null-safe history, Canvas repaint on resize + data change.               */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 180
     height: 100
     color: "transparent"
@@ -105,7 +108,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: (root.zone || "rest").toUpperCase()
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.weight: Font.Bold
                     color: root.zoneColor
                     Behavior on color { ColorAnimation { duration: Theme.Motion.statusColorDuration } }
@@ -119,7 +122,7 @@ Rectangle {
                 id: bpmText
                 text: root.bpm > 0 ? root.bpm : "--"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 22
+                font.pixelSize: Math.round(22 * root.fontScale)
                 font.weight: Font.Bold
                 color: root.zoneColor
                 transformOrigin: Item.Center
@@ -129,7 +132,7 @@ Rectangle {
             Text {
                 text: "BPM"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
+                font.pixelSize: Math.round(8 * root.fontScale)
                 font.weight: Font.Bold
                 color: Theme.Tokens.steel
                 Layout.alignment: Qt.AlignBottom

@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     Category: streaming -- uses racingPurple accent.                          */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 300
     height: 100
     color: "transparent"
@@ -69,7 +72,7 @@ Rectangle {
                 Text {
                     text: root._safeSponsor.toUpperCase()
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 9
+                    font.pixelSize: Math.round(9 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 1.2
                     color: Theme.Tokens.steel
@@ -89,7 +92,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: "PROMO"
                         font.family: Theme.Typography.monoFamily
-                        font.pixelSize: 7
+                        font.pixelSize: Math.round(7 * root.fontScale)
                         font.weight: Font.Bold
                         color: Theme.Tokens.racingPurple
                     }
@@ -131,7 +134,7 @@ Rectangle {
                     Text {
                         text: root._safeCode
                         font.family: Theme.Typography.monoFamily
-                        font.pixelSize: 18
+                        font.pixelSize: Math.round(18 * root.fontScale)
                         font.weight: Font.Bold
                         font.letterSpacing: 2.0
                         color: Theme.Tokens.chalk
@@ -152,7 +155,7 @@ Rectangle {
                     Text {
                         text: "COPY"
                         font.family: Theme.Typography.monoFamily
-                        font.pixelSize: 8
+                        font.pixelSize: Math.round(8 * root.fontScale)
                         font.weight: Font.Bold
                         font.letterSpacing: 0.8
                         color: Theme.Tokens.racingPurple

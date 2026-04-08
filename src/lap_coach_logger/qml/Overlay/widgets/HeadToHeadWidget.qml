@@ -9,6 +9,9 @@ import "../../Theme" as Theme
     Comparison rows extracted into inline component.              */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 300
     height: 160
     color: "transparent"
@@ -89,7 +92,7 @@ Rectangle {
         Text {
             text: _cmpRow.label
             font.family:       Theme.Typography.monoFamily
-            font.pixelSize:    8
+            font.pixelSize:    Math.round(8 * root.fontScale)
             font.weight:       Font.Bold
             font.letterSpacing: _cmpRow.label.length <= 3 ? 1.0 : 0.8
             color: Theme.Tokens.steel
@@ -162,7 +165,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: "VS"
                     font.family:       Theme.Typography.monoFamily
-                    font.pixelSize:    8
+                    font.pixelSize:    Math.round(8 * root.fontScale)
                     font.weight:       Font.Bold
                     font.letterSpacing: 1
                     color: Theme.Tokens.steel

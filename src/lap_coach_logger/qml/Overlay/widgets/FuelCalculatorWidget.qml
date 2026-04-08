@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     Color tiers: green=safe, yellow=tight, orange=save, red=box.     */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 220
     height: 200
     color: "transparent"
@@ -90,7 +93,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: root.stateLabel
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 0.8
                     color: root.stateColor
@@ -175,7 +178,7 @@ Rectangle {
         Text {
             text: value
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: prominent ? 16 : 13
+            font.pixelSize: prominent ? Math.round(16 * root.fontScale) : Math.round(13 * root.fontScale)
             font.weight: Font.Bold
             color: valueColor
             Behavior on color     { ColorAnimation { duration: Theme.Motion.statusColorDuration } }

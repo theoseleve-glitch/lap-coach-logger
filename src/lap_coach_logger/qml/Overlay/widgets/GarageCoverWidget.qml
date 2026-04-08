@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     Category: streaming -- uses racingPurple accent.                       */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 320
     height: 180
     color: "transparent"
@@ -78,7 +81,7 @@ Rectangle {
                 visible: root._safeSubMessage.length > 0
                 text: root._safeSubMessage
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 11
+                font.pixelSize: Math.round(11 * root.fontScale)
                 color: Theme.Tokens.steel
                 opacity: 0.7
             }
@@ -110,7 +113,7 @@ Rectangle {
                 Text {
                     text: "BE RIGHT BACK"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
+                    font.pixelSize: Math.round(8 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 1.0
                     color: Theme.Tokens.racingPurple

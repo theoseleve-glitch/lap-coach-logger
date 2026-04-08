@@ -9,6 +9,9 @@ import "../../Theme" as Theme
     Null-safe: handles missing trackName, zero coords gracefully.          */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 280
     height: 160
     color: "transparent"

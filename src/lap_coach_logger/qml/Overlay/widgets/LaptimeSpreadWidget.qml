@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     Canvas-based markers for current and average.                    */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 300
     height: 160
     color: "transparent"
@@ -49,7 +52,7 @@ Rectangle {
         Text {
             text: label
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 9
+            font.pixelSize: Math.round(9 * root.fontScale)
             font.weight: Font.Bold
             font.letterSpacing: 1.0
             color: Theme.Tokens.steel
@@ -58,7 +61,7 @@ Rectangle {
         Text {
             text: value
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 13
+            font.pixelSize: Math.round(13 * root.fontScale)
             font.weight: Font.Bold
             color: valueColor
         }
@@ -82,7 +85,7 @@ Rectangle {
             Text {
                 text: "LAP TIME SPREAD"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 9
+                font.pixelSize: Math.round(9 * root.fontScale)
                 font.weight: Font.Bold
                 font.letterSpacing: 1.2
                 color: Theme.Tokens.steel
@@ -95,7 +98,7 @@ Rectangle {
                       ? root.spread.toFixed(3) + "s"
                       : "--"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 11
+                font.pixelSize: Math.round(11 * root.fontScale)
                 font.weight: Font.Bold
                 color: Theme.Tokens.pitOrange
             }

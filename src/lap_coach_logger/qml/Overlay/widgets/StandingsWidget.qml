@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     last lap time, and class badge for each entry.                 */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width:  280
     height: 300
     color: "transparent"
@@ -34,7 +37,7 @@ Rectangle {
     component ColHeader: Text {
         required property string label
         font.family:       Theme.Typography.monoFamily
-        font.pixelSize:    8
+        font.pixelSize:    Math.round(8 * root.fontScale)
         font.weight:       Font.Bold
         font.letterSpacing: 0.8
         color:   Theme.Tokens.steel
@@ -146,7 +149,7 @@ Rectangle {
                         Layout.preferredWidth: 20
                         text: _pos >= 0 ? _pos.toString() : ""
                         font.family:    Theme.Typography.monoFamily
-                        font.pixelSize: 11
+                        font.pixelSize: Math.round(11 * root.fontScale)
                         font.weight:    Font.Bold
                         color: _isPlayer
                                ? Theme.Tokens.acidGreen
@@ -174,7 +177,7 @@ Rectangle {
                         Layout.fillWidth: true
                         text: _name
                         font.family:    Theme.Typography.monoFamily
-                        font.pixelSize: 11
+                        font.pixelSize: Math.round(11 * root.fontScale)
                         color: _isPlayer ? Theme.Tokens.acidGreen : Theme.Tokens.chalk
                         elide: Text.ElideRight
                     }
@@ -184,7 +187,7 @@ Rectangle {
                         Layout.preferredWidth: 52
                         text: _gap
                         font.family:    Theme.Typography.monoFamily
-                        font.pixelSize: 10
+                        font.pixelSize: Math.round(10 * root.fontScale)
                         color: Theme.Tokens.pitOrange
                         horizontalAlignment: Text.AlignRight
 
@@ -196,7 +199,7 @@ Rectangle {
                         Layout.preferredWidth: 56
                         text: _lastLap
                         font.family:    Theme.Typography.monoFamily
-                        font.pixelSize: 10
+                        font.pixelSize: Math.round(10 * root.fontScale)
                         color: Theme.Tokens.steel
                         horizontalAlignment: Text.AlignRight
                     }

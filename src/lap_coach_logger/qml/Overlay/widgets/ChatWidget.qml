@@ -10,6 +10,9 @@ import "../../Theme" as Theme
     empty state, null-safe messages list, dimmed timestamps.              */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 280
     height: 200
     color: "transparent"
@@ -82,7 +85,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: "STREAM"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     font.weight: Font.Bold
                     color: Theme.Tokens.racingPurple
                 }
@@ -93,7 +96,7 @@ Rectangle {
             Text {
                 text: root.messageCount + " msg"
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
+                font.pixelSize: Math.round(8 * root.fontScale)
                 color: Theme.Tokens.steel
                 opacity: 0.6
             }
@@ -158,7 +161,7 @@ Rectangle {
                 Text {
                     text: msg.timestamp || ""
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 7
+                    font.pixelSize: Math.round(7 * root.fontScale)
                     color: Theme.Tokens.steel
                     opacity: 0.4
                     Layout.alignment: Qt.AlignTop

@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     PIT WINDOW badge: green OPEN / red CLOSED with glow animation.   */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 240
     height: 160
     color: "transparent"
@@ -93,7 +96,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: root.pitWindowOpen ? "OPEN" : "CLOSED"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 8
+                    font.pixelSize: Math.round(8 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 0.8
                     color: root.windowColor
@@ -176,7 +179,7 @@ Rectangle {
         Text {
             text: value
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: prominent ? 16 : 13
+            font.pixelSize: prominent ? Math.round(16 * root.fontScale) : Math.round(13 * root.fontScale)
             font.weight: Font.Bold
             color: valueColor
             Behavior on color     { ColorAnimation { duration: Theme.Motion.statusColorDuration } }

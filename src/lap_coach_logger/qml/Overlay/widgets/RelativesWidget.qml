@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     Player row highlighted with acidGreen accent.                 */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width:  280
     height: 240
     color: "transparent"
@@ -27,7 +30,7 @@ Rectangle {
     component ColHeader: Text {
         required property string label
         font.family:       Theme.Typography.monoFamily
-        font.pixelSize:    8
+        font.pixelSize:    Math.round(8 * root.fontScale)
         font.weight:       Font.Bold
         font.letterSpacing: 0.8
         color:   Theme.Tokens.steel
@@ -161,7 +164,7 @@ Rectangle {
                         Layout.preferredWidth: 28
                         text: _pos >= 0 ? _pos.toString() : ""
                         font.family:    Theme.Typography.monoFamily
-                        font.pixelSize: 11
+                        font.pixelSize: Math.round(11 * root.fontScale)
                         font.weight:    Font.Bold
                         color: _isPlayer ? Theme.Tokens.acidGreen : Theme.Tokens.chalk
                     }
@@ -184,7 +187,7 @@ Rectangle {
                         Layout.fillWidth: true
                         text: _name
                         font.family:    Theme.Typography.monoFamily
-                        font.pixelSize: 11
+                        font.pixelSize: Math.round(11 * root.fontScale)
                         color: _isPlayer ? Theme.Tokens.acidGreen : Theme.Tokens.chalk
                         elide: Text.ElideRight
                     }
@@ -194,7 +197,7 @@ Rectangle {
                         Layout.preferredWidth: 60
                         text: _gap
                         font.family:    Theme.Typography.monoFamily
-                        font.pixelSize: 11
+                        font.pixelSize: Math.round(11 * root.fontScale)
                         font.weight:    Font.DemiBold
                         color: _gapColor
                         horizontalAlignment: Text.AlignRight

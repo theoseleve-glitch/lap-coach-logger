@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     Inactive: subtle dark background with "CLEAR" text.                   */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 200
     height: 90
     color: "transparent"
@@ -62,7 +65,7 @@ Rectangle {
                       ? (_ind.side === "LEFT" ? _ind._arrow + " CAR" : "CAR " + _ind._arrow)
                       : _ind.side.charAt(0)
                 font.family:    Theme.Typography.monoFamily
-                font.pixelSize: _ind.carDetected ? 13 : 16
+                font.pixelSize: _ind.carDetected ? Math.round(13 * root.fontScale) : Math.round(16 * root.fontScale)
                 font.weight:    Font.Bold
                 color: _ind.carDetected ? Theme.Tokens.safetyRed : Theme.Tokens.steel
                 opacity: _ind.carDetected ? 1.0 : 0.35
@@ -78,7 +81,7 @@ Rectangle {
                       ? "CAR " + _ind.side
                       : "CLEAR"
                 font.family:    Theme.Typography.monoFamily
-                font.pixelSize: 8
+                font.pixelSize: Math.round(8 * root.fontScale)
                 font.weight:    Font.Bold
                 font.letterSpacing: 0.8
                 color: _ind.carDetected ? Theme.Tokens.marshalYellow : Theme.Tokens.steel

@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     sector boundary lines, and start/finish flag.                    */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 300
     height: 100
     color: "transparent"

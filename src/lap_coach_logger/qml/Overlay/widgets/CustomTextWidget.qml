@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     Category: streaming -- uses racingPurple accent.                     */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 280
     height: 60
     color: "transparent"
@@ -39,7 +42,7 @@ Rectangle {
             anchors.centerIn: parent
             text: root._safeText
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: root.fontSize
+            font.pixelSize: Math.round(root.fontSize * root.fontScale)
             font.weight: Font.Bold
             color: root._color
             elide: Text.ElideRight
@@ -61,7 +64,7 @@ Rectangle {
                 id: scrollText
                 text: root._safeText + "          " + root._safeText
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: root.fontSize
+                font.pixelSize: Math.round(root.fontSize * root.fontScale)
                 font.weight: Font.Bold
                 color: root._color
                 y: (parent.height - height) / 2

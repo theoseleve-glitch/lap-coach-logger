@@ -8,6 +8,9 @@ import "../../Theme" as Theme
     time above best), and empty-state placeholder.                    */
 GlassSurface {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 320
     implicitHeight: 180
 
@@ -33,7 +36,7 @@ GlassSurface {
         Text {
             text: "LAP TIMES"
             font.family: Theme.Typography.monoFamily
-            font.pixelSize: 9
+            font.pixelSize: Math.round(9 * root.fontScale)
             font.weight: Font.Bold
             font.letterSpacing: 1.2
             color: Theme.Tokens.steel
@@ -52,7 +55,7 @@ GlassSurface {
                 Text {
                     text: "NO DATA"
                     font.family: Theme.Typography.monoFamily
-                    font.pixelSize: 11
+                    font.pixelSize: Math.round(11 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 1.0
                     color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.25)
@@ -63,7 +66,7 @@ GlassSurface {
                 Text {
                     text: "Complete a lap to see times"
                     font.family: Theme.Typography.bodyFamily
-                    font.pixelSize: 10
+                    font.pixelSize: Math.round(10 * root.fontScale)
                     color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.15)
                     horizontalAlignment: Text.AlignHCenter
                     Layout.alignment: Qt.AlignHCenter

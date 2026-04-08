@@ -7,6 +7,9 @@ import "../../Theme" as Theme
     with subtle borders between cells.                              */
 Rectangle {
     id: root
+
+    // -- font scale (driven by OverlayWidget parent) --
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
     width: 320
     height: 200
     color: "transparent"
@@ -56,7 +59,7 @@ Rectangle {
             Text {
                 text: block.blockLabel
                 font.family: Theme.Typography.monoFamily
-                font.pixelSize: 7
+                font.pixelSize: Math.round(7 * root.fontScale)
                 font.weight: Font.Bold
                 font.letterSpacing: 0.8
                 color: Theme.Tokens.steel
