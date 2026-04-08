@@ -867,6 +867,26 @@ class OverlayViewModel(QObject):
             return []
 
     @Slot(result=str)
+    @Slot()
+    def copyLayoutToClipboard(self) -> None:  # noqa: N802
+        """Export layout to system clipboard as JSON."""
+        import json
+        from PySide6.QtWidgets import QApplication
+        text = json.dumps(self.export_settings(), indent=2)
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(text)
+
+    @Slot(result=bool)
+    def pasteLayoutFromClipboard(self) -> bool:  # noqa: N802
+        """Import layout from system clipboard JSON."""
+        from PySide6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        if not clipboard:
+            return False
+        text = clipboard.text()
+        return self.importLayoutJson(text) if text else False
+
     def exportLayoutJson(self) -> str:  # noqa: N802
         """Export current overlay layout as JSON string for sharing."""
         import json
