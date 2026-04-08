@@ -8,6 +8,17 @@ import "../Overlay/widgets" as Widgets
 Item {
     id: root
 
+    // ── Animated demo data for widget previews ──
+    PreviewDataProvider { id: demoData }
+
+    // Timer drives animated preview (QtObject can't host Timer children)
+    Timer {
+        interval: 80
+        running: true
+        repeat: true
+        onTriggered: demoData.tick()
+    }
+
     // ── Data model for overlay widgets ──
     ListModel {
         id: overlayItemsModel
@@ -1420,13 +1431,13 @@ Item {
         id: pvDeltaTiming
         Widgets.DeltaTimeWidget {
             implicitWidth: 320; implicitHeight: 200
-            delta: overlayVM ? overlayVM.liveDelta : 0
-            lapTime: overlayVM ? overlayVM.currentLapTime || "0:00.000" : "0:00.000"
-            bestTime: overlayVM ? overlayVM.bestTime || "\u2014" : "\u2014"
-            lapNumber: overlayVM ? overlayVM.lapNumber : 0
-            totalLaps: 0
-            lapProgress: overlayVM ? overlayVM.lapProgress : 0
-            sectors: overlayVM ? overlayVM.sectorStates || [] : []
+            delta: demoData.delta
+            lapTime: demoData.lapTime
+            bestTime: demoData.bestTime
+            lapNumber: demoData.lapNumber
+            totalLaps: demoData.totalLaps
+            lapProgress: demoData.lapProgress
+            sectors: demoData.sectors
         }
     }
 
@@ -1434,14 +1445,14 @@ Item {
         id: pvInputsGrip
         Widgets.InputsWidget {
             implicitWidth: 240; implicitHeight: 260
-            throttle: overlayVM ? overlayVM.throttlePct : 0
-            brake: overlayVM ? overlayVM.brakePct : 0
-            steering: overlayVM ? overlayVM.steeringDeg / 450.0 : 0
-            gForceX: overlayVM ? overlayVM.latAccelG : 0
-            gForceY: overlayVM ? overlayVM.longAccelG : 0
-            lockup: overlayVM ? overlayVM.lockupActive : false
-            wheelspin: overlayVM ? overlayVM.wheelspinActive : false
-            smoothness: overlayVM ? overlayVM.inputSmoothness : 0.75
+            throttle: demoData.throttle
+            brake: demoData.brake
+            steering: demoData.steering
+            gForceX: demoData.gForceX
+            gForceY: demoData.gForceY
+            lockup: demoData.lockup
+            wheelspin: demoData.wheelspin
+            smoothness: demoData.smoothness
         }
     }
 
@@ -1449,13 +1460,13 @@ Item {
         id: pvFuelStrategy
         Widgets.FuelWidget {
             implicitWidth: 180; implicitHeight: 240
-            remaining: overlayVM ? overlayVM.fuelLevel : 0
-            lapsLeft: overlayVM ? overlayVM.fuelLapsLeft : 0
-            fuelPerLap: overlayVM ? overlayVM.fuelPerLap : 0
-            state: overlayVM ? overlayVM.fuelState || "SAFE" : "SAFE"
+            remaining: demoData.fuelLevel
+            lapsLeft: demoData.fuelLapsLeft
+            fuelPerLap: demoData.fuelPerLap
+            state: demoData.fuelState
             pitWindow: ""
-            totalLaps: 0
-            currentLap: overlayVM ? overlayVM.lapNumber : 0
+            totalLaps: demoData.totalLaps
+            currentLap: demoData.lapNumber
         }
     }
 
@@ -1463,12 +1474,12 @@ Item {
         id: pvCoaching
         Widgets.CoachingWidget {
             implicitWidth: 290; implicitHeight: 200
-            headline: overlayVM ? overlayVM.coachingHeadline : ""
-            sub: overlayVM ? overlayVM.coachingSub : ""
-            category: overlayVM ? overlayVM.coachingCategory : ""
-            severity: overlayVM ? overlayVM.coachingSeverity : "positive"
-            confidence: overlayVM ? overlayVM.coachingConfidence : 0
-            sector: overlayVM ? overlayVM.coachingSector : ""
+            headline: "Brake 5m later into T3"
+            sub: "You are braking too early at the end of the back straight. Try carrying more speed to the apex."
+            category: "braking"
+            severity: "warning"
+            confidence: 78
+            sector: "S2"
         }
     }
 
@@ -1476,8 +1487,8 @@ Item {
         id: pvGforceMeter
         Widgets.GForceMeterWidget {
             implicitWidth: 200; implicitHeight: 200
-            latG: overlayVM ? overlayVM.latAccelG : 0
-            longG: overlayVM ? overlayVM.longAccelG : 0
+            latG: demoData.gForceX
+            longG: demoData.gForceY
         }
     }
 
@@ -1485,10 +1496,10 @@ Item {
         id: pvLapTiming
         Widgets.LapTimingWidget {
             implicitWidth: 280; implicitHeight: 120
-            currentTime: overlayVM ? overlayVM.currentLapTime : ""
-            lastTime: overlayVM ? overlayVM.lastTime : ""
-            bestTime: overlayVM ? overlayVM.bestTime : ""
-            deltaVsBest: overlayVM ? overlayVM.lastDelta : ""
+            currentTime: demoData.lapTime
+            lastTime: demoData.lastTime
+            bestTime: demoData.bestTime
+            deltaVsBest: demoData.delta < 0 ? demoData.delta.toFixed(3) : "+" + demoData.delta.toFixed(3)
         }
     }
 
@@ -1496,7 +1507,7 @@ Item {
         id: pvTrackMap
         Widgets.TrackMapWidget {
             implicitWidth: 240; implicitHeight: 240
-            carPosition: overlayVM ? overlayVM.lapDistPct : 0
+            carPosition: demoData.lapProgress / 100
         }
     }
 
@@ -1511,6 +1522,13 @@ Item {
         id: pvWeather
         Widgets.WeatherMonitorWidget {
             implicitWidth: 200; implicitHeight: 160
+            airTemp: 24.5
+            trackTemp: 38.2
+            humidity: 45
+            windSpeed: 12.0
+            windDir: "NW"
+            rainChance: 10
+            trackState: "DRY"
         }
     }
 
@@ -1539,7 +1557,8 @@ Item {
         id: pvSessionTimer
         Widgets.SessionTimerWidget {
             implicitWidth: 200; implicitHeight: 80
-            elapsed: overlayVM ? overlayVM.elapsed || "0:00:00" : "0:00:00"
+            elapsed: demoData.elapsed
+            sessionType: demoData.sessionType
         }
     }
 
@@ -1547,7 +1566,7 @@ Item {
         id: pvDeltaBar
         Widgets.DeltaBarWidget {
             implicitWidth: 300; implicitHeight: 60
-            delta: overlayVM ? overlayVM.liveDelta : 0
+            delta: demoData.delta
         }
     }
 
@@ -1555,6 +1574,7 @@ Item {
         id: pvFlags
         Widgets.FlagsWidget {
             implicitWidth: 160; implicitHeight: 100
+            flag: demoData.flag
         }
     }
 
@@ -1562,6 +1582,9 @@ Item {
         id: pvDigiflag
         Widgets.DigiflagWidget {
             implicitWidth: 120; implicitHeight: 120
+            flag: demoData.flag
+            sector: 2
+            message: "SLOW CAR"
         }
     }
 
@@ -1625,7 +1648,7 @@ Item {
         id: pvTrackMapCanvas
         Widgets.TrackMapWidget {
             implicitWidth: 240; implicitHeight: 240
-            carPosition: overlayVM ? overlayVM.lapDistPct : 0
+            carPosition: demoData.lapProgress / 100
         }
     }
 
@@ -1633,7 +1656,7 @@ Item {
         id: pvMiniMap
         Widgets.MiniMapWidget {
             implicitWidth: 180; implicitHeight: 180
-            carPosition: overlayVM ? overlayVM.lapDistPct : 0
+            carPosition: demoData.lapProgress / 100
         }
     }
 

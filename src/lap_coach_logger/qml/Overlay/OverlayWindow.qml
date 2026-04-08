@@ -100,10 +100,13 @@ Item {
                     // Clamp to visible screen area (multi-monitor safety)
                     var clamped = overlayVM.clampToScreen(wid, posX, posY)
                     if (clamped) { posX = clamped.x; posY = clamped.y }
+                    var fs = overlayVM.getWidgetFontScale(wid)
+                    var br = overlayVM.getWidgetBorderRadius(wid)
                     var win = comp.createObject(root, {
                         widgetId: wid,
                         width: w, height: h, opacity: o,
-                        x: posX, y: posY
+                        x: posX, y: posY,
+                        fontScale: fs, borderRadius: br
                     })
                     if (win) {
                         win.visible = true
@@ -114,9 +117,11 @@ Item {
                 _windows[wid].destroy()
                 delete _windows[wid]
             } else if (enabled && _windows[wid]) {
-                _windows[wid].width   = overlayVM.getWidgetWidth(wid)
-                _windows[wid].height  = overlayVM.getWidgetHeight(wid)
-                _windows[wid].opacity = overlayVM.getWidgetOpacity(wid)
+                _windows[wid].width        = overlayVM.getWidgetWidth(wid)
+                _windows[wid].height       = overlayVM.getWidgetHeight(wid)
+                _windows[wid].opacity      = overlayVM.getWidgetOpacity(wid)
+                _windows[wid].fontScale    = overlayVM.getWidgetFontScale(wid)
+                _windows[wid].borderRadius = overlayVM.getWidgetBorderRadius(wid)
             }
         }
     }

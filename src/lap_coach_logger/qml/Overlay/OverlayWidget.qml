@@ -24,6 +24,10 @@ Window {
     // Widget identity — set by OverlayWindow to link back to VM settings
     property string widgetId: ""
 
+    // Customization settings — applied from VM
+    property real fontScale: 1.0
+    property int borderRadius: 12
+
     // Content injected by parent
     default property alias content: contentArea.data
 
@@ -53,7 +57,7 @@ Window {
     Rectangle {
         id: container
         anchors.fill: parent
-        radius: 12
+        radius: root.borderRadius
         color: Qt.rgba(0, 0, 0, 0.78)
         border.width: (overlayVM && overlayVM.overlayLocked) ? 2 : 1
         border.color: (overlayVM && overlayVM.overlayLocked)
@@ -74,10 +78,12 @@ Window {
             }
         }
 
-        // Content area
+        // Content area — scaled by fontScale setting
         Item {
             id: contentArea
             anchors.fill: parent
+            scale: root.fontScale
+            transformOrigin: Item.TopLeft
         }
     }
 
