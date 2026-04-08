@@ -297,6 +297,20 @@ Item {
     }
 
     property int selectedIndex: 0
+    property string searchQuery: ""
+    property string categoryFilter: ""
+
+    // Count of currently visible (filtered) widgets
+    readonly property int visibleCount: {
+        var n = 0
+        for (var i = 0; i < overlayItemsModel.count; i++) {
+            var item = overlayItemsModel.get(i)
+            var matchesSearch = !searchQuery || item.name.toLowerCase().indexOf(searchQuery.toLowerCase()) >= 0
+            var matchesCategory = !categoryFilter || item.category === categoryFilter
+            if (matchesSearch && matchesCategory) n++
+        }
+        return n
+    }
 
     function categoryColor(cat) {
         switch (cat) {
@@ -373,16 +387,19 @@ Item {
                         color: Theme.Tokens.steel
                     }
 
-                    // Count badge
+                    // Count badge (filtered / total)
                     Rectangle {
-                        width: 22
+                        width: countBadgeText.implicitWidth + 12
                         height: 16
                         radius: 8
                         color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.15)
 
                         Text {
+                            id: countBadgeText
                             anchors.centerIn: parent
-                            text: overlayItemsModel.count
+                            text: (root.searchQuery || root.categoryFilter)
+                                  ? root.visibleCount + " / " + overlayItemsModel.count
+                                  : overlayItemsModel.count
                             font.family: Theme.Typography.monoFamily
                             font.pixelSize: 9
                             font.weight: Font.Bold
@@ -494,7 +511,65 @@ Item {
                     placeholder: "Search overlays..."
 
                     onSearchTextChanged: function(searchText) {
-                        filterModel(searchText)
+                        root.searchQuery = searchText
+                    }
+                }
+
+                // ── Category filter chips ──
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    Repeater {
+                        model: [
+                            { label: "ALL",       value: "",          chipColor: Theme.Tokens.steel },
+                            { label: "TIMING",    value: "timing",    chipColor: Theme.Tokens.pitOrange },
+                            { label: "INPUTS",    value: "inputs",    chipColor: Theme.Tokens.acidGreen },
+                            { label: "AWARENESS", value: "awareness", chipColor: Theme.Tokens.racingPurple },
+                            { label: "STRATEGY",  value: "strategy",  chipColor: Theme.Tokens.marshalYellow },
+                            { label: "STREAMING", value: "streaming", chipColor: Theme.Tokens.racingPurple }
+                        ]
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: chipLabel.implicitWidth + 16
+                            height: 24
+                            radius: 12
+                            color: root.categoryFilter === modelData.value
+                                   ? Theme.Tokens.subtle(modelData.chipColor, 0.25)
+                                   : chipMouseArea.containsMouse
+                                     ? Theme.Tokens.subtle(modelData.chipColor, 0.12)
+                                     : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.05)
+                            border.width: root.categoryFilter === modelData.value ? 1 : 0
+                            border.color: Theme.Tokens.subtle(modelData.chipColor, 0.50)
+
+                            Behavior on color {
+                                ColorAnimation { duration: Theme.Motion.hoverDuration }
+                            }
+
+                            Text {
+                                id: chipLabel
+                                anchors.centerIn: parent
+                                text: modelData.label
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: 9
+                                font.weight: Font.DemiBold
+                                font.letterSpacing: 1
+                                color: root.categoryFilter === modelData.value
+                                       ? modelData.chipColor
+                                       : Theme.Tokens.steel
+                            }
+
+                            MouseArea {
+                                id: chipMouseArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.categoryFilter = modelData.value
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -514,8 +589,14 @@ Item {
                         required property string name
                         required property string category
 
+                        visible: {
+                            var matchesSearch = !root.searchQuery || name.toLowerCase().indexOf(root.searchQuery.toLowerCase()) >= 0
+                            var matchesCategory = !root.categoryFilter || category === root.categoryFilter
+                            return matchesSearch && matchesCategory
+                        }
+
                         width: overlayList.width
-                        height: 44
+                        height: visible ? 44 : 0
                         radius: Theme.Tokens.radiusSm
                         color: {
                             if (root.selectedIndex === index)
@@ -1157,20 +1238,19 @@ Item {
         }
     }
 
-    // ── Search filter helper (hides non-matching items) ──
-    function filterModel(searchText) {
-        // Simple approach: reset visibility on all items via the list
-        // (QML ListModel doesn't support filtering natively, so we just
-        // change selectedIndex when search narrows things down.)
-        // For now, select first matching item.
-        if (searchText.length === 0) return
+    // ── Select first visible item when filters change ──
+    onSearchQueryChanged: _selectFirstVisible()
+    onCategoryFilterChanged: _selectFirstVisible()
 
-        var lower = searchText.toLowerCase()
+    function _selectFirstVisible() {
         for (var i = 0; i < overlayItemsModel.count; i++) {
             var item = overlayItemsModel.get(i)
-            if (item.name.toLowerCase().indexOf(lower) !== -1) {
+            var matchesSearch = !searchQuery || item.name.toLowerCase().indexOf(searchQuery.toLowerCase()) >= 0
+            var matchesCategory = !categoryFilter || item.category === categoryFilter
+            if (matchesSearch && matchesCategory) {
                 root.selectedIndex = i
-                overlayList.positionViewAtIndex(i, ListView.Center)
+                if (overlayVM) overlayVM.selectWidget(item.widgetId)
+                overlayList.positionViewAtIndex(i, ListView.Beginning)
                 return
             }
         }
