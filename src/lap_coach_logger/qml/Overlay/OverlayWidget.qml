@@ -287,55 +287,46 @@ Window {
             }
         }
 
+        // Title bar IS the drag handle
         MouseArea {
             id: titleHoverArea
             anchors.fill: parent
             hoverEnabled: true
-            propagateComposedEvents: true
-            // Don't consume clicks — let them fall through to drag handler
-            onPressed: function(mouse) { mouse.accepted = false }
+            cursorShape: overlayVM && overlayVM.overlayLocked ? Qt.ArrowCursor : Qt.SizeAllCursor
+            enabled: overlayVM ? !overlayVM.overlayLocked : true
+            property point clickPos
+            onPressed: function(mouse) { clickPos = Qt.point(mouse.x, mouse.y) }
+            onPositionChanged: function(mouse) {
+                var newX = root.x + mouse.x - clickPos.x
+                var newY = root.y + mouse.y - clickPos.y
+                if (overlayVM && overlayVM.snapEnabled) {
+                    var snapT = 15
+                    var sW = Screen.width; var sH = Screen.height
+                    if (Math.abs(newX) < snapT) newX = 0
+                    if (Math.abs(newX + root.width - sW) < snapT) newX = sW - root.width
+                    if (Math.abs(newY) < snapT) newY = 0
+                    if (Math.abs(newY + root.height - sH) < snapT) newY = sH - root.height
+                }
+                root.x = newX; root.y = newY
+            }
+            onReleased: {
+                if (root.widgetId && overlayVM) {
+                    overlayVM.setWidgetSetting(root.widgetId, "x", root.x)
+                    overlayVM.setWidgetSetting(root.widgetId, "y", root.y)
+                }
+            }
         }
     }
 
-    // Drag support — grabs anywhere on the window
-    // Also handles hover opacity boost
+    // Hover detection for opacity boost (covers whole widget, doesn't consume events)
     MouseArea {
         id: dragArea
         anchors.fill: parent
         hoverEnabled: true
-        enabled: overlayVM ? !overlayVM.overlayLocked : true
-        property point clickPos
-        z: -1  // below content so widget buttons still work
-        onPressed: function(mouse) { clickPos = Qt.point(mouse.x, mouse.y) }
-        onPositionChanged: function(mouse) {
-            var newX = root.x + mouse.x - clickPos.x
-            var newY = root.y + mouse.y - clickPos.y
-
-            // Snap to screen edges (15px threshold)
-            if (overlayVM && overlayVM.snapEnabled) {
-                var snapThreshold = 15
-                var screenW = Screen.width
-                var screenH = Screen.height
-
-                // Left edge
-                if (Math.abs(newX) < snapThreshold) newX = 0
-                // Right edge
-                if (Math.abs(newX + root.width - screenW) < snapThreshold) newX = screenW - root.width
-                // Top edge
-                if (Math.abs(newY) < snapThreshold) newY = 0
-                // Bottom edge
-                if (Math.abs(newY + root.height - screenH) < snapThreshold) newY = screenH - root.height
-            }
-
-            root.x = newX
-            root.y = newY
-        }
-        onReleased: {
-            // Persist final position when drag ends
-            if (root.widgetId && overlayVM) {
-                overlayVM.setWidgetSetting(root.widgetId, "x", root.x)
-                overlayVM.setWidgetSetting(root.widgetId, "y", root.y)
-            }
+        acceptedButtons: Qt.RightButton
+        z: -1
+        onClicked: function(mouse) {
+            if (mouse.button === Qt.RightButton) contextMenu.popup()
         }
     }
 
