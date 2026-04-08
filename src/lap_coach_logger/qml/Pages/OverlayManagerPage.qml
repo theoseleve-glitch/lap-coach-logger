@@ -408,6 +408,102 @@ Item {
                     }
 
                     Item { Layout.fillWidth: true }
+
+                    // ALL ON button
+                    Rectangle {
+                        width: allOnLabel.implicitWidth + 12
+                        height: 20
+                        radius: 4
+                        color: allOnArea.containsMouse
+                               ? Theme.Tokens.subtle(Theme.Tokens.acidGreen, 0.20)
+                               : Theme.Tokens.subtle(Theme.Tokens.acidGreen, 0.10)
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.acidGreen, 0.30)
+
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.Motion.hoverDuration }
+                        }
+
+                        Text {
+                            id: allOnLabel
+                            anchors.centerIn: parent
+                            text: "ALL ON"
+                            font.family: Theme.Typography.monoFamily
+                            font.pixelSize: 8
+                            font.weight: Font.Bold
+                            font.letterSpacing: 1
+                            color: Theme.Tokens.acidGreen
+                        }
+
+                        MouseArea {
+                            id: allOnArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (!overlayVM) return
+                                if (root.categoryFilter)
+                                    overlayVM.enableCategory(root.categoryFilter)
+                                else
+                                    overlayVM.enableAllWidgets()
+                            }
+                        }
+                    }
+
+                    // ALL OFF button
+                    Rectangle {
+                        width: allOffLabel.implicitWidth + 12
+                        height: 20
+                        radius: 4
+                        color: allOffArea.containsMouse
+                               ? Theme.Tokens.subtle(Theme.Tokens.steel, 0.20)
+                               : Theme.Tokens.subtle(Theme.Tokens.steel, 0.10)
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.steel, 0.30)
+
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.Motion.hoverDuration }
+                        }
+
+                        Text {
+                            id: allOffLabel
+                            anchors.centerIn: parent
+                            text: "ALL OFF"
+                            font.family: Theme.Typography.monoFamily
+                            font.pixelSize: 8
+                            font.weight: Font.Bold
+                            font.letterSpacing: 1
+                            color: Theme.Tokens.steel
+                        }
+
+                        MouseArea {
+                            id: allOffArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (!overlayVM) return
+                                if (root.categoryFilter)
+                                    overlayVM.disableCategory(root.categoryFilter)
+                                else
+                                    overlayVM.disableAllWidgets()
+                            }
+                        }
+                    }
+                }
+
+                // ── Enabled count ──
+                Text {
+                    Layout.fillWidth: true
+                    // Re-read widgetSettings to trigger re-evaluation on changes
+                    text: {
+                        var _ws = overlayVM ? overlayVM.widgetSettings : null
+                        if (!overlayVM) return "0 enabled"
+                        return overlayVM.enabledWidgetCount() + " / " + overlayVM.totalWidgetCount() + " enabled"
+                    }
+                    font.family: Theme.Typography.monoFamily
+                    font.pixelSize: 10
+                    color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.50)
                 }
 
                 // ── Presets ──

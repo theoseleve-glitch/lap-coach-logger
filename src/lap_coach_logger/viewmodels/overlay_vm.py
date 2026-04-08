@@ -32,6 +32,58 @@ class OverlayViewModel(QObject):
     settingsSaveRequested = Signal()
     accentChanged = Signal()
 
+    # -- widget category mapping -----------------------------------------------
+
+    _WIDGET_CATEGORIES: dict[str, str] = {
+        "delta_timing": "timing",
+        "inputs_grip": "inputs",
+        "fuel_strategy": "strategy",
+        "coaching": "awareness",
+        "gforce_meter": "inputs",
+        "lap_timing": "timing",
+        "track_map": "awareness",
+        "standings": "awareness",
+        "weather": "awareness",
+        "laptime_graph": "timing",
+        "laptime_log": "timing",
+        "laptime_spread": "timing",
+        "session_timer": "awareness",
+        "delta_bar": "timing",
+        "flags": "awareness",
+        "digiflag": "awareness",
+        "radar": "awareness",
+        "radar_bars": "awareness",
+        "blind_spot": "awareness",
+        "overtake_alert": "awareness",
+        "relatives": "awareness",
+        "standings_table": "awareness",
+        "leaderboard": "awareness",
+        "head_to_head": "awareness",
+        "track_map_canvas": "awareness",
+        "mini_map": "awareness",
+        "flat_map": "awareness",
+        "fuel_calculator": "strategy",
+        "pitbox_helper": "strategy",
+        "weather_monitor": "awareness",
+        "boost_box": "inputs",
+        "gforce_meter_full": "inputs",
+        "advanced_panel": "inputs",
+        "data_blocks": "inputs",
+        "race_schedule": "awareness",
+        "world_map": "awareness",
+        "heart_rate": "inputs",
+        "input_telemetry": "inputs",
+        "chat": "streaming",
+        "chat_highlight": "streaming",
+        "chat_race_game": "streaming",
+        "chat_race_standing": "streaming",
+        "custom_text": "streaming",
+        "custom_url": "streaming",
+        "garage_cover": "streaming",
+        "mic_visualizer": "streaming",
+        "promo_code_alert": "streaming",
+    }
+
     # -- accent colour palette -------------------------------------------------
 
     _ACCENT_COLORS: dict[str, str] = {
@@ -526,6 +578,56 @@ class OverlayViewModel(QObject):
             )
             self.widgetSettingsChanged.emit()
             self.settingsSaveRequested.emit()
+
+    # -- Batch enable / disable ------------------------------------------------
+
+    def _get_category(self, widget_id: str) -> str:
+        """Return the category for a widget ID, or empty string if unknown."""
+        return self._WIDGET_CATEGORIES.get(widget_id, "")
+
+    @Slot()
+    def enableAllWidgets(self) -> None:  # noqa: N802
+        """Enable every widget."""
+        for wid in self._widget_settings:
+            self._widget_settings[wid]["enabled"] = True
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @Slot()
+    def disableAllWidgets(self) -> None:  # noqa: N802
+        """Disable every widget."""
+        for wid in self._widget_settings:
+            self._widget_settings[wid]["enabled"] = False
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @Slot(str)
+    def enableCategory(self, category: str) -> None:  # noqa: N802
+        """Enable all widgets matching *category*."""
+        for wid in self._widget_settings:
+            if self._get_category(wid) == category:
+                self._widget_settings[wid]["enabled"] = True
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @Slot(str)
+    def disableCategory(self, category: str) -> None:  # noqa: N802
+        """Disable all widgets matching *category*."""
+        for wid in self._widget_settings:
+            if self._get_category(wid) == category:
+                self._widget_settings[wid]["enabled"] = False
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @Slot(result=int)
+    def enabledWidgetCount(self) -> int:  # noqa: N802
+        """Return the number of currently enabled widgets."""
+        return sum(1 for s in self._widget_settings.values() if s.get("enabled"))
+
+    @Slot(result=int)
+    def totalWidgetCount(self) -> int:  # noqa: N802
+        """Return the total number of widgets."""
+        return len(self._widget_settings)
 
     # -- Slot-based getters (QML can't access nested dict properties) --------
 
