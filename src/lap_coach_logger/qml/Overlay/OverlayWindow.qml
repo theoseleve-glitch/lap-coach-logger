@@ -2,54 +2,50 @@ import QtQuick
 import "../Theme" as Theme
 import "widgets" as Widgets
 
-// Pre-declared overlay windows. Each widget has its own OverlayWidget
-// instance with visibility bound directly to the VM. No dynamic creation.
+// Pre-declared overlay windows. Visibility polled via _tick timer.
+// x/y set once via Component.onCompleted, NOT bound (so drag works).
 
 Item {
     id: root
 
-    // Helper: read settings via Slots (reactive through _syncTimer)
     property int _tick: 0
     Timer {
-        id: _syncTimer
-        interval: 500
-        running: true
-        repeat: true
+        interval: 500; running: true; repeat: true
         onTriggered: root._tick++
     }
 
-    function ws(wid, key, def) {
+    function isOn(wid) {
         void(_tick)
+        return overlayVM && overlayVM.isWidgetEnabled(wid) && overlayVM.shouldShowOverlays
+    }
+    function gw(wid, key, def) {
         if (!overlayVM) return def
-        if (key === "enabled") return overlayVM.isWidgetEnabled(wid)
         if (key === "width") return overlayVM.getWidgetWidth(wid)
         if (key === "height") return overlayVM.getWidgetHeight(wid)
         if (key === "opacity") return overlayVM.getWidgetOpacity(wid)
-        if (key === "x") return overlayVM.getWidgetX(wid)
-        if (key === "y") return overlayVM.getWidgetY(wid)
         if (key === "fontScale") return overlayVM.getWidgetFontScale(wid)
         if (key === "borderRadius") return overlayVM.getWidgetBorderRadius(wid)
         return def
     }
 
-    function shouldShow(wid) {
-        void(_tick)
-        return overlayVM && overlayVM.isWidgetEnabled(wid) && overlayVM.shouldShowOverlays
+    // Macro-like helper: set initial position once, then never re-bind
+    component OW: OverlayWidget {
+        property string _wid: ""
+        Component.onCompleted: {
+            if (overlayVM && _wid) {
+                x = overlayVM.getWidgetX(_wid)
+                y = overlayVM.getWidgetY(_wid)
+            }
+        }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // Pre-declared overlay widget windows
-    // ═══════════════════════════════════════════════════════════════
-
-    OverlayWidget {
-        visible: root.shouldShow("delta_timing")
-        widgetId: "delta_timing"
-        width: root.ws("delta_timing", "width", 320)
-        height: root.ws("delta_timing", "height", 200)
-        opacity: root.ws("delta_timing", "opacity", 0.92)
-        x: root.ws("delta_timing", "x", 100); y: root.ws("delta_timing", "y", 80)
-        fontScale: root.ws("delta_timing", "fontScale", 1.0)
-        borderRadius: root.ws("delta_timing", "borderRadius", 12)
+    OW {
+        _wid: "delta_timing"; widgetId: "delta_timing"
+        visible: root.isOn("delta_timing")
+        width: root.gw("delta_timing","width",320); height: root.gw("delta_timing","height",200)
+        opacity: root.gw("delta_timing","opacity",0.92)
+        fontScale: root.gw("delta_timing","fontScale",1.0)
+        borderRadius: root.gw("delta_timing","borderRadius",12)
         Widgets.DeltaTimeWidget {
             anchors.fill: parent; anchors.margins: 4
             delta: overlayVM ? overlayVM.liveDelta : 0
@@ -61,15 +57,13 @@ Item {
         }
     }
 
-    OverlayWidget {
-        visible: root.shouldShow("inputs_grip")
-        widgetId: "inputs_grip"
-        width: root.ws("inputs_grip", "width", 240)
-        height: root.ws("inputs_grip", "height", 260)
-        opacity: root.ws("inputs_grip", "opacity", 0.92)
-        x: root.ws("inputs_grip", "x", 440); y: root.ws("inputs_grip", "y", 80)
-        fontScale: root.ws("inputs_grip", "fontScale", 1.0)
-        borderRadius: root.ws("inputs_grip", "borderRadius", 12)
+    OW {
+        _wid: "inputs_grip"; widgetId: "inputs_grip"
+        visible: root.isOn("inputs_grip")
+        width: root.gw("inputs_grip","width",240); height: root.gw("inputs_grip","height",260)
+        opacity: root.gw("inputs_grip","opacity",0.92)
+        fontScale: root.gw("inputs_grip","fontScale",1.0)
+        borderRadius: root.gw("inputs_grip","borderRadius",12)
         Widgets.InputsWidget {
             anchors.fill: parent; anchors.margins: 4
             throttle: overlayVM ? overlayVM.throttlePct : 0
@@ -83,15 +77,13 @@ Item {
         }
     }
 
-    OverlayWidget {
-        visible: root.shouldShow("fuel_strategy")
-        widgetId: "fuel_strategy"
-        width: root.ws("fuel_strategy", "width", 180)
-        height: root.ws("fuel_strategy", "height", 240)
-        opacity: root.ws("fuel_strategy", "opacity", 0.92)
-        x: root.ws("fuel_strategy", "x", 700); y: root.ws("fuel_strategy", "y", 80)
-        fontScale: root.ws("fuel_strategy", "fontScale", 1.0)
-        borderRadius: root.ws("fuel_strategy", "borderRadius", 12)
+    OW {
+        _wid: "fuel_strategy"; widgetId: "fuel_strategy"
+        visible: root.isOn("fuel_strategy")
+        width: root.gw("fuel_strategy","width",180); height: root.gw("fuel_strategy","height",240)
+        opacity: root.gw("fuel_strategy","opacity",0.92)
+        fontScale: root.gw("fuel_strategy","fontScale",1.0)
+        borderRadius: root.gw("fuel_strategy","borderRadius",12)
         Widgets.FuelWidget {
             anchors.fill: parent; anchors.margins: 4
             remaining: overlayVM ? overlayVM.fuelLevel : 0
@@ -103,15 +95,13 @@ Item {
         }
     }
 
-    OverlayWidget {
-        visible: root.shouldShow("lap_timing")
-        widgetId: "lap_timing"
-        width: root.ws("lap_timing", "width", 280)
-        height: root.ws("lap_timing", "height", 120)
-        opacity: root.ws("lap_timing", "opacity", 0.92)
-        x: root.ws("lap_timing", "x", 100); y: root.ws("lap_timing", "y", 300)
-        fontScale: root.ws("lap_timing", "fontScale", 1.0)
-        borderRadius: root.ws("lap_timing", "borderRadius", 12)
+    OW {
+        _wid: "lap_timing"; widgetId: "lap_timing"
+        visible: root.isOn("lap_timing")
+        width: root.gw("lap_timing","width",280); height: root.gw("lap_timing","height",120)
+        opacity: root.gw("lap_timing","opacity",0.92)
+        fontScale: root.gw("lap_timing","fontScale",1.0)
+        borderRadius: root.gw("lap_timing","borderRadius",12)
         Widgets.LapTimingWidget {
             anchors.fill: parent; anchors.margins: 4
             currentTime: overlayVM ? overlayVM.currentLapTime || "0:00.000" : "0:00.000"
@@ -121,30 +111,26 @@ Item {
         }
     }
 
-    OverlayWidget {
-        visible: root.shouldShow("delta_bar")
-        widgetId: "delta_bar"
-        width: root.ws("delta_bar", "width", 300)
-        height: root.ws("delta_bar", "height", 60)
-        opacity: root.ws("delta_bar", "opacity", 0.92)
-        x: root.ws("delta_bar", "x", 400); y: root.ws("delta_bar", "y", 20)
-        fontScale: root.ws("delta_bar", "fontScale", 1.0)
-        borderRadius: root.ws("delta_bar", "borderRadius", 12)
+    OW {
+        _wid: "delta_bar"; widgetId: "delta_bar"
+        visible: root.isOn("delta_bar")
+        width: root.gw("delta_bar","width",300); height: root.gw("delta_bar","height",60)
+        opacity: root.gw("delta_bar","opacity",0.92)
+        fontScale: root.gw("delta_bar","fontScale",1.0)
+        borderRadius: root.gw("delta_bar","borderRadius",12)
         Widgets.DeltaBarWidget {
             anchors.fill: parent; anchors.margins: 4
             delta: overlayVM ? overlayVM.liveDelta : 0
         }
     }
 
-    OverlayWidget {
-        visible: root.shouldShow("session_timer")
-        widgetId: "session_timer"
-        width: root.ws("session_timer", "width", 200)
-        height: root.ws("session_timer", "height", 80)
-        opacity: root.ws("session_timer", "opacity", 0.92)
-        x: root.ws("session_timer", "x", 100); y: root.ws("session_timer", "y", 440)
-        fontScale: root.ws("session_timer", "fontScale", 1.0)
-        borderRadius: root.ws("session_timer", "borderRadius", 12)
+    OW {
+        _wid: "session_timer"; widgetId: "session_timer"
+        visible: root.isOn("session_timer")
+        width: root.gw("session_timer","width",200); height: root.gw("session_timer","height",80)
+        opacity: root.gw("session_timer","opacity",0.92)
+        fontScale: root.gw("session_timer","fontScale",1.0)
+        borderRadius: root.gw("session_timer","borderRadius",12)
         Widgets.SessionTimerWidget {
             anchors.fill: parent; anchors.margins: 4
             elapsed: overlayVM ? overlayVM.elapsed || "0:00" : "0:00"
@@ -153,44 +139,36 @@ Item {
         }
     }
 
-    OverlayWidget {
-        visible: root.shouldShow("flags")
-        widgetId: "flags"
-        width: root.ws("flags", "width", 160)
-        height: root.ws("flags", "height", 100)
-        opacity: root.ws("flags", "opacity", 0.92)
-        x: root.ws("flags", "x", 700); y: root.ws("flags", "y", 340)
-        fontScale: root.ws("flags", "fontScale", 1.0)
-        borderRadius: root.ws("flags", "borderRadius", 12)
+    OW {
+        _wid: "flags"; widgetId: "flags"
+        visible: root.isOn("flags")
+        width: root.gw("flags","width",160); height: root.gw("flags","height",100)
+        opacity: root.gw("flags","opacity",0.92)
+        fontScale: root.gw("flags","fontScale",1.0)
+        borderRadius: root.gw("flags","borderRadius",12)
         Widgets.FlagsWidget {
             anchors.fill: parent; anchors.margins: 4
             flag: overlayVM ? overlayVM.currentFlag || "green" : "green"
         }
     }
 
-    OverlayWidget {
-        visible: root.shouldShow("radar")
-        widgetId: "radar"
-        width: root.ws("radar", "width", 200)
-        height: root.ws("radar", "height", 200)
-        opacity: root.ws("radar", "opacity", 0.92)
-        x: root.ws("radar", "x", 830); y: root.ws("radar", "y", 400)
-        fontScale: root.ws("radar", "fontScale", 1.0)
-        borderRadius: root.ws("radar", "borderRadius", 12)
-        Widgets.RadarWidget {
-            anchors.fill: parent; anchors.margins: 4
-        }
+    OW {
+        _wid: "radar"; widgetId: "radar"
+        visible: root.isOn("radar")
+        width: root.gw("radar","width",200); height: root.gw("radar","height",200)
+        opacity: root.gw("radar","opacity",0.92)
+        fontScale: root.gw("radar","fontScale",1.0)
+        borderRadius: root.gw("radar","borderRadius",12)
+        Widgets.RadarWidget { anchors.fill: parent; anchors.margins: 4 }
     }
 
-    OverlayWidget {
-        visible: root.shouldShow("weather_monitor")
-        widgetId: "weather_monitor"
-        width: root.ws("weather_monitor", "width", 200)
-        height: root.ws("weather_monitor", "height", 160)
-        opacity: root.ws("weather_monitor", "opacity", 0.92)
-        x: root.ws("weather_monitor", "x", 830); y: root.ws("weather_monitor", "y", 80)
-        fontScale: root.ws("weather_monitor", "fontScale", 1.0)
-        borderRadius: root.ws("weather_monitor", "borderRadius", 12)
+    OW {
+        _wid: "weather_monitor"; widgetId: "weather_monitor"
+        visible: root.isOn("weather_monitor")
+        width: root.gw("weather_monitor","width",200); height: root.gw("weather_monitor","height",160)
+        opacity: root.gw("weather_monitor","opacity",0.92)
+        fontScale: root.gw("weather_monitor","fontScale",1.0)
+        borderRadius: root.gw("weather_monitor","borderRadius",12)
         Widgets.WeatherMonitorWidget {
             anchors.fill: parent; anchors.margins: 4
             trackTemp: overlayVM ? overlayVM.trackTemp : 0
@@ -198,15 +176,13 @@ Item {
         }
     }
 
-    OverlayWidget {
-        visible: root.shouldShow("gforce_meter_full")
-        widgetId: "gforce_meter_full"
-        width: root.ws("gforce_meter_full", "width", 200)
-        height: root.ws("gforce_meter_full", "height", 200)
-        opacity: root.ws("gforce_meter_full", "opacity", 0.92)
-        x: root.ws("gforce_meter_full", "x", 20); y: root.ws("gforce_meter_full", "y", 20)
-        fontScale: root.ws("gforce_meter_full", "fontScale", 1.0)
-        borderRadius: root.ws("gforce_meter_full", "borderRadius", 12)
+    OW {
+        _wid: "gforce_meter_full"; widgetId: "gforce_meter_full"
+        visible: root.isOn("gforce_meter_full")
+        width: root.gw("gforce_meter_full","width",200); height: root.gw("gforce_meter_full","height",200)
+        opacity: root.gw("gforce_meter_full","opacity",0.92)
+        fontScale: root.gw("gforce_meter_full","fontScale",1.0)
+        borderRadius: root.gw("gforce_meter_full","borderRadius",12)
         Widgets.GForceMeterWidget {
             anchors.fill: parent; anchors.margins: 4
             latG: overlayVM ? overlayVM.latAccelG : 0
@@ -214,15 +190,13 @@ Item {
         }
     }
 
-    OverlayWidget {
-        visible: root.shouldShow("input_telemetry")
-        widgetId: "input_telemetry"
-        width: root.ws("input_telemetry", "width", 280)
-        height: root.ws("input_telemetry", "height", 180)
-        opacity: root.ws("input_telemetry", "opacity", 0.92)
-        x: root.ws("input_telemetry", "x", 440); y: root.ws("input_telemetry", "y", 360)
-        fontScale: root.ws("input_telemetry", "fontScale", 1.0)
-        borderRadius: root.ws("input_telemetry", "borderRadius", 12)
+    OW {
+        _wid: "input_telemetry"; widgetId: "input_telemetry"
+        visible: root.isOn("input_telemetry")
+        width: root.gw("input_telemetry","width",280); height: root.gw("input_telemetry","height",180)
+        opacity: root.gw("input_telemetry","opacity",0.92)
+        fontScale: root.gw("input_telemetry","fontScale",1.0)
+        borderRadius: root.gw("input_telemetry","borderRadius",12)
         Widgets.InputTelemetryWidget {
             anchors.fill: parent; anchors.margins: 4
             throttle: overlayVM ? overlayVM.throttlePct : 0
@@ -235,15 +209,13 @@ Item {
         }
     }
 
-    OverlayWidget {
-        visible: root.shouldShow("fuel_calculator")
-        widgetId: "fuel_calculator"
-        width: root.ws("fuel_calculator", "width", 220)
-        height: root.ws("fuel_calculator", "height", 200)
-        opacity: root.ws("fuel_calculator", "opacity", 0.92)
-        x: root.ws("fuel_calculator", "x", 20); y: root.ws("fuel_calculator", "y", 240)
-        fontScale: root.ws("fuel_calculator", "fontScale", 1.0)
-        borderRadius: root.ws("fuel_calculator", "borderRadius", 12)
+    OW {
+        _wid: "fuel_calculator"; widgetId: "fuel_calculator"
+        visible: root.isOn("fuel_calculator")
+        width: root.gw("fuel_calculator","width",220); height: root.gw("fuel_calculator","height",200)
+        opacity: root.gw("fuel_calculator","opacity",0.92)
+        fontScale: root.gw("fuel_calculator","fontScale",1.0)
+        borderRadius: root.gw("fuel_calculator","borderRadius",12)
         Widgets.FuelCalculatorWidget {
             anchors.fill: parent; anchors.margins: 4
             fuelLevel: overlayVM ? overlayVM.fuelLevel : 0
