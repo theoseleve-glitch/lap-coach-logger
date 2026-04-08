@@ -878,14 +878,14 @@ Item {
                         }
                     }
 
-                    // ── Live widget preview ──
+                    // ── Live widget preview with racing backdrop ──
                     Rectangle {
                         Layout.leftMargin: Theme.Tokens.xxxl
                         Layout.rightMargin: Theme.Tokens.xxxl
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 220
+                        Layout.preferredHeight: 260
                         radius: Theme.Tokens.radiusLg
-                        color: Qt.rgba(0, 0, 0, 0.4)
+                        color: "#0A0C10"
                         clip: true
                         border.width: 1
                         border.color: {
@@ -894,15 +894,70 @@ Item {
                                      : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.08)
                         }
 
-                        // Scale down the widget to fit the preview
+                        // Racing cockpit background — gradient simulating a track view
+                        Rectangle {
+                            anchors.fill: parent
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: "#1a1a2e" }
+                                GradientStop { position: 0.3; color: "#16213e" }
+                                GradientStop { position: 0.6; color: "#0f3460" }
+                                GradientStop { position: 1.0; color: "#1a1a2e" }
+                            }
+                        }
+                        // Ambient light blobs (simulate track lighting)
+                        Rectangle {
+                            x: parent.width * 0.15; y: parent.height * 0.2
+                            width: 200; height: 120; radius: 100
+                            color: Qt.rgba(Theme.Tokens.pitOrange.r, Theme.Tokens.pitOrange.g, Theme.Tokens.pitOrange.b, 0.08)
+                        }
+                        Rectangle {
+                            x: parent.width * 0.65; y: parent.height * 0.5
+                            width: 150; height: 100; radius: 80
+                            color: Qt.rgba(Theme.Tokens.racingPurple.r, Theme.Tokens.racingPurple.g, Theme.Tokens.racingPurple.b, 0.06)
+                        }
+                        // Horizon line
+                        Rectangle {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: parent.height * 0.4
+                            width: parent.width * 0.8; height: 1
+                            color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.04)
+                        }
+                        // Track edge markers
+                        Repeater {
+                            model: 6
+                            Rectangle {
+                                required property int index
+                                x: parent.width * 0.1 + index * parent.width * 0.15
+                                y: parent.height * 0.65
+                                width: 3; height: 12; radius: 1
+                                color: index % 2 === 0
+                                       ? Qt.rgba(Theme.Tokens.safetyRed.r, Theme.Tokens.safetyRed.g, Theme.Tokens.safetyRed.b, 0.15)
+                                       : Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.10)
+                            }
+                        }
+
+                        // Widget preview — applies current slider settings
                         Item {
                             anchors.centerIn: parent
                             width: previewLoader.item ? previewLoader.item.implicitWidth || 300 : 300
                             height: previewLoader.item ? previewLoader.item.implicitHeight || 200 : 200
-                            scale: Math.min(1.0, Math.min(
-                                (parent.width - 40) / Math.max(1, width),
-                                (parent.height - 20) / Math.max(1, height)
-                            ))
+
+                            // Apply settings from sliders to preview
+                            scale: {
+                                void(root._rev)
+                                var baseScale = Math.min(1.0, Math.min(
+                                    (parent.width - 40) / Math.max(1, width),
+                                    (parent.height - 20) / Math.max(1, height)
+                                ))
+                                var w = root.selectedWidget()
+                                var widgetScale = (w && overlayVM) ? overlayVM.getWidgetScale(w.widgetId) : 1.0
+                                return baseScale * widgetScale
+                            }
+                            opacity: {
+                                void(root._rev)
+                                var w = root.selectedWidget()
+                                return (w && overlayVM) ? overlayVM.getWidgetOpacity(w.widgetId) : 0.92
+                            }
 
                             Loader {
                                 id: previewLoader
