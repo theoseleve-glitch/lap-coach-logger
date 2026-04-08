@@ -245,7 +245,7 @@ Window {
                 width: parent.width - 40
             }
 
-            Item { width: 1; Layout.fillWidth: true }
+            Item { width: 1 }
 
             // Lock icon
             Text {
