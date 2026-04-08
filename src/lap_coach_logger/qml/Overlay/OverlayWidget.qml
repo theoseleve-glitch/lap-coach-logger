@@ -165,9 +165,21 @@ Window {
         opacity: dragArea.containsMouse ? 1.0 : 0.75
         Behavior on opacity { NumberAnimation { duration: 200 } }
         border.width: (overlayVM && overlayVM.overlayLocked) ? 2 : 1
-        border.color: (overlayVM && overlayVM.overlayLocked)
-            ? Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.25)
-            : Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.06)
+        border.color: {
+            // Session-state border glow
+            if (overlayVM && overlayVM.overlayLocked)
+                return Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.25)
+            if (!overlayVM) return Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.06)
+            var flag = overlayVM.currentFlag || ""
+            if (flag === "red" || flag === "checkered")
+                return Qt.rgba(Theme.Tokens.safetyRed.r, Theme.Tokens.safetyRed.g, Theme.Tokens.safetyRed.b, 0.3)
+            if (flag === "yellow")
+                return Qt.rgba(Theme.Tokens.marshalYellow.r, Theme.Tokens.marshalYellow.g, Theme.Tokens.marshalYellow.b, 0.25)
+            if (overlayVM.isRecording)
+                return Qt.rgba(Theme.Tokens.acidGreen.r, Theme.Tokens.acidGreen.g, Theme.Tokens.acidGreen.b, 0.12)
+            return Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.06)
+        }
+        Behavior on border.color { ColorAnimation { duration: 400 } }
 
         // Top refraction highlight
         Rectangle {
