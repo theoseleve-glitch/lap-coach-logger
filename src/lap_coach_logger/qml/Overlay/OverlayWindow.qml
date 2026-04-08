@@ -2,663 +2,253 @@ import QtQuick
 import "../Theme" as Theme
 import "widgets" as Widgets
 
-// Dynamic overlay manager.
-// Iterates over ALL widget IDs in overlayVM.widgetSettings and
-// creates / destroys independent, draggable OverlayWidget windows
-// for each enabled widget.
+// Pre-declared overlay windows. Each widget has its own OverlayWidget
+// instance with visibility bound directly to the VM. No dynamic creation.
 
 Item {
     id: root
 
-    property bool overlayVisible: false
-
-    // Live map of widget_id -> OverlayWidget Window instance
-    property var _windows: ({})
-
-    // Widget-ID to Component mapping.
-    // Every key in overlayVM._widget_settings must appear here.
-    property var _componentMap: ({
-        "delta_timing":       deltaTimingComp,
-        "inputs_grip":        inputsGripComp,
-        "fuel_strategy":      fuelStrategyComp,
-        "coaching":           coachingComp,
-        "gforce_meter":       gforceMeterComp,
-        "lap_timing":         lapTimingComp,
-        "track_map":          trackMapComp,
-        "standings":          standingsComp,
-        "weather":            weatherComp,
-        "laptime_graph":      laptimeGraphComp,
-        "laptime_log":        laptimeLogComp,
-        "laptime_spread":     laptimeSpreadComp,
-        "session_timer":      sessionTimerComp,
-        "delta_bar":          deltaBarComp,
-        "flags":              flagsComp,
-        "digiflag":           digiflagComp,
-        "radar":              radarComp,
-        "radar_bars":         radarBarsComp,
-        "blind_spot":         blindSpotComp,
-        "overtake_alert":     overtakeAlertComp,
-        "relatives":          relativesComp,
-        "standings_table":    standingsTableComp,
-        "leaderboard":        leaderboardComp,
-        "head_to_head":       headToHeadComp,
-        "track_map_canvas":   trackMapCanvasComp,
-        "mini_map":           miniMapComp,
-        "flat_map":           flatMapComp,
-        "fuel_calculator":    fuelCalculatorComp,
-        "pitbox_helper":      pitboxHelperComp,
-        "weather_monitor":    weatherMonitorComp,
-        "boost_box":          boostBoxComp,
-        "gforce_meter_full":  gforceMeterFullComp,
-        "advanced_panel":     advancedPanelComp,
-        "data_blocks":        dataBlocksComp,
-        "race_schedule":      raceScheduleComp,
-        "world_map":          worldMapComp,
-        "heart_rate":         heartRateComp,
-        "input_telemetry":    inputTelemetryComp,
-        "chat":               chatComp,
-        "chat_highlight":     chatHighlightComp,
-        "chat_race_game":     chatRaceGameComp,
-        "chat_race_standing": chatRaceStandingComp,
-        "custom_text":        customTextComp,
-        "custom_url":         customUrlComp,
-        "garage_cover":       garageCoverComp,
-        "mic_visualizer":     micVisualizerComp,
-        "promo_code_alert":   promoCodeAlertComp
-    })
-
-    onOverlayVisibleChanged: _syncWindows()
-
-    Connections {
-        target: overlayVM
-        function onWidgetSettingsChanged() { root._syncWindows() }
-        function onContextChanged() { root._syncWindows() }
+    // Helper: read settings via Slots (reactive through _syncTimer)
+    property int _tick: 0
+    Timer {
+        id: _syncTimer
+        interval: 500
+        running: true
+        repeat: true
+        onTriggered: root._tick++
     }
 
-    function _syncWindows() {
-        if (!overlayVM) return
-        var ids = overlayVM.getAllWidgetIds()
-        if (!ids || !ids.length) return
+    function ws(wid, key, def) {
+        void(_tick)
+        if (!overlayVM) return def
+        if (key === "enabled") return overlayVM.isWidgetEnabled(wid)
+        if (key === "width") return overlayVM.getWidgetWidth(wid)
+        if (key === "height") return overlayVM.getWidgetHeight(wid)
+        if (key === "opacity") return overlayVM.getWidgetOpacity(wid)
+        if (key === "x") return overlayVM.getWidgetX(wid)
+        if (key === "y") return overlayVM.getWidgetY(wid)
+        if (key === "fontScale") return overlayVM.getWidgetFontScale(wid)
+        if (key === "borderRadius") return overlayVM.getWidgetBorderRadius(wid)
+        return def
+    }
 
-        for (var i = 0; i < ids.length; i++) {
-            var wid = ids[i]
-            var enabled = overlayVM.isWidgetEnabled(wid)
-                          && overlayVM.shouldShowOverlays
+    function shouldShow(wid) {
+        void(_tick)
+        return overlayVM && overlayVM.isWidgetEnabled(wid) && overlayVM.shouldShowOverlays
+    }
 
-            if (enabled && !_windows[wid]) {
-                var comp = _componentMap[wid]
-                if (comp) {
-                    var w = overlayVM.getWidgetWidth(wid)
-                    var h = overlayVM.getWidgetHeight(wid)
-                    var o = overlayVM.getWidgetOpacity(wid)
-                    var sx = overlayVM.getWidgetX(wid)
-                    var sy = overlayVM.getWidgetY(wid)
-                    // Fall back to cascade positioning when no saved position
-                    var idx = Object.keys(_windows).length
-                    var posX = (sx !== 100 || sy !== 80) ? sx : 100 + (idx % 6) * 50
-                    var posY = (sx !== 100 || sy !== 80) ? sy :  80 + (idx % 6) * 50
-                    // Clamp to visible screen area (multi-monitor safety)
-                    var clamped = overlayVM.clampToScreen(wid, posX, posY)
-                    if (clamped) { posX = clamped.x; posY = clamped.y }
-                    var fs = overlayVM.getWidgetFontScale(wid)
-                    var br = overlayVM.getWidgetBorderRadius(wid)
-                    var rh = overlayVM.getWidgetRefreshHz(wid)
-                    var win = comp.createObject(root, {
-                        widgetId: wid,
-                        width: w, height: h, opacity: o,
-                        x: posX, y: posY,
-                        fontScale: fs, borderRadius: br, refreshHz: rh
-                    })
-                    if (win) {
-                        win.visible = true
-                        _windows[wid] = win
-                    }
-                }
-            } else if (!enabled && _windows[wid]) {
-                _windows[wid].destroy()
-                delete _windows[wid]
-            } else if (enabled && _windows[wid]) {
-                _windows[wid].width        = overlayVM.getWidgetWidth(wid)
-                _windows[wid].height       = overlayVM.getWidgetHeight(wid)
-                _windows[wid].opacity      = overlayVM.getWidgetOpacity(wid)
-                _windows[wid].fontScale    = overlayVM.getWidgetFontScale(wid)
-                _windows[wid].borderRadius = overlayVM.getWidgetBorderRadius(wid)
-                _windows[wid].refreshHz    = overlayVM.getWidgetRefreshHz(wid)
-            }
+    // ═══════════════════════════════════════════════════════════════
+    // Pre-declared overlay widget windows
+    // ═══════════════════════════════════════════════════════════════
+
+    OverlayWidget {
+        visible: root.shouldShow("delta_timing")
+        widgetId: "delta_timing"
+        width: root.ws("delta_timing", "width", 320)
+        height: root.ws("delta_timing", "height", 200)
+        opacity: root.ws("delta_timing", "opacity", 0.92)
+        x: root.ws("delta_timing", "x", 100); y: root.ws("delta_timing", "y", 80)
+        fontScale: root.ws("delta_timing", "fontScale", 1.0)
+        borderRadius: root.ws("delta_timing", "borderRadius", 12)
+        Widgets.DeltaTimeWidget {
+            anchors.fill: parent; anchors.margins: 4
+            delta: overlayVM ? overlayVM.liveDelta : 0
+            lapTime: overlayVM ? overlayVM.currentLapTime || "0:00.000" : "0:00.000"
+            bestTime: overlayVM ? overlayVM.bestTime || "\u2014" : "\u2014"
+            lapNumber: overlayVM ? overlayVM.lapNumber : 0
+            totalLaps: 0; lapProgress: overlayVM ? overlayVM.lapProgress : 0
+            sectors: overlayVM ? overlayVM.sectorStates || [] : []
         }
     }
 
-    // ================================================================
-    //  Component declarations -- one per widget type
-    // ================================================================
-
-    // ── Delta / Timing ──
-    Component {
-        id: deltaTimingComp
-        OverlayWidget {
-            Widgets.DeltaTimeWidget {
-                anchors.fill: parent; anchors.margins: 4
-                delta: overlayVM ? overlayVM.liveDelta : 0
-                lapTime: overlayVM ? overlayVM.currentLapTime || "0:00.000" : "0:00.000"
-                bestTime: overlayVM ? overlayVM.bestTime || "\u2014" : "\u2014"
-                lapNumber: overlayVM ? overlayVM.lapNumber : 0
-                totalLaps: 0
-                lapProgress: overlayVM ? overlayVM.lapProgress : 0
-                sectors: overlayVM ? overlayVM.sectorStates || [] : []
-            }
+    OverlayWidget {
+        visible: root.shouldShow("inputs_grip")
+        widgetId: "inputs_grip"
+        width: root.ws("inputs_grip", "width", 240)
+        height: root.ws("inputs_grip", "height", 260)
+        opacity: root.ws("inputs_grip", "opacity", 0.92)
+        x: root.ws("inputs_grip", "x", 440); y: root.ws("inputs_grip", "y", 80)
+        fontScale: root.ws("inputs_grip", "fontScale", 1.0)
+        borderRadius: root.ws("inputs_grip", "borderRadius", 12)
+        Widgets.InputsWidget {
+            anchors.fill: parent; anchors.margins: 4
+            throttle: overlayVM ? overlayVM.throttlePct : 0
+            brake: overlayVM ? overlayVM.brakePct : 0
+            steering: overlayVM ? overlayVM.steeringDeg / 450.0 : 0
+            gForceX: overlayVM ? overlayVM.latAccelG : 0
+            gForceY: overlayVM ? overlayVM.longAccelG : 0
+            lockup: overlayVM ? overlayVM.lockupActive : false
+            wheelspin: overlayVM ? overlayVM.wheelspinActive : false
+            smoothness: overlayVM ? overlayVM.inputSmoothness : 0.75
         }
     }
 
-    // ── Inputs / Grip ──
-    Component {
-        id: inputsGripComp
-        OverlayWidget {
-            Widgets.InputsWidget {
-                anchors.fill: parent; anchors.margins: 4
-                throttle: overlayVM ? overlayVM.throttlePct : 0
-                brake: overlayVM ? overlayVM.brakePct : 0
-                steering: overlayVM ? overlayVM.steeringDeg / 450.0 : 0
-                gForceX: overlayVM ? overlayVM.latAccelG : 0
-                gForceY: overlayVM ? overlayVM.longAccelG : 0
-                lockup: overlayVM ? overlayVM.lockupActive : false
-                wheelspin: overlayVM ? overlayVM.wheelspinActive : false
-                smoothness: overlayVM ? overlayVM.inputSmoothness : 0.75
-            }
+    OverlayWidget {
+        visible: root.shouldShow("fuel_strategy")
+        widgetId: "fuel_strategy"
+        width: root.ws("fuel_strategy", "width", 180)
+        height: root.ws("fuel_strategy", "height", 240)
+        opacity: root.ws("fuel_strategy", "opacity", 0.92)
+        x: root.ws("fuel_strategy", "x", 700); y: root.ws("fuel_strategy", "y", 80)
+        fontScale: root.ws("fuel_strategy", "fontScale", 1.0)
+        borderRadius: root.ws("fuel_strategy", "borderRadius", 12)
+        Widgets.FuelWidget {
+            anchors.fill: parent; anchors.margins: 4
+            remaining: overlayVM ? overlayVM.fuelLevel : 0
+            lapsLeft: overlayVM ? overlayVM.fuelLapsLeft : 0
+            fuelPerLap: overlayVM ? overlayVM.fuelPerLap : 0
+            state: overlayVM ? overlayVM.fuelState || "SAFE" : "SAFE"
+            pitWindow: ""; totalLaps: 0
+            currentLap: overlayVM ? overlayVM.lapNumber : 0
         }
     }
 
-    // ── Fuel Strategy ──
-    Component {
-        id: fuelStrategyComp
-        OverlayWidget {
-            Widgets.FuelWidget {
-                anchors.fill: parent; anchors.margins: 4
-                remaining: overlayVM ? overlayVM.fuelLevel : 0
-                lapsLeft: overlayVM ? overlayVM.fuelLapsLeft : 0
-                fuelPerLap: overlayVM ? overlayVM.fuelPerLap : 0
-                state: overlayVM ? overlayVM.fuelState || "SAFE" : "SAFE"
-                pitWindow: ""
-                totalLaps: 0
-                currentLap: overlayVM ? overlayVM.lapNumber : 0
-            }
+    OverlayWidget {
+        visible: root.shouldShow("lap_timing")
+        widgetId: "lap_timing"
+        width: root.ws("lap_timing", "width", 280)
+        height: root.ws("lap_timing", "height", 120)
+        opacity: root.ws("lap_timing", "opacity", 0.92)
+        x: root.ws("lap_timing", "x", 100); y: root.ws("lap_timing", "y", 300)
+        fontScale: root.ws("lap_timing", "fontScale", 1.0)
+        borderRadius: root.ws("lap_timing", "borderRadius", 12)
+        Widgets.LapTimingWidget {
+            anchors.fill: parent; anchors.margins: 4
+            currentTime: overlayVM ? overlayVM.currentLapTime || "0:00.000" : "0:00.000"
+            lastTime: overlayVM ? overlayVM.lastTime || "\u2014" : "\u2014"
+            bestTime: overlayVM ? overlayVM.bestTime || "\u2014" : "\u2014"
+            gap: ""
         }
     }
 
-    // ── Coaching ──
-    Component {
-        id: coachingComp
-        OverlayWidget {
-            Widgets.CoachingWidget {
-                anchors.fill: parent; anchors.margins: 4
-                headline: overlayVM ? overlayVM.coachingHeadline : ""
-                sub: overlayVM ? overlayVM.coachingSub : ""
-                category: overlayVM ? overlayVM.coachingCategory : ""
-                severity: overlayVM ? overlayVM.coachingSeverity : "positive"
-                confidence: overlayVM ? overlayVM.coachingConfidence : 0
-                sector: overlayVM ? overlayVM.coachingSector : ""
-            }
+    OverlayWidget {
+        visible: root.shouldShow("delta_bar")
+        widgetId: "delta_bar"
+        width: root.ws("delta_bar", "width", 300)
+        height: root.ws("delta_bar", "height", 60)
+        opacity: root.ws("delta_bar", "opacity", 0.92)
+        x: root.ws("delta_bar", "x", 400); y: root.ws("delta_bar", "y", 20)
+        fontScale: root.ws("delta_bar", "fontScale", 1.0)
+        borderRadius: root.ws("delta_bar", "borderRadius", 12)
+        Widgets.DeltaBarWidget {
+            anchors.fill: parent; anchors.margins: 4
+            delta: overlayVM ? overlayVM.liveDelta : 0
         }
     }
 
-    // ── G-Force Meter ──
-    Component {
-        id: gforceMeterComp
-        OverlayWidget {
-            Widgets.GForceMeterWidget {
-                anchors.fill: parent; anchors.margins: 4
-                latG: overlayVM ? overlayVM.latAccelG : 0
-                longG: overlayVM ? overlayVM.longAccelG : 0
-            }
+    OverlayWidget {
+        visible: root.shouldShow("session_timer")
+        widgetId: "session_timer"
+        width: root.ws("session_timer", "width", 200)
+        height: root.ws("session_timer", "height", 80)
+        opacity: root.ws("session_timer", "opacity", 0.92)
+        x: root.ws("session_timer", "x", 100); y: root.ws("session_timer", "y", 440)
+        fontScale: root.ws("session_timer", "fontScale", 1.0)
+        borderRadius: root.ws("session_timer", "borderRadius", 12)
+        Widgets.SessionTimerWidget {
+            anchors.fill: parent; anchors.margins: 4
+            elapsed: overlayVM ? overlayVM.elapsed || "0:00" : "0:00"
+            sessionType: overlayVM ? overlayVM.sessionType || "Practice" : "Practice"
+            timeRemaining: ""
         }
     }
 
-    // ── Lap Timing ──
-    Component {
-        id: lapTimingComp
-        OverlayWidget {
-            Widgets.LapTimingWidget {
-                anchors.fill: parent; anchors.margins: 4
-                currentTime: overlayVM ? overlayVM.currentLapTime : ""
-                lastTime: overlayVM ? overlayVM.lastTime : ""
-                bestTime: overlayVM ? overlayVM.bestTime : ""
-                deltaVsBest: overlayVM ? overlayVM.lastDelta : ""
-            }
+    OverlayWidget {
+        visible: root.shouldShow("flags")
+        widgetId: "flags"
+        width: root.ws("flags", "width", 160)
+        height: root.ws("flags", "height", 100)
+        opacity: root.ws("flags", "opacity", 0.92)
+        x: root.ws("flags", "x", 700); y: root.ws("flags", "y", 340)
+        fontScale: root.ws("flags", "fontScale", 1.0)
+        borderRadius: root.ws("flags", "borderRadius", 12)
+        Widgets.FlagsWidget {
+            anchors.fill: parent; anchors.margins: 4
+            flag: overlayVM ? overlayVM.currentFlag || "green" : "green"
         }
     }
 
-    // ── Track Map ──
-    Component {
-        id: trackMapComp
-        OverlayWidget {
-            Widgets.TrackMapWidget {
-                anchors.fill: parent; anchors.margins: 4
-                carPosition: overlayVM ? overlayVM.lapDistPct : 0
-            }
+    OverlayWidget {
+        visible: root.shouldShow("radar")
+        widgetId: "radar"
+        width: root.ws("radar", "width", 200)
+        height: root.ws("radar", "height", 200)
+        opacity: root.ws("radar", "opacity", 0.92)
+        x: root.ws("radar", "x", 830); y: root.ws("radar", "y", 400)
+        fontScale: root.ws("radar", "fontScale", 1.0)
+        borderRadius: root.ws("radar", "borderRadius", 12)
+        Widgets.RadarWidget {
+            anchors.fill: parent; anchors.margins: 4
         }
     }
 
-    // ── Standings ──
-    Component {
-        id: standingsComp
-        OverlayWidget {
-            Widgets.StandingsWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
+    OverlayWidget {
+        visible: root.shouldShow("weather_monitor")
+        widgetId: "weather_monitor"
+        width: root.ws("weather_monitor", "width", 200)
+        height: root.ws("weather_monitor", "height", 160)
+        opacity: root.ws("weather_monitor", "opacity", 0.92)
+        x: root.ws("weather_monitor", "x", 830); y: root.ws("weather_monitor", "y", 80)
+        fontScale: root.ws("weather_monitor", "fontScale", 1.0)
+        borderRadius: root.ws("weather_monitor", "borderRadius", 12)
+        Widgets.WeatherMonitorWidget {
+            anchors.fill: parent; anchors.margins: 4
+            trackTemp: overlayVM ? overlayVM.trackTemp : 0
+            airTemp: overlayVM ? overlayVM.airTemp : 0
         }
     }
 
-    // ── Weather ──
-    Component {
-        id: weatherComp
-        OverlayWidget {
-            Widgets.WeatherMonitorWidget {
-                anchors.fill: parent; anchors.margins: 4
-                trackTemp: overlayVM ? overlayVM.trackTemp : 0
-                airTemp: overlayVM ? overlayVM.airTemp : 0
-            }
+    OverlayWidget {
+        visible: root.shouldShow("gforce_meter_full")
+        widgetId: "gforce_meter_full"
+        width: root.ws("gforce_meter_full", "width", 200)
+        height: root.ws("gforce_meter_full", "height", 200)
+        opacity: root.ws("gforce_meter_full", "opacity", 0.92)
+        x: root.ws("gforce_meter_full", "x", 20); y: root.ws("gforce_meter_full", "y", 20)
+        fontScale: root.ws("gforce_meter_full", "fontScale", 1.0)
+        borderRadius: root.ws("gforce_meter_full", "borderRadius", 12)
+        Widgets.GForceMeterWidget {
+            anchors.fill: parent; anchors.margins: 4
+            latG: overlayVM ? overlayVM.latAccelG : 0
+            longG: overlayVM ? overlayVM.longAccelG : 0
         }
     }
 
-    // ── Laptime Graph ──
-    Component {
-        id: laptimeGraphComp
-        OverlayWidget {
-            Widgets.LaptimeGraphWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
+    OverlayWidget {
+        visible: root.shouldShow("input_telemetry")
+        widgetId: "input_telemetry"
+        width: root.ws("input_telemetry", "width", 280)
+        height: root.ws("input_telemetry", "height", 180)
+        opacity: root.ws("input_telemetry", "opacity", 0.92)
+        x: root.ws("input_telemetry", "x", 440); y: root.ws("input_telemetry", "y", 360)
+        fontScale: root.ws("input_telemetry", "fontScale", 1.0)
+        borderRadius: root.ws("input_telemetry", "borderRadius", 12)
+        Widgets.InputTelemetryWidget {
+            anchors.fill: parent; anchors.margins: 4
+            throttle: overlayVM ? overlayVM.throttlePct : 0
+            brake: overlayVM ? overlayVM.brakePct : 0
+            clutch: overlayVM ? overlayVM.clutchPct : 0
+            steering: overlayVM ? overlayVM.steeringDeg / 450.0 : 0
+            gear: overlayVM ? overlayVM.gear : 0
+            rpm: overlayVM ? overlayVM.rpm : 0
+            maxRpm: 8500
         }
     }
 
-    // ── Laptime Log ──
-    Component {
-        id: laptimeLogComp
-        OverlayWidget {
-            Widgets.LaptimeLogWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Laptime Spread ──
-    Component {
-        id: laptimeSpreadComp
-        OverlayWidget {
-            Widgets.LaptimeSpreadWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Session Timer ──
-    Component {
-        id: sessionTimerComp
-        OverlayWidget {
-            Widgets.SessionTimerWidget {
-                anchors.fill: parent; anchors.margins: 4
-                elapsed: overlayVM ? overlayVM.elapsed || "0:00:00" : "0:00:00"
-                sessionType: overlayVM ? overlayVM.sessionType || "Practice" : "Practice"
-            }
-        }
-    }
-
-    // ── Delta Bar ──
-    Component {
-        id: deltaBarComp
-        OverlayWidget {
-            Widgets.DeltaBarWidget {
-                anchors.fill: parent; anchors.margins: 4
-                delta: overlayVM ? overlayVM.liveDelta : 0
-            }
-        }
-    }
-
-    // ── Flags ──
-    Component {
-        id: flagsComp
-        OverlayWidget {
-            Widgets.FlagsWidget {
-                anchors.fill: parent; anchors.margins: 4
-                flag: overlayVM ? overlayVM.currentFlag : "none"
-            }
-        }
-    }
-
-    // ── Digiflag ──
-    Component {
-        id: digiflagComp
-        OverlayWidget {
-            Widgets.DigiflagWidget {
-                anchors.fill: parent; anchors.margins: 4
-                flag: overlayVM ? overlayVM.currentFlag : "none"
-            }
-        }
-    }
-
-    // ── Radar ──
-    Component {
-        id: radarComp
-        OverlayWidget {
-            Widgets.RadarWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Radar Bars ──
-    Component {
-        id: radarBarsComp
-        OverlayWidget {
-            Widgets.RadarBarsWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Blind Spot ──
-    Component {
-        id: blindSpotComp
-        OverlayWidget {
-            Widgets.BlindSpotWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Overtake Alert ──
-    Component {
-        id: overtakeAlertComp
-        OverlayWidget {
-            Widgets.OvertakeAlertWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Relatives ──
-    Component {
-        id: relativesComp
-        OverlayWidget {
-            Widgets.RelativesWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Standings Table ──
-    Component {
-        id: standingsTableComp
-        OverlayWidget {
-            Widgets.StandingsWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Leaderboard ──
-    Component {
-        id: leaderboardComp
-        OverlayWidget {
-            Widgets.LeaderboardWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Head to Head ──
-    Component {
-        id: headToHeadComp
-        OverlayWidget {
-            Widgets.HeadToHeadWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Track Map Canvas ──
-    Component {
-        id: trackMapCanvasComp
-        OverlayWidget {
-            Widgets.TrackMapWidget {
-                anchors.fill: parent; anchors.margins: 4
-                carPosition: overlayVM ? overlayVM.lapDistPct : 0
-            }
-        }
-    }
-
-    // ── Mini Map ──
-    Component {
-        id: miniMapComp
-        OverlayWidget {
-            Widgets.MiniMapWidget {
-                anchors.fill: parent; anchors.margins: 4
-                carPosition: overlayVM ? overlayVM.lapDistPct : 0
-            }
-        }
-    }
-
-    // ── Flat Map ──
-    Component {
-        id: flatMapComp
-        OverlayWidget {
-            Widgets.FlatMapWidget {
-                anchors.fill: parent; anchors.margins: 4
-                carPosition: overlayVM ? overlayVM.lapDistPct : 0
-            }
-        }
-    }
-
-    // ── Fuel Calculator ──
-    Component {
-        id: fuelCalculatorComp
-        OverlayWidget {
-            Widgets.FuelCalculatorWidget {
-                anchors.fill: parent; anchors.margins: 4
-                fuelLevel: overlayVM ? overlayVM.fuelLevel : 0
-                fuelPerLap: overlayVM ? overlayVM.fuelPerLap : 0
-                lapsLeft: overlayVM ? overlayVM.fuelLapsLeft : 0
-            }
-        }
-    }
-
-    // ── Pitbox Helper ──
-    Component {
-        id: pitboxHelperComp
-        OverlayWidget {
-            Widgets.PitboxHelperWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Weather Monitor ──
-    Component {
-        id: weatherMonitorComp
-        OverlayWidget {
-            Widgets.WeatherMonitorWidget {
-                anchors.fill: parent; anchors.margins: 4
-                trackTemp: overlayVM ? overlayVM.trackTemp : 0
-                airTemp: overlayVM ? overlayVM.airTemp : 0
-            }
-        }
-    }
-
-    // ── Boost Box ──
-    Component {
-        id: boostBoxComp
-        OverlayWidget {
-            Widgets.BoostBoxWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── G-Force Meter (Full) ──
-    Component {
-        id: gforceMeterFullComp
-        OverlayWidget {
-            Widgets.GForceMeterWidget {
-                anchors.fill: parent; anchors.margins: 4
-                latG: overlayVM ? overlayVM.latAccelG : 0
-                longG: overlayVM ? overlayVM.longAccelG : 0
-            }
-        }
-    }
-
-    // ── Advanced Panel ──
-    Component {
-        id: advancedPanelComp
-        OverlayWidget {
-            Widgets.AdvancedPanelWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Data Blocks ──
-    Component {
-        id: dataBlocksComp
-        OverlayWidget {
-            Widgets.DataBlocksWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Race Schedule ──
-    Component {
-        id: raceScheduleComp
-        OverlayWidget {
-            Widgets.RaceScheduleWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── World Map ──
-    Component {
-        id: worldMapComp
-        OverlayWidget {
-            Widgets.WorldMapWidget {
-                anchors.fill: parent; anchors.margins: 4
-                trackName: overlayVM ? overlayVM.track : ""
-            }
-        }
-    }
-
-    // ── Heart Rate ──
-    Component {
-        id: heartRateComp
-        OverlayWidget {
-            Widgets.HeartRateWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Input Telemetry ──
-    Component {
-        id: inputTelemetryComp
-        OverlayWidget {
-            Widgets.InputTelemetryWidget {
-                anchors.fill: parent; anchors.margins: 4
-                throttle: overlayVM ? overlayVM.throttlePct : 0
-                brake: overlayVM ? overlayVM.brakePct : 0
-                clutch: overlayVM ? overlayVM.clutchPct : 0
-                steering: overlayVM ? overlayVM.steeringDeg / 450.0 : 0
-                gear: overlayVM ? overlayVM.gear : 0
-                rpm: overlayVM ? overlayVM.rpm : 0
-                maxRpm: 8000
-            }
-        }
-    }
-
-    // ── Chat ──
-    Component {
-        id: chatComp
-        OverlayWidget {
-            Widgets.ChatWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Chat Highlight ──
-    Component {
-        id: chatHighlightComp
-        OverlayWidget {
-            Widgets.ChatHighlightWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Chat Race Game ──
-    Component {
-        id: chatRaceGameComp
-        OverlayWidget {
-            Widgets.ChatRaceGameWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Chat Race Standing ──
-    Component {
-        id: chatRaceStandingComp
-        OverlayWidget {
-            Widgets.ChatRaceStandingWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Custom Text ──
-    Component {
-        id: customTextComp
-        OverlayWidget {
-            Widgets.CustomTextWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Custom URL ──
-    Component {
-        id: customUrlComp
-        OverlayWidget {
-            Widgets.CustomUrlWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Garage Cover ──
-    Component {
-        id: garageCoverComp
-        OverlayWidget {
-            Widgets.GarageCoverWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Mic Visualizer ──
-    Component {
-        id: micVisualizerComp
-        OverlayWidget {
-            Widgets.MicVisualizerWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
-        }
-    }
-
-    // ── Promo Code Alert ──
-    Component {
-        id: promoCodeAlertComp
-        OverlayWidget {
-            Widgets.PromoCodeAlertWidget {
-                anchors.fill: parent; anchors.margins: 4
-            }
+    OverlayWidget {
+        visible: root.shouldShow("fuel_calculator")
+        widgetId: "fuel_calculator"
+        width: root.ws("fuel_calculator", "width", 220)
+        height: root.ws("fuel_calculator", "height", 200)
+        opacity: root.ws("fuel_calculator", "opacity", 0.92)
+        x: root.ws("fuel_calculator", "x", 20); y: root.ws("fuel_calculator", "y", 240)
+        fontScale: root.ws("fuel_calculator", "fontScale", 1.0)
+        borderRadius: root.ws("fuel_calculator", "borderRadius", 12)
+        Widgets.FuelCalculatorWidget {
+            anchors.fill: parent; anchors.margins: 4
+            fuelLevel: overlayVM ? overlayVM.fuelLevel : 0
+            fuelPerLap: overlayVM ? overlayVM.fuelPerLap : 0
+            lapsLeft: overlayVM ? overlayVM.fuelLapsLeft : 0
         }
     }
 }
