@@ -954,7 +954,7 @@ Item {
                             }
                             spacing: Theme.Tokens.lg
 
-                            // ── Width slider ──
+                            // ── Scale slider (replaces width/height/border-radius) ──
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: Theme.Tokens.xs
@@ -962,7 +962,7 @@ Item {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     Text {
-                                        text: "Width"
+                                        text: "Scale"
                                         font.family: Theme.Typography.bodyFamily
                                         font.pixelSize: 13
                                         color: Theme.Tokens.chalk
@@ -971,7 +971,7 @@ Item {
                                     Text {
                                         text: {
                                             void(root._rev); var s = root.selectedSettings()
-                                            return s ? Math.round(widthSlider.value) + " px" : "--"
+                                            return s ? (scaleSlider.value * 100).toFixed(0) + "%" : "--"
                                         }
                                         font.family: Theme.Typography.monoFamily
                                         font.pixelSize: 12
@@ -980,28 +980,28 @@ Item {
                                 }
 
                                 Slider {
-                                    id: widthSlider
+                                    id: scaleSlider
                                     Layout.fillWidth: true
-                                    from: 200; to: 800; stepSize: 10
+                                    from: 0.5; to: 2.0; stepSize: 0.05
                                     value: {
                                         void(root._rev); var s = root.selectedSettings()
-                                        return s ? s.width : 320
+                                        return s && s.scale !== undefined ? s.scale : 1.0
                                     }
                                     onMoved: {
                                         var w = root.selectedWidget()
-                                        if (w && overlayVM) overlayVM.setWidgetSetting(w.widgetId, "width", Math.round(value))
+                                        if (w && overlayVM) overlayVM.setWidgetScale(w.widgetId, value)
                                     }
 
                                     background: Rectangle {
-                                        x: widthSlider.leftPadding
-                                        y: widthSlider.topPadding + widthSlider.availableHeight / 2 - height / 2
-                                        width: widthSlider.availableWidth
+                                        x: scaleSlider.leftPadding
+                                        y: scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2
+                                        width: scaleSlider.availableWidth
                                         height: 4
                                         radius: 2
                                         color: Theme.Tokens.raised
 
                                         Rectangle {
-                                            width: widthSlider.visualPosition * parent.width
+                                            width: scaleSlider.visualPosition * parent.width
                                             height: parent.height
                                             radius: 2
                                             color: Theme.Tokens.pitOrange
@@ -1009,75 +1009,10 @@ Item {
                                     }
 
                                     handle: Rectangle {
-                                        x: widthSlider.leftPadding + widthSlider.visualPosition * (widthSlider.availableWidth - width)
-                                        y: widthSlider.topPadding + widthSlider.availableHeight / 2 - height / 2
+                                        x: scaleSlider.leftPadding + scaleSlider.visualPosition * (scaleSlider.availableWidth - width)
+                                        y: scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2
                                         width: 16; height: 16; radius: 8
-                                        color: widthSlider.pressed ? Theme.Tokens.chalk : Theme.Tokens.pitOrange
-                                        border.width: 2
-                                        border.color: Theme.Tokens.elevated
-                                    }
-                                }
-                            }
-
-                            // ── Height slider ──
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: Theme.Tokens.xs
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text {
-                                        text: "Height"
-                                        font.family: Theme.Typography.bodyFamily
-                                        font.pixelSize: 13
-                                        color: Theme.Tokens.chalk
-                                    }
-                                    Item { Layout.fillWidth: true }
-                                    Text {
-                                        text: {
-                                            void(root._rev); var s = root.selectedSettings()
-                                            return s ? Math.round(heightSlider.value) + " px" : "--"
-                                        }
-                                        font.family: Theme.Typography.monoFamily
-                                        font.pixelSize: 12
-                                        color: Theme.Tokens.pitOrange
-                                    }
-                                }
-
-                                Slider {
-                                    id: heightSlider
-                                    Layout.fillWidth: true
-                                    from: 100; to: 500; stepSize: 10
-                                    value: {
-                                        void(root._rev); var s = root.selectedSettings()
-                                        return s ? s.height : 200
-                                    }
-                                    onMoved: {
-                                        var w = root.selectedWidget()
-                                        if (w && overlayVM) overlayVM.setWidgetSetting(w.widgetId, "height", Math.round(value))
-                                    }
-
-                                    background: Rectangle {
-                                        x: heightSlider.leftPadding
-                                        y: heightSlider.topPadding + heightSlider.availableHeight / 2 - height / 2
-                                        width: heightSlider.availableWidth
-                                        height: 4
-                                        radius: 2
-                                        color: Theme.Tokens.raised
-
-                                        Rectangle {
-                                            width: heightSlider.visualPosition * parent.width
-                                            height: parent.height
-                                            radius: 2
-                                            color: Theme.Tokens.pitOrange
-                                        }
-                                    }
-
-                                    handle: Rectangle {
-                                        x: heightSlider.leftPadding + heightSlider.visualPosition * (heightSlider.availableWidth - width)
-                                        y: heightSlider.topPadding + heightSlider.availableHeight / 2 - height / 2
-                                        width: 16; height: 16; radius: 8
-                                        color: heightSlider.pressed ? Theme.Tokens.chalk : Theme.Tokens.pitOrange
+                                        color: scaleSlider.pressed ? Theme.Tokens.chalk : Theme.Tokens.pitOrange
                                         border.width: 2
                                         border.color: Theme.Tokens.elevated
                                     }
@@ -1275,71 +1210,6 @@ Item {
                                                 }
                                             }
                                         }
-                                    }
-                                }
-                            }
-
-                            // ── Border radius slider ──
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: Theme.Tokens.xs
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text {
-                                        text: "Border Radius"
-                                        font.family: Theme.Typography.bodyFamily
-                                        font.pixelSize: 13
-                                        color: Theme.Tokens.chalk
-                                    }
-                                    Item { Layout.fillWidth: true }
-                                    Text {
-                                        text: {
-                                            void(root._rev); var s = root.selectedSettings()
-                                            return s ? Math.round(borderRadiusSlider.value) + " px" : "--"
-                                        }
-                                        font.family: Theme.Typography.monoFamily
-                                        font.pixelSize: 12
-                                        color: Theme.Tokens.pitOrange
-                                    }
-                                }
-
-                                Slider {
-                                    id: borderRadiusSlider
-                                    Layout.fillWidth: true
-                                    from: 0; to: 20; stepSize: 1
-                                    value: {
-                                        void(root._rev); var s = root.selectedSettings()
-                                        return s ? (s.border_radius !== undefined ? s.border_radius : 12) : 12
-                                    }
-                                    onMoved: {
-                                        var w = root.selectedWidget()
-                                        if (w && overlayVM) overlayVM.setWidgetSetting(w.widgetId, "border_radius", Math.round(value))
-                                    }
-
-                                    background: Rectangle {
-                                        x: borderRadiusSlider.leftPadding
-                                        y: borderRadiusSlider.topPadding + borderRadiusSlider.availableHeight / 2 - height / 2
-                                        width: borderRadiusSlider.availableWidth
-                                        height: 4
-                                        radius: 2
-                                        color: Theme.Tokens.raised
-
-                                        Rectangle {
-                                            width: borderRadiusSlider.visualPosition * parent.width
-                                            height: parent.height
-                                            radius: 2
-                                            color: Theme.Tokens.pitOrange
-                                        }
-                                    }
-
-                                    handle: Rectangle {
-                                        x: borderRadiusSlider.leftPadding + borderRadiusSlider.visualPosition * (borderRadiusSlider.availableWidth - width)
-                                        y: borderRadiusSlider.topPadding + borderRadiusSlider.availableHeight / 2 - height / 2
-                                        width: 16; height: 16; radius: 8
-                                        color: borderRadiusSlider.pressed ? Theme.Tokens.chalk : Theme.Tokens.pitOrange
-                                        border.width: 2
-                                        border.color: Theme.Tokens.elevated
                                     }
                                 }
                             }

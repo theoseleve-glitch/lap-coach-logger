@@ -686,6 +686,28 @@ class OverlayViewModel(QObject):
         s = self._widget_settings.get(widget_id)
         return int(s.get("border_radius", 12)) if s else 12
 
+    @Slot(str, result=float)
+    def getWidgetScale(self, widget_id: str) -> float:  # noqa: N802
+        s = self._widget_settings.get(widget_id)
+        return float(s.get("scale", 1.0)) if s else 1.0
+
+    @Slot(str, float)
+    def setWidgetScale(self, widget_id: str, scale: float) -> None:  # noqa: N802
+        """Set scale — proportionally adjusts width/height/border_radius from defaults."""
+        if widget_id not in self._widget_settings:
+            return
+        scale = max(0.5, min(2.0, float(scale)))
+        defaults = self._widget_defaults.get(widget_id, {})
+        base_w = defaults.get("width", 300)
+        base_h = defaults.get("height", 200)
+        base_r = defaults.get("border_radius", 12)
+        self._widget_settings[widget_id]["scale"] = round(scale, 2)
+        self._widget_settings[widget_id]["width"] = int(base_w * scale)
+        self._widget_settings[widget_id]["height"] = int(base_h * scale)
+        self._widget_settings[widget_id]["border_radius"] = max(0, int(base_r * scale))
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
     @Slot(str, result="QVariant")
     def getWidgetSettingsMap(self, widget_id: str) -> dict:  # noqa: N802
         """Return a single widget's full settings as a flat dict."""
