@@ -321,16 +321,16 @@ Item {
     }
 
     function toggleOverlay() {
-        // Master toggle: if any widgets are enabled, disable all. Otherwise enable defaults.
         if (!overlayVM) return
         var enabled = overlayVM.getEnabledWidgetIds()
         if (enabled && enabled.length > 0) {
             overlayVM.disableAllWidgets()
+            toast.show("All overlays hidden")
         } else {
-            // Re-enable the 3 defaults
             overlayVM.toggleWidget("delta_timing")
             overlayVM.toggleWidget("inputs_grip")
             overlayVM.toggleWidget("fuel_strategy")
+            toast.show("Default overlays enabled")
         }
     }
 
@@ -352,7 +352,7 @@ Item {
     Shortcut {
         sequence: "Ctrl+L"
         onActivated: {
-            if (overlayVM) overlayVM.toggleOverlayLock()
+            if (overlayVM) { overlayVM.toggleOverlayLock(); toast.show(overlayVM.overlayLocked ? "Overlays locked" : "Overlays unlocked") }
         }
     }
 
@@ -360,15 +360,14 @@ Item {
     Shortcut {
         sequence: "Ctrl+G"
         onActivated: {
-            if (overlayVM) overlayVM.toggleSnap()
+            if (overlayVM) { overlayVM.toggleSnap(); toast.show(overlayVM.snapEnabled ? "Snap enabled" : "Snap disabled") }
         }
     }
 
-    // Ctrl+H — toggle auto-hide overlays when not on track
     Shortcut {
         sequence: "Ctrl+H"
         onActivated: {
-            if (overlayVM) overlayVM.toggleAutoHide()
+            if (overlayVM) { overlayVM.toggleAutoHide(); toast.show(overlayVM.autoHideEnabled ? "Auto-hide on" : "Auto-hide off") }
         }
     }
 
@@ -412,7 +411,7 @@ Item {
     // Ctrl+A — auto-arrange overlays in a grid
     Shortcut {
         sequence: "Ctrl+A"
-        onActivated: if (overlayVM) overlayVM.autoArrangeOverlays()
+        onActivated: { if (overlayVM) { overlayVM.autoArrangeOverlays(); toast.show("Overlays arranged") } }
     }
 
     // Alt+1 through Alt+9 — quick-toggle individual overlay widgets
@@ -428,6 +427,23 @@ Item {
     // Shortcut help overlay
     Components.ShortcutHelpOverlay {
         id: shortcutHelp
+    }
+
+    // Toast notification
+    Components.ToastNotification {
+        id: toast
+    }
+
+    // Wire toast signals
+    Connections {
+        target: serviceVM
+        function onToastRequested(message) { toast.show(message) }
+    }
+    Connections {
+        target: overlayVM
+        function onWidgetSettingsChanged() {
+            // Don't toast on every settings change — only on explicit actions
+        }
     }
 
     // === Page components ===
