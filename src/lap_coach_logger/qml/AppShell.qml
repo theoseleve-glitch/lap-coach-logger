@@ -384,12 +384,24 @@ Item {
         }
     }
 
-    // Escape — close settings slide-over if open
+    // Escape — close settings, help, or other overlays
     Shortcut {
         sequence: "Escape"
         onActivated: {
+            if (shortcutHelp.visible) { shortcutHelp.visible = false; return }
             if (settingsSlideOver.isOpen) settingsSlideOver.isOpen = false
         }
+    }
+
+    // F1 — keyboard shortcut help
+    Shortcut {
+        sequence: "F1"
+        onActivated: shortcutHelp.visible = !shortcutHelp.visible
+    }
+
+    // Shortcut help overlay
+    Components.ShortcutHelpOverlay {
+        id: shortcutHelp
     }
 
     // === Page components ===
