@@ -297,6 +297,7 @@ Window {
             property point clickPos
             onPressed: function(mouse) { clickPos = Qt.point(mouse.x, mouse.y) }
             onPositionChanged: function(mouse) {
+                if (!pressed) return  // only drag when mouse button is held
                 var newX = root.x + mouse.x - clickPos.x
                 var newY = root.y + mouse.y - clickPos.y
                 if (overlayVM && overlayVM.snapEnabled) {
