@@ -272,6 +272,7 @@ class OverlayViewModel(QObject):
         # Auto-hide overlays when not on track
         self._auto_hide_enabled: bool = True
         self._should_show_overlays: bool = True
+        self._has_been_recording: bool = False
 
     # -- QML properties --------------------------------------------------------
 
@@ -1018,6 +1019,8 @@ class OverlayViewModel(QObject):
         self._track = str(live.get("track_name") or snap.get("track") or snap.get("sim") or "")
         self._car = str(live.get("car_name") or snap.get("car") or "")
         self._is_recording = str(snap.get("status", "")).lower() == "recording"
+        if self._is_recording:
+            self._has_been_recording = True
         self._session_type = str(live.get("session_type") or "")
         self._track_length_m = float(live.get("track_length_m") or 0.0)
         self._track_temp = float(live.get("track_temp_c") or 0.0)
@@ -1034,7 +1037,12 @@ class OverlayViewModel(QObject):
             self._current_flag = "none"
 
         # Auto-hide: show overlays when on track or in pits during a recording session
-        self._should_show_overlays = not self._auto_hide_enabled or self._is_recording
+        # Auto-hide: only hide overlays if we WERE recording and then stopped.
+        # If no session has started yet, always show overlays.
+        if self._auto_hide_enabled and not self._is_recording and self._has_been_recording:
+            self._should_show_overlays = False
+        else:
+            self._should_show_overlays = True
 
         self.contextChanged.emit()
 
