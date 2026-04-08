@@ -646,6 +646,60 @@ class OverlayViewModel(QObject):
         """Return a serialisable copy of all widget settings for persistence."""
         return {wid: dict(s) for wid, s in self._widget_settings.items()}
 
+    @Slot(str, int, int, result="QVariant")
+    def clampToScreen(self, widget_id: str, x: int, y: int) -> dict:  # noqa: N802
+        """Clamp x/y so overlay is visible on at least one monitor."""
+        try:
+            from PySide6.QtCore import QPoint
+            from PySide6.QtWidgets import QApplication
+            screens = QApplication.screens()
+            if not screens:
+                return {"x": x, "y": y}
+            point = QPoint(x + 50, y + 20)
+            for screen in screens:
+                if screen.geometry().contains(point):
+                    return {"x": x, "y": y}
+            primary = QApplication.primaryScreen()
+            geo = primary.geometry()
+            w = self._widget_settings.get(widget_id, {}).get("width", 300)
+            h = self._widget_settings.get(widget_id, {}).get("height", 200)
+            return {"x": geo.x() + (geo.width() - w) // 2, "y": geo.y() + (geo.height() - h) // 2}
+        except Exception:
+            return {"x": x, "y": y}
+
+    @Slot(result="QVariant")
+    def getScreenInfo(self) -> list:  # noqa: N802
+        """Return info about all connected monitors."""
+        try:
+            from PySide6.QtWidgets import QApplication
+            return [{"name": s.name(), "width": s.geometry().width(), "height": s.geometry().height()}
+                    for s in QApplication.screens()]
+        except Exception:
+            return []
+
+    @Slot(result=str)
+    def exportLayoutJson(self) -> str:  # noqa: N802
+        """Export current overlay layout as JSON string for sharing."""
+        import json
+        return json.dumps(self.export_settings(), indent=2)
+
+    @Slot(str, result=bool)
+    def importLayoutJson(self, json_str: str) -> bool:  # noqa: N802
+        """Import overlay layout from JSON string."""
+        import json
+        try:
+            data = json.loads(json_str)
+            if not isinstance(data, dict):
+                return False
+            for wid, settings in data.items():
+                if wid in self._widget_settings and isinstance(settings, dict):
+                    self._widget_settings[wid].update(settings)
+            self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
+            return True
+        except Exception:
+            return False
+
     # -- public API ------------------------------------------------------------
 
     def update_from_snapshot(self, snap: dict) -> None:

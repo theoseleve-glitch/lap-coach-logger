@@ -95,6 +95,9 @@ Item {
                     var idx = Object.keys(_windows).length
                     var posX = (sx !== 100 || sy !== 80) ? sx : 100 + (idx % 6) * 50
                     var posY = (sx !== 100 || sy !== 80) ? sy :  80 + (idx % 6) * 50
+                    // Clamp to visible screen area (multi-monitor safety)
+                    var clamped = overlayVM.clampToScreen(wid, posX, posY)
+                    if (clamped) { posX = clamped.x; posY = clamped.y }
                     var win = comp.createObject(root, {
                         widgetId: wid,
                         width: w, height: h, opacity: o,
