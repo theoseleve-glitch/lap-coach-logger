@@ -50,7 +50,7 @@ Item {
     // ═══════════════════════════════════════════════════════════
 
     OW {
-        _wid: "delta_timing"; widgetId: "delta_timing"
+        _wid: "delta_timing"; widgetId: "delta_timing"; category: "timing"
         visible: root.isOn("delta_timing")
         width: root.gw("delta_timing","width",320)
         height: root.gw("delta_timing","height",200)
@@ -70,7 +70,7 @@ Item {
     }
 
     OW {
-        _wid: "inputs_grip"; widgetId: "inputs_grip"
+        _wid: "inputs_grip"; widgetId: "inputs_grip"; category: "inputs"
         visible: root.isOn("inputs_grip")
         width: root.gw("inputs_grip","width",240)
         height: root.gw("inputs_grip","height",260)
@@ -91,7 +91,7 @@ Item {
     }
 
     OW {
-        _wid: "fuel_strategy"; widgetId: "fuel_strategy"
+        _wid: "fuel_strategy"; widgetId: "fuel_strategy"; category: "strategy"
         visible: root.isOn("fuel_strategy")
         width: root.gw("fuel_strategy","width",180)
         height: root.gw("fuel_strategy","height",240)
@@ -110,7 +110,7 @@ Item {
     }
 
     OW {
-        _wid: "lap_timing"; widgetId: "lap_timing"
+        _wid: "lap_timing"; widgetId: "lap_timing"; category: "timing"
         visible: root.isOn("lap_timing")
         width: root.gw("lap_timing","width",280)
         height: root.gw("lap_timing","height",120)
@@ -127,7 +127,7 @@ Item {
     }
 
     OW {
-        _wid: "delta_bar"; widgetId: "delta_bar"
+        _wid: "delta_bar"; widgetId: "delta_bar"; category: "timing"
         visible: root.isOn("delta_bar")
         width: root.gw("delta_bar","width",300)
         height: root.gw("delta_bar","height",60)
@@ -141,7 +141,7 @@ Item {
     }
 
     OW {
-        _wid: "session_timer"; widgetId: "session_timer"
+        _wid: "session_timer"; widgetId: "session_timer"; category: "timing"
         visible: root.isOn("session_timer")
         width: root.gw("session_timer","width",200)
         height: root.gw("session_timer","height",80)
@@ -157,7 +157,7 @@ Item {
     }
 
     OW {
-        _wid: "flags"; widgetId: "flags"
+        _wid: "flags"; widgetId: "flags"; category: "awareness"
         visible: root.isOn("flags")
         width: root.gw("flags","width",160)
         height: root.gw("flags","height",100)
@@ -171,7 +171,7 @@ Item {
     }
 
     OW {
-        _wid: "radar"; widgetId: "radar"
+        _wid: "radar"; widgetId: "radar"; category: "awareness"
         visible: root.isOn("radar")
         width: root.gw("radar","width",200)
         height: root.gw("radar","height",200)
@@ -182,7 +182,7 @@ Item {
     }
 
     OW {
-        _wid: "weather_monitor"; widgetId: "weather_monitor"
+        _wid: "weather_monitor"; widgetId: "weather_monitor"; category: "awareness"
         visible: root.isOn("weather_monitor")
         width: root.gw("weather_monitor","width",200)
         height: root.gw("weather_monitor","height",160)
@@ -197,7 +197,7 @@ Item {
     }
 
     OW {
-        _wid: "gforce_meter_full"; widgetId: "gforce_meter_full"
+        _wid: "gforce_meter_full"; widgetId: "gforce_meter_full"; category: "inputs"
         visible: root.isOn("gforce_meter_full")
         width: root.gw("gforce_meter_full","width",200)
         height: root.gw("gforce_meter_full","height",200)
@@ -212,7 +212,7 @@ Item {
     }
 
     OW {
-        _wid: "input_telemetry"; widgetId: "input_telemetry"
+        _wid: "input_telemetry"; widgetId: "input_telemetry"; category: "inputs"
         visible: root.isOn("input_telemetry")
         width: root.gw("input_telemetry","width",280)
         height: root.gw("input_telemetry","height",180)
@@ -232,7 +232,7 @@ Item {
     }
 
     OW {
-        _wid: "fuel_calculator"; widgetId: "fuel_calculator"
+        _wid: "fuel_calculator"; widgetId: "fuel_calculator"; category: "strategy"
         visible: root.isOn("fuel_calculator")
         width: root.gw("fuel_calculator","width",220)
         height: root.gw("fuel_calculator","height",200)

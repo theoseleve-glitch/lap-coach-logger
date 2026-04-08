@@ -27,6 +27,19 @@ Window {
 
     // Widget identity — set by OverlayWindow to link back to VM settings
     property string widgetId: ""
+    property string category: ""  // "timing","inputs","awareness","strategy","streaming"
+
+    // Category accent color
+    readonly property color _catColor: {
+        switch(category) {
+        case "timing": return Theme.Tokens.pitOrange
+        case "inputs": return Theme.Tokens.acidGreen
+        case "awareness": return Theme.Tokens.racingPurple
+        case "strategy": return Theme.Tokens.marshalYellow
+        case "streaming": return Theme.Tokens.racingPurple
+        default: return Theme.Tokens.steel
+        }
+    }
 
     // Customization settings — applied from VM
     property real fontScale: 1.0
@@ -200,6 +213,15 @@ Window {
                 GradientStop { position: 0.7; color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.09) }
                 GradientStop { position: 1.0; color: "transparent" }
             }
+        }
+
+        // Category accent — thin left edge strip
+        Rectangle {
+            anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+            width: 3
+            radius: root.borderRadius
+            color: root.category ? Qt.rgba(root._catColor.r, root._catColor.g, root._catColor.b, 0.5) : "transparent"
+            visible: root.category !== ""
         }
 
         // Content area — hidden when minimized
