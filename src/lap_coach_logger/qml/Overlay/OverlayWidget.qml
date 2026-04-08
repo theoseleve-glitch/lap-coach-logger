@@ -190,14 +190,66 @@ Window {
         }
     }
 
-    // Lock indicator — shown when overlays are locked
-    Text {
-        anchors { top: parent.top; right: parent.right; margins: 6 }
-        text: "\uD83D\uDD12"
-        font.pixelSize: 12
-        color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.5)
-        visible: overlayVM ? overlayVM.overlayLocked : false
+    // Title bar — shows widget name on hover, hidden by default for clean look
+    Rectangle {
+        id: titleBar
+        anchors { top: parent.top; left: parent.left; right: parent.right }
+        height: 20
+        radius: root.borderRadius
+        color: Qt.rgba(0, 0, 0, 0.5)
+        opacity: titleHoverArea.containsMouse || (overlayVM && overlayVM.overlayLocked) ? 0.9 : 0
         z: 10
+
+        Behavior on opacity { NumberAnimation { duration: 150 } }
+
+        Row {
+            anchors { fill: parent; leftMargin: 8; rightMargin: 8 }
+            spacing: 6
+
+            // Drag dots (grip indicator)
+            Column {
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 2
+                Repeater {
+                    model: 2
+                    Row {
+                        spacing: 2
+                        Repeater {
+                            model: 3
+                            Rectangle { width: 2; height: 2; radius: 1; color: Qt.rgba(1,1,1,0.3) }
+                        }
+                    }
+                }
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.widgetId.replace(/_/g, " ").toUpperCase()
+                font { family: Theme.Typography.monoFamily; pixelSize: 8; weight: Font.Bold; letterSpacing: 1 }
+                color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.6)
+                elide: Text.ElideRight
+                width: parent.width - 40
+            }
+
+            Item { width: 1; Layout.fillWidth: true }
+
+            // Lock icon
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: overlayVM && overlayVM.overlayLocked ? "\uD83D\uDD12" : ""
+                font.pixelSize: 10
+                color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.5)
+            }
+        }
+
+        MouseArea {
+            id: titleHoverArea
+            anchors.fill: parent
+            hoverEnabled: true
+            propagateComposedEvents: true
+            // Don't consume clicks — let them fall through to drag handler
+            onPressed: function(mouse) { mouse.accepted = false }
+        }
     }
 
     // Drag support — grabs anywhere on the window
