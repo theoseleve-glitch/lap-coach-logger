@@ -30,6 +30,10 @@ Window {
     property int borderRadius: 12
     property int refreshHz: 60
 
+    // Minimize state — double-click title bar to collapse/expand
+    property bool minimized: false
+    property real _savedHeight: 0
+
     // Content injected by parent
     default property alias content: contentArea.data
 
@@ -195,11 +199,11 @@ Window {
             }
         }
 
-        // Content area — fontScale is exposed as a context property
-        // Individual widgets read it to adjust their font.pixelSize values
+        // Content area — hidden when minimized
         Item {
             id: contentArea
             anchors.fill: parent
+            visible: !root.minimized
             property real fontScale: root.fontScale
         }
     }
@@ -296,6 +300,16 @@ Window {
             enabled: overlayVM ? !overlayVM.overlayLocked : true
             property point clickPos
             onPressed: function(mouse) { clickPos = Qt.point(mouse.x, mouse.y) }
+            onDoubleClicked: {
+                if (root.minimized) {
+                    root.height = root._savedHeight
+                    root.minimized = false
+                } else {
+                    root._savedHeight = root.height
+                    root.height = 22
+                    root.minimized = true
+                }
+            }
             onPositionChanged: function(mouse) {
                 if (!pressed) return  // only drag when mouse button is held
                 var newX = root.x + mouse.x - clickPos.x
