@@ -795,6 +795,31 @@ class OverlayViewModel(QObject):
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
+    @Slot()
+    def autoArrangeOverlays(self) -> None:  # noqa: N802
+        """Arrange enabled overlays in a clean grid layout."""
+        try:
+            from PySide6.QtWidgets import QApplication
+            screen = QApplication.primaryScreen()
+            geo = screen.geometry()
+            sw, sh = geo.width(), geo.height()
+        except Exception:
+            sw, sh = 1920, 1080
+        enabled = [(wid, s) for wid, s in self._widget_settings.items() if s.get("enabled")]
+        if not enabled:
+            return
+        margin, gap = 20, 12
+        x, y, row_h = margin, margin, 0
+        for wid, s in enabled:
+            w, h = s.get("width", 300), s.get("height", 200)
+            if x + w > sw - margin and x > margin:
+                x, y, row_h = margin, y + row_h + gap, 0
+            s["x"], s["y"] = x, y
+            x += w + gap
+            row_h = max(row_h, h)
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
     @Slot(str)
     def loadPreset(self, preset_id: str) -> None:  # noqa: N802
         """Apply a layout preset, disabling all widgets first."""

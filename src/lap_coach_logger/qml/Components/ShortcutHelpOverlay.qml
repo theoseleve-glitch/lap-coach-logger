@@ -96,6 +96,7 @@ Item {
                     color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.06)
                 }
 
+                ShortcutRow { key: "Ctrl+A"; desc: "Auto-arrange overlays in grid" }
                 ShortcutRow { key: "Alt+1-9"; desc: "Quick-toggle overlay widgets" }
                 ShortcutRow { key: "Escape"; desc: "Close settings / help" }
                 ShortcutRow { key: "F1"; desc: "This help" }

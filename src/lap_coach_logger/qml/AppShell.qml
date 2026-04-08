@@ -409,6 +409,12 @@ Item {
         onActivated: shortcutHelp.visible = !shortcutHelp.visible
     }
 
+    // Ctrl+A — auto-arrange overlays in a grid
+    Shortcut {
+        sequence: "Ctrl+A"
+        onActivated: if (overlayVM) overlayVM.autoArrangeOverlays()
+    }
+
     // Alt+1 through Alt+9 — quick-toggle individual overlay widgets
     Repeater {
         model: 9
