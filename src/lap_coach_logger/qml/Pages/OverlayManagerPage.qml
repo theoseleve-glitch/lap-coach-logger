@@ -963,6 +963,29 @@ Item {
                                 id: previewLoader
                                 anchors.fill: parent
                                 sourceComponent: root._previewComponent()
+
+                                // Apply font scale to the loaded widget content
+                                onItemChanged: {
+                                    if (item) {
+                                        void(root._rev)
+                                        var w = root.selectedWidget()
+                                        var fs = (w && overlayVM) ? overlayVM.getWidgetFontScale(w.widgetId) : 1.0
+                                        item.scale = fs
+                                        item.transformOrigin = Item.TopLeft
+                                    }
+                                }
+                            }
+
+                            // Re-apply font scale when slider changes
+                            Connections {
+                                target: root
+                                function on_revChanged() {
+                                    if (previewLoader.item) {
+                                        var w = root.selectedWidget()
+                                        var fs = (w && overlayVM) ? overlayVM.getWidgetFontScale(w.widgetId) : 1.0
+                                        previewLoader.item.scale = fs
+                                    }
+                                }
                             }
                         }
 
