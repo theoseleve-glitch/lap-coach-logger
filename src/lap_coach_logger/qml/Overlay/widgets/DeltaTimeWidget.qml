@@ -16,6 +16,9 @@ GlassSurface {
     width: 310
     implicitHeight: col.implicitHeight + 28
 
+    // ── Font scale — multiplies all font sizes (from parent or OverlayWidget) ──
+    property real fontScale: parent && parent.fontScale !== undefined ? parent.fontScale : 1.0
+
     // ── Public API ──────────────────────────────────────────────
     property real   delta: 0.0
     property string lapTime: "—:——.———"
@@ -102,13 +105,13 @@ GlassSurface {
                 spacing: 1
                 Text {
                     text: "LAP TIME"
-                    font { family: Theme.Typography.monoFamily; pixelSize: 9; weight: Font.Bold; letterSpacing: 2 }
+                    font { family: Theme.Typography.monoFamily; pixelSize: Math.round(9 * root.fontScale); weight: Font.Bold; letterSpacing: 2 }
                     color: Theme.Tokens.steel
                     lineHeight: 1
                 }
                 Text {
                     text: root.lapTime || "—:——.———"
-                    font { family: Theme.Typography.monoFamily; pixelSize: 16; weight: Font.Bold }
+                    font { family: Theme.Typography.monoFamily; pixelSize: Math.round(16 * root.fontScale); weight: Font.Bold }
                     color: Theme.Tokens.chalk
                     lineHeight: 1.3
                     Behavior on text { SequentialAnimation {
@@ -126,7 +129,7 @@ GlassSurface {
                 Layout.alignment: Qt.AlignRight
                 Text {
                     text: "DELTA"
-                    font { family: Theme.Typography.monoFamily; pixelSize: 9; weight: Font.Bold; letterSpacing: 2 }
+                    font { family: Theme.Typography.monoFamily; pixelSize: Math.round(9 * root.fontScale); weight: Font.Bold; letterSpacing: 2 }
                     color: Theme.Tokens.steel
                     horizontalAlignment: Text.AlignRight
                     Layout.fillWidth: true
@@ -134,7 +137,7 @@ GlassSurface {
                 }
                 Text {
                     text: formatDelta(root.delta)
-                    font { family: Theme.Typography.monoFamily; pixelSize: 20; weight: Font.Bold; letterSpacing: -0.5 }
+                    font { family: Theme.Typography.monoFamily; pixelSize: Math.round(20 * root.fontScale); weight: Font.Bold; letterSpacing: -0.5 }
                     color: deltaColor(root.delta)
                     horizontalAlignment: Text.AlignRight
                     Layout.fillWidth: true
@@ -196,7 +199,7 @@ GlassSurface {
                             }
                             Text {
                                 text: "S" + (index + 1)
-                                font { family: Theme.Typography.monoFamily; pixelSize: 9; weight: Font.Bold; letterSpacing: 1.5 }
+                                font { family: Theme.Typography.monoFamily; pixelSize: Math.round(9 * root.fontScale); weight: Font.Bold; letterSpacing: 1.5 }
                                 color: Theme.Tokens.racingPurple
                                 opacity: isActive ? 1.0 : 0.5
                             }
@@ -205,7 +208,7 @@ GlassSurface {
                             Text {
                                 visible: isActive
                                 text: "LIVE"
-                                font { family: Theme.Typography.monoFamily; pixelSize: 7; weight: Font.Bold; letterSpacing: 1.5 }
+                                font { family: Theme.Typography.monoFamily; pixelSize: Math.round(7 * root.fontScale); weight: Font.Bold; letterSpacing: 1.5 }
                                 color: Theme.Tokens.racingPurple
                                 opacity: 0.6
                             }
@@ -219,7 +222,7 @@ GlassSurface {
                                 if (d === 0) return "—.———"
                                 return (d > 0 ? "+" : "") + d.toFixed(3)
                             }
-                            font { family: Theme.Typography.monoFamily; pixelSize: 13; weight: Font.Bold; letterSpacing: -0.3 }
+                            font { family: Theme.Typography.monoFamily; pixelSize: Math.round(13 * root.fontScale); weight: Font.Bold; letterSpacing: -0.3 }
                             color: isGain ? Theme.Tokens.acidGreen :
                                    isLoss ? Theme.Tokens.safetyRed :
                                    Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.25)
@@ -240,7 +243,7 @@ GlassSurface {
 
             Text {
                 text: "BST " + (root.bestTime || "—:——.———")
-                font { family: Theme.Typography.monoFamily; pixelSize: 9; weight: Font.Bold; letterSpacing: 1.5 }
+                font { family: Theme.Typography.monoFamily; pixelSize: Math.round(9 * root.fontScale); weight: Font.Bold; letterSpacing: 1.5 }
                 color: Theme.Tokens.steel
                 opacity: 0.7
             }
@@ -251,7 +254,7 @@ GlassSurface {
                 text: root.totalLaps > 0
                       ? "LAP " + root.lapNumber + " / " + root.totalLaps
                       : "LAP " + root.lapNumber
-                font { family: Theme.Typography.monoFamily; pixelSize: 9; weight: Font.Bold; letterSpacing: 1.5 }
+                font { family: Theme.Typography.monoFamily; pixelSize: Math.round(9 * root.fontScale); weight: Font.Bold; letterSpacing: 1.5 }
                 color: Theme.Tokens.steel
                 opacity: 0.5
             }

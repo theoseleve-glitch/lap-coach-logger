@@ -970,8 +970,7 @@ Item {
                                         void(root._rev)
                                         var w = root.selectedWidget()
                                         var fs = (w && overlayVM) ? overlayVM.getWidgetFontScale(w.widgetId) : 1.0
-                                        item.scale = fs
-                                        item.transformOrigin = Item.TopLeft
+                                        if (item.fontScale !== undefined) item.fontScale = fs
                                     }
                                 }
                             }
@@ -983,7 +982,10 @@ Item {
                                     if (previewLoader.item) {
                                         var w = root.selectedWidget()
                                         var fs = (w && overlayVM) ? overlayVM.getWidgetFontScale(w.widgetId) : 1.0
-                                        previewLoader.item.scale = fs
+                                        // Set fontScale property if widget supports it
+                                        if (previewLoader.item.fontScale !== undefined) {
+                                            previewLoader.item.fontScale = fs
+                                        }
                                     }
                                 }
                             }

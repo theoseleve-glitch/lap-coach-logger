@@ -90,12 +90,12 @@ Window {
             }
         }
 
-        // Content area — scaled by fontScale setting
+        // Content area — fontScale is exposed as a context property
+        // Individual widgets read it to adjust their font.pixelSize values
         Item {
             id: contentArea
             anchors.fill: parent
-            scale: root.fontScale
-            transformOrigin: Item.TopLeft
+            property real fontScale: root.fontScale
         }
     }
 
