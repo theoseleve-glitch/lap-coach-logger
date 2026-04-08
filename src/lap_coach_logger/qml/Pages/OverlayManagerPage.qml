@@ -501,6 +501,43 @@ Item {
                             }
                         }
                     }
+
+                    // RESET ALL POSITIONS button
+                    Rectangle {
+                        width: resetAllLabel.implicitWidth + 12
+                        height: 20
+                        radius: 4
+                        color: resetAllArea.containsMouse
+                               ? Theme.Tokens.subtle(Theme.Tokens.safetyRed, 0.20)
+                               : Theme.Tokens.subtle(Theme.Tokens.safetyRed, 0.10)
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.safetyRed, 0.30)
+
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.Motion.hoverDuration }
+                        }
+
+                        Text {
+                            id: resetAllLabel
+                            anchors.centerIn: parent
+                            text: "RESET POS"
+                            font.family: Theme.Typography.monoFamily
+                            font.pixelSize: 8
+                            font.weight: Font.Bold
+                            font.letterSpacing: 1
+                            color: Theme.Tokens.safetyRed
+                        }
+
+                        MouseArea {
+                            id: resetAllArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (overlayVM) overlayVM.resetAllPositions()
+                            }
+                        }
+                    }
                 }
 
                 // ── Enabled count ──
@@ -1296,42 +1333,84 @@ Item {
                                 }
                             }
 
-                            // ── Reset button ──
+                            // ── Reset + Center buttons ──
                             Item { height: Theme.Tokens.sm }
 
-                            Rectangle {
-                                Layout.alignment: Qt.AlignLeft
-                                width: resetLabel.implicitWidth + Theme.Tokens.xl * 2
-                                height: 32
-                                radius: Theme.Tokens.radiusSm
-                                color: resetArea.containsMouse
-                                       ? Theme.Tokens.subtle(Theme.Tokens.safetyRed, 0.12)
-                                       : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.04)
-                                border.width: 1
-                                border.color: resetArea.containsMouse
-                                              ? Theme.Tokens.subtle(Theme.Tokens.safetyRed, 0.25)
-                                              : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.08)
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.Tokens.sm
 
-                                Text {
-                                    id: resetLabel
-                                    anchors.centerIn: parent
-                                    text: "Reset to Defaults"
-                                    font.family: Theme.Typography.bodyFamily
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
+                                Rectangle {
+                                    Layout.alignment: Qt.AlignLeft
+                                    width: resetLabel.implicitWidth + Theme.Tokens.xl * 2
+                                    height: 32
+                                    radius: Theme.Tokens.radiusSm
                                     color: resetArea.containsMouse
-                                           ? Theme.Tokens.safetyRed
-                                           : Theme.Tokens.steel
+                                           ? Theme.Tokens.subtle(Theme.Tokens.safetyRed, 0.12)
+                                           : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.04)
+                                    border.width: 1
+                                    border.color: resetArea.containsMouse
+                                                  ? Theme.Tokens.subtle(Theme.Tokens.safetyRed, 0.25)
+                                                  : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.08)
+
+                                    Text {
+                                        id: resetLabel
+                                        anchors.centerIn: parent
+                                        text: "Reset to Defaults"
+                                        font.family: Theme.Typography.bodyFamily
+                                        font.pixelSize: 12
+                                        font.weight: Font.DemiBold
+                                        color: resetArea.containsMouse
+                                               ? Theme.Tokens.safetyRed
+                                               : Theme.Tokens.steel
+                                    }
+
+                                    MouseArea {
+                                        id: resetArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            var w = root.selectedWidget()
+                                            if (w && overlayVM) overlayVM.resetWidget(w.widgetId)
+                                        }
+                                    }
                                 }
 
-                                MouseArea {
-                                    id: resetArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        var w = root.selectedWidget()
-                                        if (w && overlayVM) overlayVM.resetWidget(w.widgetId)
+                                Rectangle {
+                                    Layout.alignment: Qt.AlignLeft
+                                    width: centerLabel.implicitWidth + Theme.Tokens.xl * 2
+                                    height: 32
+                                    radius: Theme.Tokens.radiusSm
+                                    color: centerArea.containsMouse
+                                           ? Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.12)
+                                           : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.04)
+                                    border.width: 1
+                                    border.color: centerArea.containsMouse
+                                                  ? Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.25)
+                                                  : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.08)
+
+                                    Text {
+                                        id: centerLabel
+                                        anchors.centerIn: parent
+                                        text: "Center on Screen"
+                                        font.family: Theme.Typography.bodyFamily
+                                        font.pixelSize: 12
+                                        font.weight: Font.DemiBold
+                                        color: centerArea.containsMouse
+                                               ? Theme.Tokens.pitOrange
+                                               : Theme.Tokens.steel
+                                    }
+
+                                    MouseArea {
+                                        id: centerArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            var w = root.selectedWidget()
+                                            if (w && overlayVM) overlayVM.centerWidget(w.widgetId)
+                                        }
                                     }
                                 }
                             }

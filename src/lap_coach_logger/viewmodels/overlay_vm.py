@@ -729,6 +729,34 @@ class OverlayViewModel(QObject):
             self.settingsSaveRequested.emit()
 
     @Slot(str)
+    def centerWidget(self, widget_id: str) -> None:  # noqa: N802
+        """Move a widget to the center of the primary screen."""
+        try:
+            from PySide6.QtWidgets import QApplication
+            screen = QApplication.primaryScreen()
+            geo = screen.geometry()
+            s = self._widget_settings.get(widget_id, {})
+            w = s.get("width", 300)
+            h = s.get("height", 200)
+            self._widget_settings[widget_id]["x"] = geo.x() + (geo.width() - w) // 2
+            self._widget_settings[widget_id]["y"] = geo.y() + (geo.height() - h) // 2
+            self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
+        except Exception:
+            pass
+
+    @Slot()
+    def resetAllPositions(self) -> None:  # noqa: N802
+        """Reset all widget positions to cascade defaults."""
+        idx = 0
+        for wid in self._widget_settings:
+            self._widget_settings[wid]["x"] = 100 + (idx % 6) * 50
+            self._widget_settings[wid]["y"] = 80 + (idx % 6) * 50
+            idx += 1
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @Slot(str)
     def loadPreset(self, preset_id: str) -> None:  # noqa: N802
         """Apply a layout preset, disabling all widgets first."""
         preset = self._PRESETS.get(preset_id)
