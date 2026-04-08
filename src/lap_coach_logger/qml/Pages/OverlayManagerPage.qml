@@ -1386,6 +1386,59 @@ Item {
                                     }
                                 }
                             }
+
+                            // ── Lock Style & Position button ──
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 36
+                                radius: Theme.Tokens.radiusSm
+                                color: {
+                                    var locked = overlayVM && overlayVM.overlayLocked
+                                    return locked
+                                        ? Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.15)
+                                        : lockBtnArea.containsMouse
+                                            ? Theme.Tokens.subtle(Theme.Tokens.chalk, 0.06)
+                                            : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.03)
+                                }
+                                border.width: 1
+                                border.color: {
+                                    var locked = overlayVM && overlayVM.overlayLocked
+                                    return locked
+                                        ? Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.3)
+                                        : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.08)
+                                }
+                                Behavior on color { ColorAnimation { duration: 150 } }
+
+                                Row {
+                                    anchors.centerIn: parent
+                                    spacing: 8
+                                    Text {
+                                        text: overlayVM && overlayVM.overlayLocked ? "\uD83D\uDD12" : "\uD83D\uDD13"
+                                        font.pixelSize: 14
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                    Text {
+                                        text: overlayVM && overlayVM.overlayLocked
+                                              ? "LOCKED — Style & Position Frozen"
+                                              : "Lock Style & Position"
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 11
+                                        font.weight: Font.Bold
+                                        color: overlayVM && overlayVM.overlayLocked
+                                               ? Theme.Tokens.marshalYellow
+                                               : Theme.Tokens.steel
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: lockBtnArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: if (overlayVM) overlayVM.toggleOverlayLock()
+                                }
+                            }
                         }
                     }
 

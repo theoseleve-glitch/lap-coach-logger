@@ -324,6 +324,19 @@ Item {
         overlayManager.overlayVisible = !overlayManager.overlayVisible
     }
 
+    // Auto-show overlays when any widget gets enabled
+    Connections {
+        target: overlayVM
+        function onWidgetSettingsChanged() {
+            if (!overlayManager.overlayVisible && overlayVM) {
+                var ids = overlayVM.getEnabledWidgetIds()
+                if (ids && ids.length > 0) {
+                    overlayManager.overlayVisible = true
+                }
+            }
+        }
+    }
+
     // === Tray integration ===
     Connections {
         target: typeof trayVM !== "undefined" && trayVM !== null ? trayVM : null

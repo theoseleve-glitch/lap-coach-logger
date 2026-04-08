@@ -579,6 +579,8 @@ class OverlayViewModel(QObject):
     @Slot(str, str, "QVariant")
     def setWidgetSetting(self, widget_id: str, key: str, value: object) -> None:  # noqa: N802
         """Update a single setting for a widget and notify QML."""
+        if self._overlay_locked and key not in ("enabled",):
+            return  # locked — only toggle enabled is allowed
         if widget_id in self._widget_settings:
             # Coerce numeric types for clean storage
             if key in ("width", "height", "refresh_hz", "border_radius", "x", "y"):
@@ -694,6 +696,8 @@ class OverlayViewModel(QObject):
     @Slot(str, float)
     def setWidgetScale(self, widget_id: str, scale: float) -> None:  # noqa: N802
         """Set scale — proportionally adjusts width/height/border_radius from defaults."""
+        if self._overlay_locked:
+            return
         if widget_id not in self._widget_settings:
             return
         scale = max(0.5, min(2.0, float(scale)))
@@ -755,6 +759,8 @@ class OverlayViewModel(QObject):
     @Slot(str)
     def resetWidget(self, widget_id: str) -> None:  # noqa: N802
         """Reset a widget's settings to factory defaults."""
+        if self._overlay_locked:
+            return
         if widget_id in self._widget_defaults:
             self._widget_settings[widget_id] = dict(self._widget_defaults[widget_id])
             self.widgetSettingsChanged.emit()
