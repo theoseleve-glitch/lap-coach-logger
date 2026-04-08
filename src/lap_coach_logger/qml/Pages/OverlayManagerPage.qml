@@ -839,6 +839,7 @@ Item {
                 anchors.fill: parent
                 clip: true
                 contentWidth: availableWidth
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                 ColumnLayout {
                     id: centerCol
@@ -982,7 +983,9 @@ Item {
                                 Slider {
                                     id: scaleSlider
                                     Layout.fillWidth: true
+                                    Layout.preferredHeight: 32
                                     from: 0.5; to: 2.0; stepSize: 0.05
+                                    live: true
                                     value: {
                                         void(root._rev); var s = root.selectedSettings()
                                         return s && s.scale !== undefined ? s.scale : 1.0
@@ -995,6 +998,8 @@ Item {
                                     background: Rectangle {
                                         x: scaleSlider.leftPadding
                                         y: scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2
+                                        implicitWidth: 200
+                                        implicitHeight: 4
                                         width: scaleSlider.availableWidth
                                         height: 4
                                         radius: 2
@@ -1047,6 +1052,8 @@ Item {
                                 Slider {
                                     id: fontScaleSlider
                                     Layout.fillWidth: true
+                                    Layout.preferredHeight: 32
+                                    live: true
                                     from: 0.7; to: 1.5; stepSize: 0.1
                                     value: {
                                         void(root._rev); var s = root.selectedSettings()
@@ -1060,6 +1067,7 @@ Item {
                                     background: Rectangle {
                                         x: fontScaleSlider.leftPadding
                                         y: fontScaleSlider.topPadding + fontScaleSlider.availableHeight / 2 - height / 2
+                                        implicitWidth: 200; implicitHeight: 4
                                         width: fontScaleSlider.availableWidth
                                         height: 4
                                         radius: 2
@@ -1112,6 +1120,8 @@ Item {
                                 Slider {
                                     id: opacitySlider
                                     Layout.fillWidth: true
+                                    Layout.preferredHeight: 32
+                                    live: true
                                     from: 0.3; to: 1.0; stepSize: 0.01
                                     value: {
                                         void(root._rev); var s = root.selectedSettings()
@@ -1125,6 +1135,7 @@ Item {
                                     background: Rectangle {
                                         x: opacitySlider.leftPadding
                                         y: opacitySlider.topPadding + opacitySlider.availableHeight / 2 - height / 2
+                                        implicitWidth: 200; implicitHeight: 4
                                         width: opacitySlider.availableWidth
                                         height: 4
                                         radius: 2
