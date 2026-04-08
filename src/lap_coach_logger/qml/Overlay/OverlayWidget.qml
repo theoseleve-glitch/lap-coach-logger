@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Window
+import QtQuick.Controls
 import "../Theme" as Theme
 
 /*  OverlayWidget — frameless, always-on-top, draggable window wrapper.
@@ -61,6 +62,96 @@ Window {
                 // In QML, Window doesn't directly expose HWND, but we can use
                 // a workaround: the ViewModel applies flags by window title match
                 overlayVM.applyOverlayFlags(0)  // 0 = apply to all overlay windows
+            }
+        }
+    }
+
+    // Right-click context menu
+    Menu {
+        id: contextMenu
+
+        background: Rectangle {
+            implicitWidth: 200
+            color: "#141519"
+            border.width: 1
+            border.color: Qt.rgba(0.94, 0.93, 0.90, 0.08)
+            radius: 8
+        }
+
+        MenuItem {
+            text: overlayVM && overlayVM.overlayLocked ? "Unlock Positions" : "Lock Positions"
+            onTriggered: if (overlayVM) overlayVM.toggleOverlayLock()
+            contentItem: Text {
+                text: parent.text
+                font.family: "Consolas"
+                font.pixelSize: 11
+                color: parent.highlighted ? "#F0EDE5" : "#949494"
+            }
+            background: Rectangle {
+                color: parent.highlighted ? Qt.rgba(0.94, 0.93, 0.90, 0.06) : "transparent"
+                radius: 4
+            }
+        }
+        MenuItem {
+            text: "Center on Screen"
+            onTriggered: if (overlayVM && root.widgetId) overlayVM.centerWidget(root.widgetId)
+            contentItem: Text {
+                text: parent.text
+                font.family: "Consolas"
+                font.pixelSize: 11
+                color: parent.highlighted ? "#F0EDE5" : "#949494"
+            }
+            background: Rectangle {
+                color: parent.highlighted ? Qt.rgba(0.94, 0.93, 0.90, 0.06) : "transparent"
+                radius: 4
+            }
+        }
+        MenuItem {
+            text: "Reset Size"
+            onTriggered: if (overlayVM && root.widgetId) overlayVM.resetWidget(root.widgetId)
+            contentItem: Text {
+                text: parent.text
+                font.family: "Consolas"
+                font.pixelSize: 11
+                color: parent.highlighted ? "#F0EDE5" : "#949494"
+            }
+            background: Rectangle {
+                color: parent.highlighted ? Qt.rgba(0.94, 0.93, 0.90, 0.06) : "transparent"
+                radius: 4
+            }
+        }
+        MenuSeparator {
+            contentItem: Rectangle {
+                implicitHeight: 1
+                color: Qt.rgba(0.94, 0.93, 0.90, 0.08)
+            }
+        }
+        MenuItem {
+            text: "Hide This Widget"
+            onTriggered: if (overlayVM && root.widgetId) overlayVM.toggleWidget(root.widgetId)
+            contentItem: Text {
+                text: parent.text
+                font.family: "Consolas"
+                font.pixelSize: 11
+                color: parent.highlighted ? "#F0EDE5" : "#949494"
+            }
+            background: Rectangle {
+                color: parent.highlighted ? Qt.rgba(0.94, 0.93, 0.90, 0.06) : "transparent"
+                radius: 4
+            }
+        }
+        MenuItem {
+            text: "Hide All Overlays"
+            onTriggered: root.visible = false
+            contentItem: Text {
+                text: parent.text
+                font.family: "Consolas"
+                font.pixelSize: 11
+                color: parent.highlighted ? "#F0EDE5" : "#949494"
+            }
+            background: Rectangle {
+                color: parent.highlighted ? Qt.rgba(0.94, 0.93, 0.90, 0.06) : "transparent"
+                radius: 4
             }
         }
     }
