@@ -192,6 +192,12 @@ Item {
             description: "Extended fuel info showing current level, consumption rate, laps remaining, fuel to add at pit stop, stint length and target laps."
         }
         ListElement {
+            widgetId: "race_strategy"
+            name: "Race Strategy"
+            category: "strategy"
+            description: "Pre-race and live pit strategy planner. Shows next pit lap, fuel to add, stints remaining, fuel at finish, and a timeline of all planned stops."
+        }
+        ListElement {
             widgetId: "pitbox_helper"
             name: "Pitbox Helper"
             category: "strategy"
@@ -771,6 +777,177 @@ Item {
                                 onClicked: {
                                     root.categoryFilter = modelData.value
                                 }
+                            }
+                        }
+                    }
+                }
+
+                // ── RACE STRATEGY panel ──
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: strategyCol.implicitHeight + 16
+                    radius: 6
+                    color: Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.06)
+                    border.width: 1
+                    border.color: Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.15)
+
+                    ColumnLayout {
+                        id: strategyCol
+                        anchors { left: parent.left; right: parent.right; top: parent.top; margins: 8 }
+                        spacing: 4
+
+                        Text {
+                            text: "RACE STRATEGY"
+                            font.family: Theme.Typography.monoFamily
+                            font.pixelSize: Theme.Typography.microSize
+                            font.weight: Theme.Typography.microWeight
+                            font.letterSpacing: 2
+                            color: Theme.Tokens.marshalYellow
+                        }
+
+                        // Total laps
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 4
+                            Text { text: "LAPS"; font.family: Theme.Typography.monoFamily; font.pixelSize: 9; font.weight: Font.Bold; color: Theme.Tokens.steel; Layout.preferredWidth: 55 }
+                            Rectangle {
+                                Layout.fillWidth: true; height: 22; radius: 4
+                                color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.06)
+                                border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.10)
+                                TextInput {
+                                    id: stratLapsInput; anchors.fill: parent; anchors.margins: 4
+                                    color: Theme.Tokens.chalk; font.family: Theme.Typography.monoFamily; font.pixelSize: 11
+                                    horizontalAlignment: TextInput.AlignRight; verticalAlignment: TextInput.AlignVCenter
+                                    text: "30"; selectByMouse: true; validator: IntValidator { bottom: 1; top: 999 }
+                                }
+                            }
+                        }
+
+                        // Fuel capacity
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 4
+                            Text { text: "FUEL CAP"; font.family: Theme.Typography.monoFamily; font.pixelSize: 9; font.weight: Font.Bold; color: Theme.Tokens.steel; Layout.preferredWidth: 55 }
+                            Rectangle {
+                                Layout.fillWidth: true; height: 22; radius: 4
+                                color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.06)
+                                border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.10)
+                                TextInput {
+                                    id: stratFuelCapInput; anchors.fill: parent; anchors.margins: 4
+                                    color: Theme.Tokens.chalk; font.family: Theme.Typography.monoFamily; font.pixelSize: 11
+                                    horizontalAlignment: TextInput.AlignRight; verticalAlignment: TextInput.AlignVCenter
+                                    text: "65"; selectByMouse: true; validator: DoubleValidator { bottom: 1; top: 999; decimals: 1 }
+                                }
+                            }
+                            Text { text: "L"; font.family: Theme.Typography.monoFamily; font.pixelSize: 9; color: Theme.Tokens.steel }
+                        }
+
+                        // Tire life
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 4
+                            Text { text: "TYRE LIFE"; font.family: Theme.Typography.monoFamily; font.pixelSize: 9; font.weight: Font.Bold; color: Theme.Tokens.steel; Layout.preferredWidth: 55 }
+                            Rectangle {
+                                Layout.fillWidth: true; height: 22; radius: 4
+                                color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.06)
+                                border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.10)
+                                TextInput {
+                                    id: stratTireLifeInput; anchors.fill: parent; anchors.margins: 4
+                                    color: Theme.Tokens.chalk; font.family: Theme.Typography.monoFamily; font.pixelSize: 11
+                                    horizontalAlignment: TextInput.AlignRight; verticalAlignment: TextInput.AlignVCenter
+                                    text: "30"; selectByMouse: true; validator: IntValidator { bottom: 1; top: 999 }
+                                }
+                            }
+                            Text { text: "laps"; font.family: Theme.Typography.monoFamily; font.pixelSize: 9; color: Theme.Tokens.steel }
+                        }
+
+                        // Pit time
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 4
+                            Text { text: "PIT TIME"; font.family: Theme.Typography.monoFamily; font.pixelSize: 9; font.weight: Font.Bold; color: Theme.Tokens.steel; Layout.preferredWidth: 55 }
+                            Rectangle {
+                                Layout.fillWidth: true; height: 22; radius: 4
+                                color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.06)
+                                border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.10)
+                                TextInput {
+                                    id: stratPitTimeInput; anchors.fill: parent; anchors.margins: 4
+                                    color: Theme.Tokens.chalk; font.family: Theme.Typography.monoFamily; font.pixelSize: 11
+                                    horizontalAlignment: TextInput.AlignRight; verticalAlignment: TextInput.AlignVCenter
+                                    text: "25"; selectByMouse: true; validator: DoubleValidator { bottom: 1; top: 120; decimals: 1 }
+                                }
+                            }
+                            Text { text: "s"; font.family: Theme.Typography.monoFamily; font.pixelSize: 9; color: Theme.Tokens.steel }
+                        }
+
+                        // CALCULATE button
+                        Rectangle {
+                            Layout.fillWidth: true; height: 26; radius: 4
+                            color: stratCalcArea.containsMouse
+                                   ? Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.25)
+                                   : Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.12)
+                            border.width: 1
+                            border.color: Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.35)
+
+                            Behavior on color { ColorAnimation { duration: Theme.Motion.hoverDuration } }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "CALCULATE"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: 10; font.weight: Font.Bold; font.letterSpacing: 1.5
+                                color: Theme.Tokens.marshalYellow
+                            }
+
+                            MouseArea {
+                                id: stratCalcArea; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (!overlayVM) return
+                                    var laps = parseInt(stratLapsInput.text) || 30
+                                    var cap  = parseFloat(stratFuelCapInput.text) || 65.0
+                                    var pit  = parseFloat(stratPitTimeInput.text) || 25.0
+                                    var tire = parseInt(stratTireLifeInput.text) || 30
+                                    overlayVM.calculatePreRaceStrategy(laps, cap, pit, tire)
+                                }
+                            }
+                        }
+
+                        // Results display
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            visible: overlayVM && overlayVM.strategyTotalLaps > 0
+
+                            Rectangle { Layout.fillWidth: true; height: 1; color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.06) }
+
+                            Text {
+                                text: {
+                                    if (!overlayVM) return ""
+                                    var n = overlayVM.strategyStintsRemaining
+                                    if (n === 0) return "NO STOPS NEEDED"
+                                    return n + " stop" + (n > 1 ? "s" : "") + " planned"
+                                }
+                                font.family: Theme.Typography.monoFamily; font.pixelSize: 10; font.weight: Font.Bold
+                                color: Theme.Tokens.chalk
+                            }
+
+                            Repeater {
+                                model: overlayVM ? overlayVM.strategyPitStops || [] : []
+
+                                Text {
+                                    required property var modelData
+                                    required property int index
+                                    text: "Pit " + (index + 1) + ": Lap " + modelData.lap + " (" + modelData.fuel + " L)"
+                                    font.family: Theme.Typography.monoFamily; font.pixelSize: 9
+                                    color: Theme.Tokens.pitOrange
+                                }
+                            }
+
+                            Text {
+                                text: {
+                                    if (!overlayVM) return ""
+                                    var f = overlayVM.strategyFuelAtFinish
+                                    var sign = f >= 0 ? "+" : ""
+                                    return "Fuel at finish: " + sign + f.toFixed(1) + " L"
+                                }
+                                font.family: Theme.Typography.monoFamily; font.pixelSize: 9
+                                color: overlayVM && overlayVM.strategyFuelAtFinish >= 0 ? Theme.Tokens.acidGreen : Theme.Tokens.safetyRed
                             }
                         }
                     }
@@ -1548,6 +1725,7 @@ Item {
         "mini_map":           pvMiniMap,
         "flat_map":           pvFlatMap,
         "fuel_calculator":    pvFuelCalculator,
+        "race_strategy":      pvRaceStrategy,
         "pitbox_helper":      pvPitboxHelper,
         "weather_monitor":    pvWeatherMonitor,
         "boost_box":          pvBoostBox,
@@ -1827,6 +2005,22 @@ Item {
             fuelLevel: overlayVM ? overlayVM.fuelLevel : 0
             fuelPerLap: overlayVM ? overlayVM.fuelPerLap : 0
             lapsLeft: overlayVM ? overlayVM.fuelLapsLeft : 0
+        }
+    }
+
+    Component {
+        id: pvRaceStrategy
+        Widgets.RaceStrategyWidget {
+            implicitWidth: 280; implicitHeight: 200
+            nextPitLap: overlayVM ? overlayVM.strategyNextPitLap : 12
+            fuelToAdd: overlayVM && overlayVM.strategyFuelToAdd > 0 ? overlayVM.strategyFuelToAdd : 32.5
+            stintsRemaining: overlayVM && overlayVM.strategyStintsRemaining > 0 ? overlayVM.strategyStintsRemaining : 2
+            pitStops: overlayVM && overlayVM.strategyPitStops && overlayVM.strategyPitStops.length > 0
+                      ? overlayVM.strategyPitStops
+                      : [{"lap": 12, "fuel": 32.5, "compound": "medium"}, {"lap": 24, "fuel": 28.0, "compound": "medium"}]
+            fuelAtFinish: overlayVM && overlayVM.strategyFuelAtFinish !== 0 ? overlayVM.strategyFuelAtFinish : 2.3
+            totalLaps: overlayVM && overlayVM.strategyTotalLaps > 0 ? overlayVM.strategyTotalLaps : 35
+            currentLap: overlayVM ? overlayVM.lapNumber : 5
         }
     }
 

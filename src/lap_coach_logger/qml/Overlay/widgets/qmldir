@@ -24,6 +24,7 @@ TrackMapWidget 1.0 TrackMapWidget.qml
 MiniMapWidget 1.0 MiniMapWidget.qml
 FlatMapWidget 1.0 FlatMapWidget.qml
 FuelCalculatorWidget 1.0 FuelCalculatorWidget.qml
+RaceStrategyWidget 1.0 RaceStrategyWidget.qml
 PitboxHelperWidget 1.0 PitboxHelperWidget.qml
 WeatherMonitorWidget 1.0 WeatherMonitorWidget.qml
 BoostBoxWidget 1.0 BoostBoxWidget.qml

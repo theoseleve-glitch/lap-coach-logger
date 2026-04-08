@@ -11,6 +11,7 @@ import logging
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
 from lap_coach_logger.core.live_telemetry_processor import LiveTelemetryProcessor
+from lap_coach_logger.core.race_strategy import RaceStrategy, calculate_strategy, recalculate_live
 from lap_coach_logger.utils.overlay_hwnd import apply_overlay_flags, apply_overlay_flags_to_all_overlays, remove_overlay_flags
 
 log = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class OverlayViewModel(QObject):
     overlayLockChanged = Signal()
     settingsSaveRequested = Signal()
     accentChanged = Signal()
+    strategyChanged = Signal()
 
     # -- widget category mapping -----------------------------------------------
 
@@ -63,6 +65,7 @@ class OverlayViewModel(QObject):
         "mini_map": "awareness",
         "flat_map": "awareness",
         "fuel_calculator": "strategy",
+        "race_strategy": "strategy",
         "pitbox_helper": "strategy",
         "weather_monitor": "awareness",
         "boost_box": "inputs",
@@ -204,6 +207,19 @@ class OverlayViewModel(QObject):
         self._prev_fuel_level: float = 0.0
         self._lap_fuel_samples: list[float] = []
 
+        # Race strategy
+        self._strategy: RaceStrategy | None = None
+        self._strategy_total_laps: int = 0
+        self._strategy_fuel_capacity: float = 65.0
+        self._strategy_pit_time: float = 25.0
+        self._strategy_tire_life: int = 30
+        self._strategy_next_pit_lap: int = 0
+        self._strategy_fuel_to_add: float = 0.0
+        self._strategy_stints_remaining: int = 0
+        self._strategy_pit_stops: list = []
+        self._strategy_fuel_at_finish: float = 0.0
+        self._strategy_prev_lap: int = -1
+
         # Per-widget settings (widget_id -> settings dict)
         self._widget_settings: dict[str, dict] = {
             "delta_timing": {"enabled": False, "width": 320, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
@@ -234,6 +250,7 @@ class OverlayViewModel(QObject):
             "mini_map": {"enabled": False, "width": 180, "height": 180, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "flat_map": {"enabled": False, "width": 300, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "fuel_calculator": {"enabled": False, "width": 220, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
+            "race_strategy": {"enabled": False, "width": 280, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "pitbox_helper": {"enabled": False, "width": 240, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "weather_monitor": {"enabled": False, "width": 200, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
             "boost_box": {"enabled": False, "width": 160, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
@@ -484,6 +501,96 @@ class OverlayViewModel(QObject):
     @Property(str, notify=fuelChanged)
     def fuelState(self) -> str:  # noqa: N802
         return self._fuel_state
+
+    # -- Strategy properties ---------------------------------------------------
+
+    @Property(int, notify=strategyChanged)
+    def strategyNextPitLap(self) -> int:  # noqa: N802
+        """Lap number for the next planned pit stop."""
+        return self._strategy_next_pit_lap
+
+    @Property(float, notify=strategyChanged)
+    def strategyFuelToAdd(self) -> float:  # noqa: N802
+        """Liters of fuel to add at the next pit stop."""
+        return self._strategy_fuel_to_add
+
+    @Property(int, notify=strategyChanged)
+    def strategyStintsRemaining(self) -> int:  # noqa: N802
+        """Number of pit stops still remaining."""
+        return self._strategy_stints_remaining
+
+    @Property("QVariant", notify=strategyChanged)
+    def strategyPitStops(self) -> list:  # noqa: N802
+        """List of pit stop dicts for QML display."""
+        return self._strategy_pit_stops
+
+    @Property(float, notify=strategyChanged)
+    def strategyFuelAtFinish(self) -> float:  # noqa: N802
+        """Estimated fuel remaining at the chequered flag."""
+        return self._strategy_fuel_at_finish
+
+    @Property(int, notify=strategyChanged)
+    def strategyTotalLaps(self) -> int:  # noqa: N802
+        """Total laps in the current strategy."""
+        return self._strategy_total_laps
+
+    @Slot(int, float, float, int)
+    def calculatePreRaceStrategy(self, total_laps: int, fuel_capacity: float, pit_time: float, tire_life: int) -> None:  # noqa: N802
+        """Calculate and store pre-race strategy."""
+        self._strategy_total_laps = total_laps
+        self._strategy_fuel_capacity = fuel_capacity
+        self._strategy_pit_time = pit_time
+        self._strategy_tire_life = tire_life
+
+        fpl = self._fuel_per_lap if self._fuel_per_lap > 0 else 3.0
+        self._strategy = calculate_strategy(
+            total_laps=total_laps,
+            fuel_capacity=fuel_capacity,
+            fuel_per_lap=fpl,
+            tire_life_laps=tire_life,
+            pit_time_s=pit_time,
+        )
+        self._apply_strategy(self._strategy)
+
+    @Slot()
+    def recalculateLiveStrategy(self) -> None:  # noqa: N802
+        """Recalculate strategy from current telemetry."""
+        if self._strategy is None:
+            return
+        fpl = self._fuel_per_lap if self._fuel_per_lap > 0 else self._strategy.fuel_per_lap
+        laps_remaining = self._strategy.total_laps - self._lap_number
+        if laps_remaining <= 0:
+            return
+        new_strategy = recalculate_live(
+            strategy=self._strategy,
+            current_lap=self._lap_number,
+            current_fuel=self._fuel_level,
+            actual_fuel_per_lap=fpl,
+            laps_remaining=laps_remaining,
+        )
+        self._strategy = new_strategy
+        self._apply_strategy(new_strategy)
+
+    def _apply_strategy(self, strat: RaceStrategy) -> None:
+        """Push strategy results into QML-bindable properties."""
+        stops = strat.pit_stops
+        # Find the next upcoming pit stop (first with lap > current)
+        upcoming = [s for s in stops if s.lap > self._lap_number]
+        if upcoming:
+            self._strategy_next_pit_lap = upcoming[0].lap
+            self._strategy_fuel_to_add = round(upcoming[0].fuel_to_add, 1)
+            self._strategy_stints_remaining = len(upcoming)
+        else:
+            self._strategy_next_pit_lap = 0
+            self._strategy_fuel_to_add = 0.0
+            self._strategy_stints_remaining = 0
+
+        self._strategy_pit_stops = [
+            {"lap": s.lap, "fuel": round(s.fuel_to_add, 1), "compound": s.tire_compound}
+            for s in stops
+        ]
+        self._strategy_fuel_at_finish = round(strat.fuel_at_finish, 1)
+        self.strategyChanged.emit()
 
     # -- Widget settings properties --------------------------------------------
 
@@ -1122,6 +1229,16 @@ class OverlayViewModel(QObject):
                 else:
                     self._fuel_state = "SAFE"
             self.fuelChanged.emit()
+
+        # Live strategy recalculation on lap transitions
+        if (
+            self._strategy is not None
+            and self._is_recording
+            and self._lap_number != self._strategy_prev_lap
+            and self._lap_number > 0
+        ):
+            self._strategy_prev_lap = self._lap_number
+            self.recalculateLiveStrategy()
 
     @Slot()
     def dismissCoaching(self) -> None:

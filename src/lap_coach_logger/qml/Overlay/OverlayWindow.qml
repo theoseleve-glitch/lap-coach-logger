@@ -232,6 +232,26 @@ Item {
     }
 
     OW {
+        _wid: "race_strategy"; widgetId: "race_strategy"; category: "strategy"
+        visible: root.isOn("race_strategy")
+        width: root.gw("race_strategy","width",280)
+        height: root.gw("race_strategy","height",200)
+        opacity: root.gw("race_strategy","opacity",0.92)
+        fontScale: root.gw("race_strategy","fontScale",1.0)
+        borderRadius: root.gw("race_strategy","borderRadius",12)
+        Widgets.RaceStrategyWidget {
+            anchors.fill: parent; anchors.margins: 4
+            nextPitLap: overlayVM ? overlayVM.strategyNextPitLap : 0
+            fuelToAdd: overlayVM ? overlayVM.strategyFuelToAdd : 0
+            stintsRemaining: overlayVM ? overlayVM.strategyStintsRemaining : 0
+            pitStops: overlayVM ? overlayVM.strategyPitStops || [] : []
+            fuelAtFinish: overlayVM ? overlayVM.strategyFuelAtFinish : 0
+            totalLaps: overlayVM ? overlayVM.strategyTotalLaps : 0
+            currentLap: overlayVM ? overlayVM.lapNumber : 0
+        }
+    }
+
+    OW {
         _wid: "fuel_calculator"; widgetId: "fuel_calculator"; category: "strategy"
         visible: root.isOn("fuel_calculator")
         width: root.gw("fuel_calculator","width",220)
