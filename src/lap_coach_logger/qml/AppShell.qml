@@ -321,19 +321,16 @@ Item {
     }
 
     function toggleOverlay() {
-        overlayManager.overlayVisible = !overlayManager.overlayVisible
-    }
-
-    // Auto-show overlays when any widget gets enabled
-    Connections {
-        target: overlayVM
-        function onWidgetSettingsChanged() {
-            if (!overlayManager.overlayVisible && overlayVM) {
-                var ids = overlayVM.getEnabledWidgetIds()
-                if (ids && ids.length > 0) {
-                    overlayManager.overlayVisible = true
-                }
-            }
+        // Master toggle: if any widgets are enabled, disable all. Otherwise enable defaults.
+        if (!overlayVM) return
+        var enabled = overlayVM.getEnabledWidgetIds()
+        if (enabled && enabled.length > 0) {
+            overlayVM.disableAllWidgets()
+        } else {
+            // Re-enable the 3 defaults
+            overlayVM.toggleWidget("delta_timing")
+            overlayVM.toggleWidget("inputs_grip")
+            overlayVM.toggleWidget("fuel_strategy")
         }
     }
 

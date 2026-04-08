@@ -82,7 +82,7 @@ Item {
 
         for (var i = 0; i < ids.length; i++) {
             var wid = ids[i]
-            var enabled = root.overlayVisible && overlayVM.isWidgetEnabled(wid)
+            var enabled = overlayVM.isWidgetEnabled(wid)
                           && overlayVM.shouldShowOverlays
 
             if (enabled && !_windows[wid]) {
