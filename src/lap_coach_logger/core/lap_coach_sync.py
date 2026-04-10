@@ -5,12 +5,14 @@ via POST /api/v1/sessions/sync-upload using a device token.
 """
 from __future__ import annotations
 
+import gzip
 import json
 import logging
 import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
+from typing import Any
 
 from lap_coach_logger.core.sync_service import SyncAttemptResult
 
@@ -56,13 +58,16 @@ class LapCoachSyncService:
 
         try:
             body, content_type = _build_multipart(csv_path, manifest)
+            compressed_body = gzip.compress(body)
             url = f"{self._api_url}/api/v1/sessions/sync-upload"
-            req = urllib.request.Request(url, data=body, method="POST")
+            req = urllib.request.Request(url, data=compressed_body, method="POST")
             req.add_header("Authorization", f"DeviceToken {self._device_token}")
             req.add_header("Content-Type", content_type)
+            req.add_header("Content-Encoding", "gzip")
+            req.add_header("Accept-Encoding", "gzip, deflate, identity")
 
             with urllib.request.urlopen(req, timeout=120) as resp:
-                resp_body = json.loads(resp.read().decode("utf-8"))
+                resp_body = json.loads(_read_response(resp))
 
             if resp_body.get("ok"):
                 remote_id = str(resp_body.get("data", {}).get("session_id", ""))
@@ -78,7 +83,7 @@ class LapCoachSyncService:
             retryable = e.code not in _NO_RETRY_CODES
             error_msg = f"HTTP {e.code}: {e.reason}"
             try:
-                err_body = json.loads(e.read().decode("utf-8"))
+                err_body = json.loads(_read_response(e))
                 error_msg = err_body.get("error", error_msg)
             except Exception:
                 pass
@@ -88,6 +93,24 @@ class LapCoachSyncService:
         except Exception as e:
             logger.exception("Sync upload error")
             return SyncAttemptResult(success=False, error=str(e), retryable=True)
+
+
+def _read_response(resp: Any) -> bytes:
+    """Read an HTTP response, decompressing gzip/deflate if needed."""
+    raw = resp.read()
+    encoding = ""
+    if hasattr(resp, "headers") and resp.headers:
+        encoding = (resp.headers.get("Content-Encoding") or "").lower()
+    if encoding == "gzip":
+        raw = gzip.decompress(raw)
+    elif encoding == "deflate":
+        import zlib
+
+        try:
+            raw = zlib.decompress(raw)
+        except zlib.error:
+            raw = zlib.decompress(raw, -zlib.MAX_WBITS)
+    return raw
 
 
 def _build_multipart(csv_path: Path, manifest: dict) -> tuple[bytes, str]:
@@ -107,6 +130,7 @@ def _build_multipart(csv_path: Path, manifest: dict) -> tuple[bytes, str]:
     # Manifest part
     lines.append(f"--{boundary}".encode())
     lines.append(b'Content-Disposition: form-data; name="manifest"')
+    lines.append(b"Content-Type: application/json")
     lines.append(b"")
     lines.append(json.dumps(manifest).encode("utf-8"))
 

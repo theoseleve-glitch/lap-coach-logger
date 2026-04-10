@@ -5,7 +5,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lap_coach_logger.core.schema import TelemetrySample
-from lap_coach_logger.core.sync_queue import SyncQueueManager
+from lap_coach_logger.core.sync_queue import MAX_SYNC_ATTEMPTS, SyncQueueManager
+from lap_coach_logger.core.sync_service import SyncAttemptResult
 from lap_coach_logger.writers.finalizer import SessionFinalizer
 
 
@@ -102,3 +103,26 @@ class TestSyncQueueManager:
 
         assert results == []
         assert queue.queue_depth() == 1
+
+    def test_process_queue_drops_entry_after_max_retry_attempts(self, tmp_path: Path) -> None:
+        """Entries should be removed from the queue after MAX_SYNC_ATTEMPTS failures."""
+        bundle = _finalize_bundle(tmp_path)
+
+        class _FailingSync:
+            enabled = True
+            def upload_bundle(self, **kw: object) -> SyncAttemptResult:
+                return SyncAttemptResult(success=False, error="server error", retryable=True)
+
+        queue = SyncQueueManager(
+            output_root=tmp_path, sync_enabled=True, sync_service=_FailingSync(),
+        )
+        queue.queue_session(bundle)
+        assert queue.queue_depth() == 1
+
+        for i in range(MAX_SYNC_ATTEMPTS):
+            results = queue.process_queue(max_items=5)
+            assert len(results) == 1
+            assert results[0]["status"] == "failed"
+
+        # After MAX_SYNC_ATTEMPTS the entry should be permanently dropped
+        assert queue.queue_depth() == 0
