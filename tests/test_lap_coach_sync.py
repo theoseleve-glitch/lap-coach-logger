@@ -1,4 +1,5 @@
 """Tests for LapCoachSyncService."""
+import gzip
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -29,6 +30,7 @@ def test_upload_bundle_reads_csv_and_manifest(tmp_path):
     with patch("lap_coach_logger.core.lap_coach_sync.urllib.request.urlopen") as mock_urlopen:
         mock_resp = MagicMock()
         mock_resp.status = 200
+        mock_resp.headers = {}
         mock_resp.read.return_value = json.dumps({
             "ok": True,
             "data": {"session_id": 42, "status": "pending_analysis", "analyze_triggered": False},
@@ -45,6 +47,42 @@ def test_upload_bundle_reads_csv_and_manifest(tmp_path):
 
     assert result.success is True
     assert result.remote_id == "42"
+
+    # Verify the request was gzip-compressed with correct headers
+    call_args = mock_urlopen.call_args
+    req = call_args[0][0]
+    assert req.get_header("Content-encoding") == "gzip"
+    assert "gzip" in req.get_header("Accept-encoding")
+    # Verify request body is valid gzip
+    gzip.decompress(req.data)
+
+
+def test_upload_bundle_handles_gzip_response(tmp_path):
+    """Server may respond with Content-Encoding: gzip."""
+    (tmp_path / "telemetry.csv").write_text("Time,Speed\n0,10\n", encoding="utf-8")
+    (tmp_path / "session.json").write_text("{}", encoding="utf-8")
+
+    svc = LapCoachSyncService(api_url="https://example.com", device_token="tok")
+
+    with patch("lap_coach_logger.core.lap_coach_sync.urllib.request.urlopen") as mock_urlopen:
+        resp_json = json.dumps({
+            "ok": True,
+            "data": {"session_id": 99},
+        }).encode()
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.headers = {"Content-Encoding": "gzip"}
+        mock_resp.read.return_value = gzip.compress(resp_json)
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        result = svc.upload_bundle(
+            bundle_dir=tmp_path, session_id="test", bundle_hash="hash",
+        )
+
+    assert result.success is True
+    assert result.remote_id == "99"
 
 
 def test_upload_bundle_401_not_retryable(tmp_path):

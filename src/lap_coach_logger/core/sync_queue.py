@@ -9,6 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# Maximum number of upload attempts before permanently marking as failed.
+MAX_SYNC_ATTEMPTS = 3
+
 from lap_coach_logger.core.sync_service import DisabledSyncService, SyncService
 from lap_coach_logger.core.sync_status import (
     SYNC_STATUS_BLOCKED,
@@ -193,7 +196,7 @@ class SyncQueueManager:
                     last_sync_error=upload.error or "Unknown sync error",
                 )
                 results.append({"dedupe_key": entry.dedupe_key, "status": "failed"})
-                if upload.retryable:
+                if upload.retryable and attempt_count < MAX_SYNC_ATTEMPTS:
                     remaining.append(entry)
 
         remaining.extend(self._entries[max_items:])
