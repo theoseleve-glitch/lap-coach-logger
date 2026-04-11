@@ -331,6 +331,21 @@ def test_import_from_session_persists_stint(tmp_path: Path, bundled_session: Pat
     assert stints[0].compound == "medium"
 
 
+def test_import_from_session_populates_per_lap_data(
+    tmp_path: Path, bundled_session: Path,
+):
+    """import_from_session populates lap_times_s and lap_avg_temps_c."""
+    store = StintStore(tmp_path / "stints.json")
+    record = store.import_from_session(bundled_session, compound="soft")
+    assert record is not None
+    # Bundled session has 3 laps -> 3 entries each
+    assert len(record.lap_times_s) == record.lap_count
+    assert len(record.lap_avg_temps_c) == record.lap_count
+    # Lap times derived from session_time_s should be positive
+    for lap_time in record.lap_times_s:
+        assert lap_time >= 0.0
+
+
 # ---------------------------------------------------------------------------
 #  Per-lap data roundtrip & fitted model integration (Task 2)
 # ---------------------------------------------------------------------------

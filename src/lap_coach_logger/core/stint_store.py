@@ -300,6 +300,7 @@ class StintStore:
         tyre_rr = tel_dict.get("tyre_temp_rr", [])
         track_temps = tel_dict.get("track_temp_c", [])
         air_temps = tel_dict.get("air_temp_c", [])
+        session_times = tel_dict.get("session_time_s", [])
 
         n_samples = len(lap_numbers)
 
@@ -333,8 +334,9 @@ class StintStore:
             else 0.0
         )
 
-        # Per-lap average tyre temps for wear estimation
+        # Per-lap average tyre temps for wear estimation and per-lap data
         wear_per_lap_values: list[float] = []
+        lap_avg_temps_c: list[float] = []
         for lap_num in sorted_laps:
             indices = laps_by_num[lap_num]
             temps: list[float] = []
@@ -343,6 +345,7 @@ class StintStore:
                     if idx < len(col) and col[idx] is not None:
                         temps.append(float(col[idx]))
             avg_temp = sum(temps) / len(temps) if temps else 80.0
+            lap_avg_temps_c.append(avg_temp)
 
             # Wear estimation (same formula as StintRecorder)
             base_wear = 2.0
@@ -357,6 +360,22 @@ class StintStore:
             if wear_per_lap_values
             else 2.0
         )
+
+        # Per-lap times from session_time_s if present
+        lap_times_s: list[float] = []
+        if session_times:
+            for lap_num in sorted_laps:
+                indices = laps_by_num[lap_num]
+                lap_time_values = [
+                    float(session_times[i])
+                    for i in indices
+                    if i < len(session_times) and session_times[i] is not None
+                ]
+                if lap_time_values:
+                    lap_time = max(lap_time_values) - min(lap_time_values)
+                    lap_times_s.append(lap_time)
+                else:
+                    lap_times_s.append(0.0)
 
         lap_count = len(sorted_laps)
 
@@ -403,6 +422,8 @@ class StintStore:
             air_temp_c=air_temp_c,
             source_session_id=session_id,
             source_label=session_type,
+            lap_times_s=lap_times_s,
+            lap_avg_temps_c=lap_avg_temps_c,
         )
 
         # -- 6. Persist --------------------------------------------------
