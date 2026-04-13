@@ -6,6 +6,11 @@ from typing import Any
 
 from PySide6.QtCore import QObject, Property, Signal, Slot
 
+from lap_coach_logger.core.practice_readiness import (
+    compute_nudges,
+    compute_race_statistics,
+    compute_readiness,
+)
 from lap_coach_logger.core.race_strategy import (
     ConditionWindow,
     PlannedStint,
@@ -47,7 +52,7 @@ class StrategyViewModel(QObject):
         self._conditions: list[ConditionWindow] = []
         self._race_mode = "laps"
         self._race_duration_hours = 0.0
-        self._driver_swap_time_s = 0.0
+        self._was_in_pits = False
 
     # -- QML properties --------------------------------------------------------
 
@@ -158,10 +163,6 @@ class StrategyViewModel(QObject):
     def raceDurationHours(self) -> float:  # noqa: N802
         return self._race_duration_hours
 
-    @Property(float, notify=planChanged)
-    def driverSwapTimeS(self) -> float:  # noqa: N802
-        return self._driver_swap_time_s
-
     @Property("QVariant", notify=profilesChanged)
     def modelAvailability(self) -> dict[str, Any]:  # noqa: N802
         """Per-compound model availability for UI indicators."""
@@ -178,6 +179,34 @@ class StrategyViewModel(QObject):
                 "stint_count": profile.stint_count,
             }
         return result
+
+    @Property("QVariant", notify=profilesChanged)
+    def readiness(self) -> dict:
+        pit = self._store.get_pit_profile(self._track) if self._track else None
+        return compute_readiness(self._profiles, pit)
+
+    @Property(list, notify=profilesChanged)
+    def nudges(self) -> list:
+        pit = self._store.get_pit_profile(self._track) if self._track else None
+        compounds = list(self._profiles.keys()) or ["soft", "medium", "hard"]
+        return compute_nudges(self._profiles, pit, compounds)
+
+    @Property("QVariant", notify=planChanged)
+    def raceStatistics(self) -> dict:  # noqa: N802
+        if self._plan is None:
+            return {}
+        return compute_race_statistics(
+            self.racePlan, self._profiles, self._fuel_capacity,
+            self._plan.total_race_time_s, self._plan.fuel_at_finish,
+        )
+
+    @Property(str, notify=planChanged)
+    def activeTab(self) -> str:  # noqa: N802
+        if self._plan is not None:
+            return "raceplan"
+        if self._profiles:
+            return "build"
+        return "practice"
 
     # -- Slots -----------------------------------------------------------------
 
@@ -213,11 +242,6 @@ class StrategyViewModel(QObject):
     @Slot(float)
     def setRaceDurationHours(self, hours: float) -> None:  # noqa: N802
         self._race_duration_hours = max(0.0, hours)
-        self.planChanged.emit()
-
-    @Slot(float)
-    def setDriverSwapTime(self, seconds: float) -> None:  # noqa: N802
-        self._driver_swap_time_s = max(0.0, seconds)
         self.planChanged.emit()
 
     @Slot()
@@ -281,6 +305,45 @@ class StrategyViewModel(QObject):
         self._profiles = {}
         self.profilesChanged.emit()
         self.stintLogChanged.emit()
+
+    # -- Auto-capture lifecycle ------------------------------------------------
+
+    _AUTO_RECORD_SESSIONS = frozenset({
+        "practice", "qualifying", "lone qualify", "open qualify",
+    })
+
+    def on_session_detected(self, session_type: str, track: str, car: str) -> None:
+        """Called when a new session is detected from telemetry."""
+        self.setTrackCar(track, car)
+        if session_type.lower() in self._AUTO_RECORD_SESSIONS:
+            self._recorder = StintRecorder(
+                store=self._store, track=self._track, car=self._car,
+            )
+            self._recorder.start(compound="unknown")
+        self.recordingChanged.emit()
+
+    def on_pit_detected(self) -> None:
+        """Called when the car enters the pit lane."""
+        if self._recorder and self._recorder.is_recording:
+            self._recorder.stop()
+            self._profiles = self._store.get_profiles(self._track, self._car)
+            self.profilesChanged.emit()
+            self.stintLogChanged.emit()
+        self._recorder = StintRecorder(
+            store=self._store, track=self._track, car=self._car,
+        )
+        self._recorder.start(compound="unknown")
+        self.recordingChanged.emit()
+
+    def on_session_ended(self) -> None:
+        """Called when the session ends."""
+        if self._recorder and self._recorder.is_recording:
+            self._recorder.stop()
+            self._profiles = self._store.get_profiles(self._track, self._car)
+            self.profilesChanged.emit()
+            self.stintLogChanged.emit()
+        self._recorder = None
+        self.recordingChanged.emit()
 
     @Slot(int, int)
     def editStintLaps(self, index: int, laps: int) -> None:  # noqa: N802
@@ -354,6 +417,13 @@ class StrategyViewModel(QObject):
             car = snap.get("car_name")
             if track and car:
                 self.setTrackCar(str(track), str(car))
+
+        # Pit-entry detection for auto-capture
+        is_in_pits = bool(snap.get("is_in_pits", False))
+        was_in_pits = self._was_in_pits
+        if is_in_pits and not was_in_pits:
+            self.on_pit_detected()
+        self._was_in_pits = is_in_pits
 
         if self._recorder and self._recorder.is_recording:
             self._recorder.push_snapshot(snap)

@@ -80,6 +80,54 @@ def test_vm_model_availability_empty_when_no_profiles(tmp_path: Path) -> None:
     assert vm.modelAvailability == {}
 
 
+def test_vm_on_session_detected_starts_recording(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    vm.on_session_detected("practice", "Monza", "GT3")
+    assert vm.trackName == "Monza"
+    assert vm.carName == "GT3"
+    assert vm.isRecording is True
+
+
+def test_vm_on_session_detected_race_does_not_auto_record(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    vm.on_session_detected("race", "Monza", "GT3")
+    assert vm.trackName == "Monza"
+    assert vm.isRecording is False
+
+
+def test_vm_on_session_ended_stops_recording(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    vm.on_session_detected("practice", "Monza", "GT3")
+    assert vm.isRecording is True
+    vm.on_session_ended()
+    assert vm.isRecording is False
+
+
+def test_vm_readiness_property(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    vm.setTrackCar("Monza", "GT3")
+    assert vm.readiness == {}  # no profiles yet
+
+
+def test_vm_nudges_property(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    vm.setTrackCar("Monza", "GT3")
+    nudges = vm.nudges
+    assert isinstance(nudges, list)
+    assert len(nudges) >= 1  # should suggest logging data
+
+
+def test_vm_active_tab_defaults_to_practice(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    assert vm.activeTab == "practice"
+
+
 def test_vm_autoOptimize_timed_race_produces_plan(tmp_path: Path) -> None:
     store = StintStore(tmp_path / "stints.json")
     store.log_stint("Monza", "GT3", StintRecord(
