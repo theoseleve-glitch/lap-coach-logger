@@ -31,6 +31,7 @@ from lap_coach_logger.viewmodels import (
     SessionViewModel,
     SettingsViewModel,
 )
+from lap_coach_logger.viewmodels.mode_vm import ModeViewModel
 from lap_coach_logger.viewmodels.strategy_vm import StrategyViewModel
 from lap_coach_logger.viewmodels.tray_vm import TrayViewModel
 from lap_coach_logger.core.stint_store import StintStore
@@ -92,6 +93,10 @@ def build_view_models(service: DesktopService) -> dict:
 
     overlay_vm.settingsSaveRequested.connect(_save_overlay_settings)
 
+    # -- Mode VM ---------------------------------------------------------------
+    mode_vm = ModeViewModel()
+    service._mode_vm = mode_vm
+
     # -- Strategy VM -----------------------------------------------------------
     stint_store = StintStore(runtime_dir() / "stint_profiles.json")
     strategy_vm = StrategyViewModel(stint_store)
@@ -109,6 +114,7 @@ def build_view_models(service: DesktopService) -> dict:
         "settings": settings_vm,
         "overlay": overlay_vm,
         "onboarding": onboarding_vm,
+        "mode": mode_vm,
         "strategy": strategy_vm,
     }
 

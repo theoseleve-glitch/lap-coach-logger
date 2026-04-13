@@ -177,6 +177,7 @@ class DesktopService(QObject):
         self._current_session_started_epoch: float | None = None
         self._strategy_session_active = False
         self._strategy_vm = None  # set externally after construction
+        self._mode_vm = None  # set externally after construction
 
         # Initialize session index for fast filtering
         self._session_index = SessionIndex(config_dir())
@@ -637,6 +638,8 @@ class DesktopService(QObject):
                 car = str(live.get("car_name") or "")
                 if track and car:
                     self._strategy_vm.on_session_detected(session_type, track, car)
+                if self._mode_vm is not None:
+                    self._mode_vm.onSessionDetected(session_type, 0.0, False)
             elif raw_state in ("idle",) and self._strategy_session_active:
                 self._strategy_session_active = False
                 self._strategy_vm.on_session_ended()

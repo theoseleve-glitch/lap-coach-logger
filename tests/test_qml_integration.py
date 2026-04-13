@@ -12,78 +12,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# PySide6 may not be installed in the test environment.  We mock the Qt
-# modules so the ViewModel source can be imported without a real Qt runtime.
-# ---------------------------------------------------------------------------
-
-_qt_core_mock = MagicMock()
-
-
-class _FakeSignalInstance:
-    """Per-object signal instance that records emit() and connect() calls."""
-
-    def __init__(self) -> None:
-        self._mock = MagicMock()
-        self._connections: list = []
-
-    def emit(self, *args: object) -> None:
-        self._mock(*args)
-        # Propagate to connected slots so integration wiring works.
-        for slot in self._connections:
-            slot(*args)
-
-    def connect(self, slot: object) -> None:
-        self._connections.append(slot)
-
-    @property
-    def call_count(self) -> int:
-        return self._mock.call_count
-
-    @property
-    def call_args(self):  # noqa: ANN204
-        return self._mock.call_args
-
-    @property
-    def call_args_list(self):  # noqa: ANN204
-        return self._mock.call_args_list
-
-
-class _FakeSignal:
-    """Descriptor that yields a fresh _FakeSignalInstance per owner object."""
-
-    def __init__(self, *_args: object) -> None:
-        self._name: str | None = None
-
-    def __set_name__(self, owner: type, name: str) -> None:
-        self._name = name
-
-    def __get__(self, obj: object, objtype: type | None = None) -> _FakeSignal | _FakeSignalInstance:
-        if obj is None:
-            return self
-        attr = f"_sig_{self._name}"
-        inst = obj.__dict__.get(attr)
-        if inst is None:
-            inst = _FakeSignalInstance()
-            obj.__dict__[attr] = inst
-        return inst
-
-
-class _FakeQObject:
-    def __init__(self, *_a: object, **_kw: object) -> None:
-        pass
-
-
-_qt_core_mock.QObject = _FakeQObject
-_qt_core_mock.Signal = _FakeSignal
-_qt_core_mock.Slot = lambda *a, **kw: (lambda fn: fn)  # noqa: ARG005
-_qt_core_mock.Property = lambda *a, **kw: property(kw.get("fget", lambda s: None))  # noqa: ARG005
-
-sys.modules.setdefault("PySide6", MagicMock())
-sys.modules.setdefault("PySide6.QtCore", _qt_core_mock)
-sys.modules.setdefault("PySide6.QtGui", MagicMock())
-sys.modules.setdefault("PySide6.QtQml", MagicMock())
-sys.modules.setdefault("PySide6.QtWidgets", MagicMock())
+from tests.qt_mock import FakeSignalInstance as _FakeSignalInstance, install
+install(propagate_signals=True, mock_gui=True)
 
 from lap_coach_logger.viewmodels import (  # noqa: E402
     HistoryViewModel,
@@ -198,16 +128,16 @@ def _mock_service() -> MagicMock:
 # ---------------------------------------------------------------------------
 
 class TestAllViewModelsInstantiate:
-    """build_view_models must return all 7 VMs with correct types."""
+    """build_view_models must return all 8 VMs with correct types."""
 
-    def test_returns_all_seven_keys(self) -> None:
+    def test_returns_all_nine_keys(self) -> None:
         vms = build_view_models(_mock_service())
-        expected = {"service", "session", "history", "review", "settings", "overlay", "onboarding"}
+        expected = {"service", "session", "history", "review", "settings", "overlay", "onboarding", "mode", "strategy"}
         assert set(vms.keys()) == expected
 
-    def test_returns_exactly_seven_entries(self) -> None:
+    def test_returns_exactly_nine_entries(self) -> None:
         vms = build_view_models(_mock_service())
-        assert len(vms) == 7
+        assert len(vms) == 9
 
     def test_service_vm_type(self) -> None:
         vms = build_view_models(_mock_service())
