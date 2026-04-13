@@ -15,6 +15,7 @@ Item {
     readonly property var pageComponents: ({
         "dashboard": dashboardComponent,
         "live": liveComponent,
+        "strategy": strategyComponent,
         "history": historyComponent,
         "overlays": overlaysComponent
     })
@@ -170,6 +171,29 @@ Item {
                     duration: Theme.Motion.pushDuration
                 }
             }
+        }
+    }
+
+    // === 2a. Mode selection banner ===
+    Components.ModeBanner {
+        id: modeBanner
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: navBar.bottom
+        detectedSession: {
+            var track = typeof strategyVM !== "undefined" && strategyVM ? strategyVM.trackName : ""
+            var car = typeof strategyVM !== "undefined" && strategyVM ? strategyVM.carName : ""
+            var st = typeof modeVM !== "undefined" && modeVM ? modeVM.sessionType : ""
+            if (track && car) return st + " \u00b7 " + track + " \u00b7 " + car
+            return st || "Connecting..."
+        }
+        activeMode: typeof modeVM !== "undefined" && modeVM ? modeVM.activeMode : "sprint"
+        bannerVisible: typeof modeVM !== "undefined" && modeVM ? modeVM.bannerVisible : false
+
+        onModeSelected: function(mode) {
+            if (typeof modeVM !== "undefined" && modeVM) modeVM.setMode(mode)
+        }
+        onDismissed: {
+            if (typeof modeVM !== "undefined" && modeVM) modeVM.dismissBanner()
         }
     }
 
@@ -371,11 +395,12 @@ Item {
         }
     }
 
-    // Ctrl+1/2/3/4 — switch tabs
+    // Ctrl+1/2/3/4/5 — switch tabs
     Shortcut { sequence: "Ctrl+1"; onActivated: navBar.pageRequested("dashboard") }
     Shortcut { sequence: "Ctrl+2"; onActivated: navBar.pageRequested("live") }
-    Shortcut { sequence: "Ctrl+3"; onActivated: navBar.pageRequested("history") }
-    Shortcut { sequence: "Ctrl+4"; onActivated: navBar.pageRequested("overlays") }
+    Shortcut { sequence: "Ctrl+3"; onActivated: navBar.pageRequested("strategy") }
+    Shortcut { sequence: "Ctrl+4"; onActivated: navBar.pageRequested("history") }
+    Shortcut { sequence: "Ctrl+5"; onActivated: navBar.pageRequested("overlays") }
 
     // Ctrl+Up — increase all overlay opacity by 5%
     Shortcut {
@@ -455,6 +480,11 @@ Item {
     Component {
         id: liveComponent
         Pages.LivePage {}
+    }
+
+    Component {
+        id: strategyComponent
+        Pages.StrategyPage {}
     }
 
     Component {

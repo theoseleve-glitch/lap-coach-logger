@@ -83,6 +83,7 @@ Rectangle {
                 model: [
                     { pageId: "dashboard", label: "Dashboard" },
                     { pageId: "live",      label: "Live" },
+                    { pageId: "strategy",  label: "Strategy" },
                     { pageId: "history",   label: "History" },
                     { pageId: "overlays",  label: "Overlays" }
                 ]
@@ -197,6 +198,29 @@ Rectangle {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: root.overlayToggleRequested()
+            }
+        }
+
+        // === 6b. Mode badge ===
+        Rectangle {
+            visible: typeof modeVM !== "undefined" && modeVM
+            implicitWidth: modeBadgeText.implicitWidth + 12
+            height: 20
+            radius: 4
+            color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.12)
+            border.width: 1
+            border.color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.25)
+            Layout.alignment: Qt.AlignVCenter
+
+            Text {
+                id: modeBadgeText
+                anchors.centerIn: parent
+                text: (typeof modeVM !== "undefined" && modeVM ? modeVM.activeMode : "").toUpperCase()
+                font.family: Theme.Typography.monoFamily
+                font.pixelSize: 8
+                font.weight: Font.Bold
+                font.letterSpacing: 0.8
+                color: Theme.Tokens.pitOrange
             }
         }
 

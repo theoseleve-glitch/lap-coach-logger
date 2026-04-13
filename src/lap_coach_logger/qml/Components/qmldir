@@ -12,3 +12,6 @@ Sparkline 1.0 Sparkline.qml
 SectorBars 1.0 SectorBars.qml
 ThrottleBrakeBar 1.0 ThrottleBrakeBar.qml
 LapTimeChart 1.0 LapTimeChart.qml
+ShortcutHelpOverlay 1.0 ShortcutHelpOverlay.qml
+ToastNotification 1.0 ToastNotification.qml
+ModeBanner 1.0 ModeBanner.qml
