@@ -31,7 +31,10 @@ from lap_coach_logger.viewmodels import (
     SessionViewModel,
     SettingsViewModel,
 )
+from lap_coach_logger.viewmodels.strategy_vm import StrategyViewModel
 from lap_coach_logger.viewmodels.tray_vm import TrayViewModel
+from lap_coach_logger.core.stint_store import StintStore
+from lap_coach_logger.utils.paths import runtime_dir
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -89,6 +92,15 @@ def build_view_models(service: DesktopService) -> dict:
 
     overlay_vm.settingsSaveRequested.connect(_save_overlay_settings)
 
+    # -- Strategy VM -----------------------------------------------------------
+    stint_store = StintStore(runtime_dir() / "stint_profiles.json")
+    strategy_vm = StrategyViewModel(stint_store)
+    overlay_vm.set_strategy_vm(strategy_vm)
+    service._strategy_vm = strategy_vm
+    service.snapshot_changed.connect(
+        lambda payload: strategy_vm.update_live(payload.get("live", {}) if isinstance(payload, dict) else {})
+    )
+
     return {
         "service": svc_vm,
         "session": session_vm,
@@ -97,6 +109,7 @@ def build_view_models(service: DesktopService) -> dict:
         "settings": settings_vm,
         "overlay": overlay_vm,
         "onboarding": onboarding_vm,
+        "strategy": strategy_vm,
     }
 
 

@@ -175,7 +175,9 @@ class DesktopService(QObject):
         self._last_live_timestamp_utc: str | None = None
         self._last_live_change_monotonic: float | None = None
         self._current_session_started_epoch: float | None = None
-        
+        self._strategy_session_active = False
+        self._strategy_vm = None  # set externally after construction
+
         # Initialize session index for fast filtering
         self._session_index = SessionIndex(config_dir())
         self._sync_queue = SyncQueueManager(
@@ -625,6 +627,20 @@ class DesktopService(QObject):
             "sync_queue_depth": self._sync_queue.queue_depth(),
             "sync_feature_enabled": self._sync_queue.sync_enabled,
         }
+        # Strategy auto-capture lifecycle
+        if self._strategy_vm is not None:
+            if raw_state in ("arming", "recording") and not self._strategy_session_active:
+                self._strategy_session_active = True
+                live = payload.get("live", {})
+                session_type = str(live.get("session_type") or "practice")
+                track = str(live.get("track_name") or "")
+                car = str(live.get("car_name") or "")
+                if track and car:
+                    self._strategy_vm.on_session_detected(session_type, track, car)
+            elif raw_state in ("idle",) and self._strategy_session_active:
+                self._strategy_session_active = False
+                self._strategy_vm.on_session_ended()
+
         self._last_snapshot_monotonic = now_mono
         self._last_sample_count = hs.sample_count
         self.snapshot_changed.emit(payload)
