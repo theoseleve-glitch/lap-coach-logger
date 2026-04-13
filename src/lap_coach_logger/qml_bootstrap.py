@@ -106,8 +106,9 @@ def build_view_models(service: DesktopService) -> dict:
         lambda payload: strategy_vm.update_live(payload.get("live", {}) if isinstance(payload, dict) else {})
     )
 
-    # -- Wire mode changes to strategy VM --------------------------------------
+    # -- Wire mode changes to strategy VM and overlay defaults ------------------
     mode_vm.modeChanged.connect(lambda: strategy_vm.set_mode(mode_vm.activeMode))
+    mode_vm.modeChanged.connect(lambda: overlay_vm.apply_mode_defaults(mode_vm.activeMode))
 
     return {
         "service": svc_vm,

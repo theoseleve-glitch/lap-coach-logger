@@ -13,8 +13,35 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 from lap_coach_logger.core.live_telemetry_processor import LiveTelemetryProcessor
 from lap_coach_logger.core.race_strategy import RaceStrategy, calculate_strategy, recalculate_live
 from lap_coach_logger.utils.overlay_hwnd import apply_overlay_flags, apply_overlay_flags_to_all_overlays, remove_overlay_flags
+from lap_coach_logger.viewmodels.overlay_helpers import (
+    ACCENT_COLORS,
+    LAYOUT_PRESETS,
+    PRESET_LIST,
+    WIDGET_CATEGORIES,
+    build_sector_states,
+    calc_brake_temp_max,
+    calc_fuel_state,
+    calc_tyre_temp_avg,
+    compute_scaled_widget,
+    extract_coaching_top_card,
+    extract_context,
+    extract_telemetry_inputs,
+    get_widget_float,
+    get_widget_int,
+    make_default_widget_settings,
+)
 
 log = logging.getLogger(__name__)
+
+_MODE_OVERLAY_DEFAULTS: dict[str, set[str]] = {
+    "sprint": {"relatives", "radar", "fuel_strategy", "standings", "track_map"},
+    "endurance": {
+        "relatives", "radar", "fuel_strategy", "standings", "track_map",
+        "race_strategy", "tire_life", "session_timer",
+    },
+    "coaching": {"delta_timing", "inputs_grip", "coaching", "delta_bar"},
+    "data": {"relatives", "radar", "fuel_strategy", "track_map"},
+}
 
 
 class OverlayViewModel(QObject):
@@ -37,96 +64,15 @@ class OverlayViewModel(QObject):
 
     # -- widget category mapping -----------------------------------------------
 
-    _WIDGET_CATEGORIES: dict[str, str] = {
-        "delta_timing": "timing",
-        "inputs_grip": "inputs",
-        "fuel_strategy": "strategy",
-        "coaching": "awareness",
-        "gforce_meter": "inputs",
-        "lap_timing": "timing",
-        "track_map": "awareness",
-        "standings": "awareness",
-        "weather": "awareness",
-        "laptime_graph": "timing",
-        "laptime_log": "timing",
-        "laptime_spread": "timing",
-        "session_timer": "awareness",
-        "delta_bar": "timing",
-        "flags": "awareness",
-        "digiflag": "awareness",
-        "radar": "awareness",
-        "radar_bars": "awareness",
-        "blind_spot": "awareness",
-        "overtake_alert": "awareness",
-        "relatives": "awareness",
-        "standings_table": "awareness",
-        "leaderboard": "awareness",
-        "head_to_head": "awareness",
-        "track_map_canvas": "awareness",
-        "mini_map": "awareness",
-        "flat_map": "awareness",
-        "fuel_calculator": "strategy",
-        "race_strategy": "strategy",
-        "tire_life": "strategy",
-        "pitbox_helper": "strategy",
-        "weather_monitor": "awareness",
-        "boost_box": "inputs",
-        "gforce_meter_full": "inputs",
-        "advanced_panel": "inputs",
-        "data_blocks": "inputs",
-        "race_schedule": "awareness",
-        "world_map": "awareness",
-        "heart_rate": "inputs",
-        "input_telemetry": "inputs",
-        "chat": "streaming",
-        "chat_highlight": "streaming",
-        "chat_race_game": "streaming",
-        "chat_race_standing": "streaming",
-        "custom_text": "streaming",
-        "custom_url": "streaming",
-        "garage_cover": "streaming",
-        "mic_visualizer": "streaming",
-        "promo_code_alert": "streaming",
-    }
+    _WIDGET_CATEGORIES: dict[str, str] = WIDGET_CATEGORIES
 
     # -- accent colour palette -------------------------------------------------
 
-    _ACCENT_COLORS: dict[str, str] = {
-        "purple": "#8B5CF6",
-        "orange": "#C9A84C",
-        "green": "#22C55E",
-        "red": "#FF2A2A",
-        "blue": "#3B82F6",
-        "cyan": "#06B6D4",
-    }
+    _ACCENT_COLORS: dict[str, str] = ACCENT_COLORS
 
     # -- layout presets --------------------------------------------------------
 
-    _PRESETS: dict[str, dict[str, dict]] = {
-        "qualifying": {
-            "delta_timing": {"enabled": True, "x": 500, "y": 20, "width": 320, "height": 200},
-            "lap_timing": {"enabled": True, "x": 830, "y": 20, "width": 280, "height": 120},
-            "inputs_grip": {"enabled": True, "x": 20, "y": 400, "width": 240, "height": 260},
-            "gforce_meter": {"enabled": True, "x": 20, "y": 20, "width": 200, "height": 200},
-        },
-        "race": {
-            "delta_timing": {"enabled": True, "x": 500, "y": 20},
-            "fuel_strategy": {"enabled": True, "x": 20, "y": 20, "width": 180, "height": 240},
-            "radar": {"enabled": True, "x": 830, "y": 400, "width": 200, "height": 200},
-            "standings": {"enabled": True, "x": 830, "y": 20, "width": 280, "height": 300},
-            "blind_spot": {"enabled": True, "x": 500, "y": 680, "width": 160, "height": 80},
-        },
-        "streaming": {
-            "delta_bar": {"enabled": True, "x": 400, "y": 20, "width": 300, "height": 60},
-            "leaderboard": {"enabled": True, "x": 20, "y": 20, "width": 260, "height": 280},
-            "chat": {"enabled": True, "x": 20, "y": 400, "width": 280, "height": 200},
-            "chat_highlight": {"enabled": True, "x": 400, "y": 620, "width": 320, "height": 80},
-            "custom_text": {"enabled": True, "x": 400, "y": 700, "width": 280, "height": 60},
-        },
-        "minimal": {
-            "delta_timing": {"enabled": True, "x": 500, "y": 20, "width": 310, "height": 200},
-        },
-    }
+    _PRESETS: dict[str, dict[str, dict]] = LAYOUT_PRESETS
 
     # -- construction ----------------------------------------------------------
 
@@ -210,6 +156,7 @@ class OverlayViewModel(QObject):
         self._lap_fuel_samples: list[float] = []
 
         # Race strategy
+        self._strategy_vm: object | None = None  # StrategyViewModel reference
         self._strategy: RaceStrategy | None = None
         self._strategy_total_laps: int = 0
         self._strategy_fuel_capacity: float = 65.0
@@ -221,6 +168,7 @@ class OverlayViewModel(QObject):
         self._strategy_pit_stops: list = []
         self._strategy_fuel_at_finish: float = 0.0
         self._strategy_prev_lap: int = -1
+        self._strategy_weather_alert: str = ""
 
         # Tire state
         self._tire_grip_pct: float = 100.0
@@ -233,57 +181,7 @@ class OverlayViewModel(QObject):
         self._tire_temp_rr: float = 0.0
 
         # Per-widget settings (widget_id -> settings dict)
-        self._widget_settings: dict[str, dict] = {
-            "delta_timing": {"enabled": False, "width": 320, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
-            "inputs_grip": {"enabled": False, "width": 240, "height": 260, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
-            "fuel_strategy": {"enabled": False, "width": 180, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
-            "coaching": {"enabled": False, "width": 290, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
-            "gforce_meter": {"enabled": False, "width": 200, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
-            "lap_timing": {"enabled": False, "width": 280, "height": 120, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
-            "track_map": {"enabled": False, "width": 240, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "standings": {"enabled": False, "width": 300, "height": 300, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "weather": {"enabled": False, "width": 200, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "laptime_graph": {"enabled": False, "width": 320, "height": 180, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "laptime_log": {"enabled": False, "width": 280, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "laptime_spread": {"enabled": False, "width": 300, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "session_timer": {"enabled": False, "width": 200, "height": 80, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "delta_bar": {"enabled": False, "width": 300, "height": 60, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
-            "flags": {"enabled": False, "width": 160, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "digiflag": {"enabled": False, "width": 120, "height": 120, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "radar": {"enabled": False, "width": 200, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "radar_bars": {"enabled": False, "width": 200, "height": 120, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "blind_spot": {"enabled": False, "width": 160, "height": 80, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "overtake_alert": {"enabled": False, "width": 240, "height": 60, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "relatives": {"enabled": False, "width": 280, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "standings_table": {"enabled": False, "width": 280, "height": 300, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "leaderboard": {"enabled": False, "width": 260, "height": 280, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "head_to_head": {"enabled": False, "width": 300, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "track_map_canvas": {"enabled": False, "width": 240, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "mini_map": {"enabled": False, "width": 180, "height": 180, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "flat_map": {"enabled": False, "width": 300, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "fuel_calculator": {"enabled": False, "width": 220, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "race_strategy": {"enabled": False, "width": 280, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "tire_life": {"enabled": False, "width": 220, "height": 180, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "pitbox_helper": {"enabled": False, "width": 240, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "weather_monitor": {"enabled": False, "width": 200, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "boost_box": {"enabled": False, "width": 160, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "gforce_meter_full": {"enabled": False, "width": 200, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
-            "advanced_panel": {"enabled": False, "width": 360, "height": 280, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "data_blocks": {"enabled": False, "width": 320, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "race_schedule": {"enabled": False, "width": 300, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "world_map": {"enabled": False, "width": 280, "height": 160, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "heart_rate": {"enabled": False, "width": 180, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "input_telemetry": {"enabled": False, "width": 280, "height": 180, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 60, "border_radius": 12},
-            "chat": {"enabled": False, "width": 280, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "chat_highlight": {"enabled": False, "width": 320, "height": 80, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "chat_race_game": {"enabled": False, "width": 280, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "chat_race_standing": {"enabled": False, "width": 260, "height": 240, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "custom_text": {"enabled": False, "width": 280, "height": 60, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "custom_url": {"enabled": False, "width": 300, "height": 200, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "garage_cover": {"enabled": False, "width": 320, "height": 180, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "mic_visualizer": {"enabled": False, "width": 200, "height": 60, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-            "promo_code_alert": {"enabled": False, "width": 300, "height": 100, "opacity": 0.92, "font_scale": 1.0, "refresh_hz": 30, "border_radius": 12},
-        }
+        self._widget_settings: dict[str, dict] = make_default_widget_settings()
         self._widget_defaults: dict[str, dict] = {
             k: dict(v) for k, v in self._widget_settings.items()
         }
@@ -547,6 +445,65 @@ class OverlayViewModel(QObject):
         """Total laps in the current strategy."""
         return self._strategy_total_laps
 
+    @Property(str, notify=strategyChanged)
+    def strategyWeatherAlert(self) -> str:  # noqa: N802
+        """One-line weather alert text from the strategy plan."""
+        return self._strategy_weather_alert
+
+    # -- Strategy VM wiring ----------------------------------------------------
+
+    def set_strategy_vm(self, vm: object) -> None:
+        """Store a reference to the StrategyViewModel and connect its signals."""
+        self._strategy_vm = vm
+        vm.planChanged.connect(self._sync_strategy_from_vm)
+        vm.alertsChanged.connect(self._sync_strategy_from_vm)
+
+    def _sync_strategy_from_vm(self) -> None:
+        """Read strategy VM state and update overlay properties."""
+        vm = self._strategy_vm
+        if vm is None:
+            return
+
+        plan = vm.racePlan
+        if plan:
+            # Update total laps from strategy VM
+            self._strategy_total_laps = vm.totalLaps
+
+            # Find upcoming stints (fuel_to_add > 0 means a pit stop before it)
+            upcoming_stops = [s for s in plan if s.get("start_lap", 0) > self._lap_number and s.get("fuel_to_add", 0) > 0]
+            if upcoming_stops:
+                first = upcoming_stops[0]
+                self._strategy_next_pit_lap = first.get("start_lap", 0)
+                self._strategy_fuel_to_add = first.get("fuel_to_add", 0.0)
+                self._strategy_stints_remaining = len(upcoming_stops)
+            else:
+                self._strategy_next_pit_lap = 0
+                self._strategy_fuel_to_add = 0.0
+                self._strategy_stints_remaining = 0
+
+            self._strategy_pit_stops = [
+                {"lap": s.get("start_lap", 0), "fuel": s.get("fuel_to_add", 0.0), "compound": s.get("compound", "")}
+                for s in plan
+                if s.get("fuel_to_add", 0) > 0
+            ]
+
+            # Fuel at finish from last stint
+            if plan:
+                last = plan[-1]
+                laps_in_stint = last.get("end_lap", 0) - last.get("start_lap", 0) + 1
+                self._strategy_fuel_at_finish = round(vm.planFuelAtFinish, 1)
+
+        # Weather alert from first weather-category alert
+        alerts = vm.alerts
+        weather_alert = ""
+        for a in alerts:
+            if a.get("category") == "weather":
+                weather_alert = a.get("message", "")
+                break
+        self._strategy_weather_alert = weather_alert
+
+        self.strategyChanged.emit()
+
     # -- Tire properties -------------------------------------------------------
 
     @Property(float, notify=tireChanged)
@@ -796,6 +753,19 @@ class OverlayViewModel(QObject):
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
+    def apply_mode_defaults(self, mode: str) -> None:
+        """Enable/disable overlays based on the selected mode."""
+        defaults = _MODE_OVERLAY_DEFAULTS.get(mode, set())
+        if not defaults:
+            return
+        for widget_id in self._widget_settings:
+            was_enabled = self._widget_settings[widget_id].get("enabled", False)
+            should_enable = widget_id in defaults
+            if was_enabled != should_enable:
+                self._widget_settings[widget_id]["enabled"] = should_enable
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
     @Slot(result=int)
     def enabledWidgetCount(self) -> int:  # noqa: N802
         """Return the number of currently enabled widgets."""
@@ -815,38 +785,31 @@ class OverlayViewModel(QObject):
 
     @Slot(str, result=int)
     def getWidgetWidth(self, widget_id: str) -> int:  # noqa: N802
-        s = self._widget_settings.get(widget_id)
-        return int(s.get("width", 300)) if s else 300
+        return get_widget_int(self._widget_settings, widget_id, "width", 300)
 
     @Slot(str, result=int)
     def getWidgetHeight(self, widget_id: str) -> int:  # noqa: N802
-        s = self._widget_settings.get(widget_id)
-        return int(s.get("height", 200)) if s else 200
+        return get_widget_int(self._widget_settings, widget_id, "height", 200)
 
     @Slot(str, result=float)
     def getWidgetOpacity(self, widget_id: str) -> float:  # noqa: N802
-        s = self._widget_settings.get(widget_id)
-        return float(s.get("opacity", 0.92)) if s else 0.92
+        return get_widget_float(self._widget_settings, widget_id, "opacity", 0.92)
 
     @Slot(str, result=float)
     def getWidgetFontScale(self, widget_id: str) -> float:  # noqa: N802
-        s = self._widget_settings.get(widget_id)
-        return float(s.get("font_scale", 1.0)) if s else 1.0
+        return get_widget_float(self._widget_settings, widget_id, "font_scale", 1.0)
 
     @Slot(str, result=int)
     def getWidgetRefreshHz(self, widget_id: str) -> int:  # noqa: N802
-        s = self._widget_settings.get(widget_id)
-        return int(s.get("refresh_hz", 60)) if s else 60
+        return get_widget_int(self._widget_settings, widget_id, "refresh_hz", 60)
 
     @Slot(str, result=int)
     def getWidgetBorderRadius(self, widget_id: str) -> int:  # noqa: N802
-        s = self._widget_settings.get(widget_id)
-        return int(s.get("border_radius", 12)) if s else 12
+        return get_widget_int(self._widget_settings, widget_id, "border_radius", 12)
 
     @Slot(str, result=float)
     def getWidgetScale(self, widget_id: str) -> float:  # noqa: N802
-        s = self._widget_settings.get(widget_id)
-        return float(s.get("scale", 1.0)) if s else 1.0
+        return get_widget_float(self._widget_settings, widget_id, "scale", 1.0)
 
     @Slot(str, float)
     def setWidgetScale(self, widget_id: str, scale: float) -> None:  # noqa: N802
@@ -855,15 +818,8 @@ class OverlayViewModel(QObject):
             return
         if widget_id not in self._widget_settings:
             return
-        scale = max(0.5, min(2.0, float(scale)))
-        defaults = self._widget_defaults.get(widget_id, {})
-        base_w = defaults.get("width", 300)
-        base_h = defaults.get("height", 200)
-        base_r = defaults.get("border_radius", 12)
-        self._widget_settings[widget_id]["scale"] = round(scale, 2)
-        self._widget_settings[widget_id]["width"] = int(base_w * scale)
-        self._widget_settings[widget_id]["height"] = int(base_h * scale)
-        self._widget_settings[widget_id]["border_radius"] = max(0, int(base_r * scale))
+        scaled = compute_scaled_widget(self._widget_defaults.get(widget_id, {}), scale)
+        self._widget_settings[widget_id].update(scaled)
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
@@ -993,22 +949,15 @@ class OverlayViewModel(QObject):
     @Slot(result="QVariant")
     def getPresetList(self) -> list:  # noqa: N802
         """Return the list of available layout presets for QML."""
-        return [
-            {"id": "qualifying", "name": "Qualifying Focus", "description": "Delta, timing, inputs, G-force"},
-            {"id": "race", "name": "Race Focus", "description": "Delta, fuel, radar, standings, blind spot"},
-            {"id": "streaming", "name": "Streaming", "description": "Delta bar, leaderboard, chat, highlights"},
-            {"id": "minimal", "name": "Minimal", "description": "Delta timing only"},
-        ]
+        return list(PRESET_LIST)
 
     @Slot(str, result=int)
     def getWidgetX(self, widget_id: str) -> int:  # noqa: N802
-        s = self._widget_settings.get(widget_id)
-        return int(s.get("x", 100)) if s else 100
+        return get_widget_int(self._widget_settings, widget_id, "x", 100)
 
     @Slot(str, result=int)
     def getWidgetY(self, widget_id: str) -> int:  # noqa: N802
-        s = self._widget_settings.get(widget_id)
-        return int(s.get("y", 80)) if s else 80
+        return get_widget_int(self._widget_settings, widget_id, "y", 80)
 
     def export_settings(self) -> dict[str, dict]:
         """Return a serialisable copy of all widget settings for persistence."""
@@ -1095,38 +1044,24 @@ class OverlayViewModel(QObject):
         live = snap.get("live") or {}
 
         # Telemetry inputs
-        self._speed_kph = float(live.get("speed_kph", 0.0))
-        self._throttle_pct = float(live.get("throttle_pct", 0.0))
-        self._brake_pct = float(live.get("brake_pct", 0.0))
-        self._steering_deg = float(live.get("steering_deg", 0.0))
-        self._lat_accel_g = float(live.get("lat_accel_g", 0.0))
-        self._long_accel_g = float(live.get("long_accel_g", 0.0))
-        self._clutch_pct = float(live.get("clutch_pct", 0.0))
-        self._lap_dist_pct = float(live.get("lap_dist_pct") or 0.0)
+        inputs = extract_telemetry_inputs(live)
+        self._speed_kph = inputs["speed_kph"]
+        self._throttle_pct = inputs["throttle_pct"]
+        self._brake_pct = inputs["brake_pct"]
+        self._steering_deg = inputs["steering_deg"]
+        self._lat_accel_g = inputs["lat_accel_g"]
+        self._long_accel_g = inputs["long_accel_g"]
+        self._clutch_pct = inputs["clutch_pct"]
+        self._lap_dist_pct = inputs["lap_dist_pct"]
         self._lap_progress = self._lap_dist_pct * 100.0
-        self._lap_number = int(live.get("lap_number") or live.get("current_lap", 0))
-        self._gear = int(live.get("gear", 0))
-        self._rpm = int(live.get("rpm", 0))
+        self._lap_number = inputs["lap_number"]
+        self._gear = inputs["gear"]
+        self._rpm = inputs["rpm"]
+        self._position = inputs["position"]
+        self._num_cars = inputs["num_cars"]
 
-        # Tyre temperature average (only count non-None values)
-        tyre_temps = [
-            live.get("tyre_temp_lf"), live.get("tyre_temp_rf"),
-            live.get("tyre_temp_lr"), live.get("tyre_temp_rr"),
-        ]
-        valid_tyre = [float(t) for t in tyre_temps if t is not None]
-        self._tyre_temp_avg = round(sum(valid_tyre) / len(valid_tyre), 1) if valid_tyre else 0.0
-
-        # Brake temperature max
-        brake_temps = [
-            live.get("brake_temp_lf"), live.get("brake_temp_rf"),
-            live.get("brake_temp_lr"), live.get("brake_temp_rr"),
-        ]
-        valid_brake = [float(t) for t in brake_temps if t is not None]
-        self._brake_temp_max = round(max(valid_brake), 1) if valid_brake else 0.0
-
-        # Race position
-        self._position = int(live.get("position") or 0)
-        self._num_cars = int(live.get("num_cars") or 0)
+        self._tyre_temp_avg = calc_tyre_temp_avg(live)
+        self._brake_temp_max = calc_brake_temp_max(live)
 
         self.inputsChanged.emit()
 
@@ -1142,14 +1077,14 @@ class OverlayViewModel(QObject):
         cards = result.get("coaching_cards", [])
         if cards:
             self._coaching_cards = cards
-            top = cards[0]
-            self._coaching_visible = True
-            self._coaching_headline = str(top.get("headline", ""))
-            self._coaching_sub = str(top.get("sub", ""))
-            self._coaching_category = str(top.get("category", ""))
-            self._coaching_severity = str(top.get("severity", "caution"))
-            self._coaching_confidence = int(top.get("confidence", 80))
-            self._coaching_sector = str(top.get("sector", ""))
+            cinfo = extract_coaching_top_card(cards)
+            self._coaching_visible = cinfo["visible"]
+            self._coaching_headline = cinfo["headline"]
+            self._coaching_sub = cinfo["sub"]
+            self._coaching_category = cinfo["category"]
+            self._coaching_severity = cinfo["severity"]
+            self._coaching_confidence = cinfo["confidence"]
+            self._coaching_sector = cinfo["sector"]
             self.coachingChanged.emit()
         elif self._coaching_visible:
             self._coaching_visible = False
@@ -1180,75 +1115,26 @@ class OverlayViewModel(QObject):
             self._tire_temp_rr = float(ts.get("avg_temp_rr", 0))
             self.tireChanged.emit()
 
-        # Map sector split rows from the processor into the QML format
-        # expected by DeltaTimeWidget: [{id, delta, status}].
+        # Sector states
         raw_sectors = result.get("sector_rows", [])
-        dist_pct = self._lap_dist_pct  # 0.0 .. 1.0
-        new_sectors: list[dict] = []
-        for i, row in enumerate(raw_sectors):
-            sector_index = i + 1  # 1-based
-            delta = row.get("delta_s") or 0
-            current_time = row.get("current_time_s")
-            marker = row.get("marker")  # "GAIN", "LOSS", "HOLD", or None
-
-            # A sector is "active" when the car is currently inside it
-            # (based on lap_dist_pct) and no split time has been recorded.
-            sector_start = i / 3.0
-            sector_end = (i + 1) / 3.0
-            in_sector = sector_start <= dist_pct < sector_end
-
-            if current_time is not None and marker is not None:
-                # Sector has a completed split -- use the marker to
-                # decide gain/loss/hold.
-                if marker == "GAIN":
-                    status = "gain"
-                elif marker == "LOSS":
-                    status = "loss"
-                else:
-                    status = "gain"  # HOLD treated as neutral-gain
-            elif in_sector:
-                status = "active"
-            else:
-                status = "pending"
-
-            new_sectors.append({
-                "id": sector_index,
-                "delta": round(delta, 3),
-                "status": status,
-            })
-
-        # Fall back to 3 pending sectors when tracker has no data yet.
-        if not new_sectors:
-            new_sectors = [
-                {"id": k, "delta": 0, "status": "pending"} for k in range(1, 4)
-            ]
-
+        new_sectors = build_sector_states(raw_sectors, self._lap_dist_pct)
         if new_sectors != self._sector_states:
             self._sector_states = new_sectors
             self.timesChanged.emit()
 
         # Context
-        self._track = str(live.get("track_name") or snap.get("track") or snap.get("sim") or "")
-        self._car = str(live.get("car_name") or snap.get("car") or "")
-        self._is_recording = str(snap.get("status", "")).lower() == "recording"
+        ctx = extract_context(live, snap)
+        self._track = ctx["track"]
+        self._car = ctx["car"]
+        self._is_recording = ctx["is_recording"]
         if self._is_recording:
             self._has_been_recording = True
-        self._session_type = str(live.get("session_type") or "")
-        self._track_length_m = float(live.get("track_length_m") or 0.0)
-        self._track_temp = float(live.get("track_temp_c") or 0.0)
-        self._air_temp = float(live.get("air_temp_c") or 0.0)
+        self._session_type = ctx["session_type"]
+        self._track_length_m = ctx["track_length_m"]
+        self._track_temp = ctx["track_temp"]
+        self._air_temp = ctx["air_temp"]
+        self._current_flag = ctx["current_flag"]
 
-        # Flag detection: derive from pit/track status and session type
-        is_in_pits = bool(live.get("is_in_pits"))
-        is_on_track = bool(live.get("is_on_track"))
-        if is_in_pits and not is_on_track:
-            self._current_flag = "none"
-        elif self._is_recording and is_on_track:
-            self._current_flag = "green"
-        else:
-            self._current_flag = "none"
-
-        # Auto-hide: show overlays when on track or in pits during a recording session
         # Auto-hide: only hide overlays if we WERE recording and then stopped.
         # If no session has started yet, always show overlays.
         if self._auto_hide_enabled and not self._is_recording and self._has_been_recording:
@@ -1261,33 +1147,16 @@ class OverlayViewModel(QObject):
         # Fuel calculation
         fuel = float(live.get("fuel_level", 0.0))
         if fuel > 0:
-            # Track fuel consumption per lap
-            if self._prev_fuel_level > 0 and fuel < self._prev_fuel_level:
-                consumed = self._prev_fuel_level - fuel
-                if 0.1 < consumed < 20:  # sanity check
-                    self._lap_fuel_samples.append(consumed)
-                    if len(self._lap_fuel_samples) > 10:
-                        self._lap_fuel_samples.pop(0)
-            self._prev_fuel_level = fuel
-            self._fuel_level = fuel
-
-            if self._lap_fuel_samples:
-                avg = sum(self._lap_fuel_samples) / len(self._lap_fuel_samples)
-                self._fuel_per_lap = round(avg, 2)
-                self._fuel_laps_left = round(fuel / avg, 1) if avg > 0 else 0.0
-
-                # Determine state
-                laps_remaining = int(snap.get("total_laps", 0)) - self._lap_number
-                if laps_remaining <= 0:
-                    laps_remaining = 99
-                if self._fuel_laps_left < 1.5:
-                    self._fuel_state = "BOX"
-                elif self._fuel_laps_left < laps_remaining * 0.85:
-                    self._fuel_state = "SAVE"
-                elif self._fuel_laps_left < laps_remaining * 1.05:
-                    self._fuel_state = "TIGHT"
-                else:
-                    self._fuel_state = "SAFE"
+            fs = calc_fuel_state(
+                fuel, self._prev_fuel_level, self._lap_fuel_samples,
+                self._lap_number, int(snap.get("total_laps", 0)),
+            )
+            self._fuel_level = fs["fuel_level"]
+            self._fuel_per_lap = fs["fuel_per_lap"]
+            self._fuel_laps_left = fs["fuel_laps_left"]
+            self._fuel_state = fs["fuel_state"]
+            self._prev_fuel_level = fs["prev_fuel_level"]
+            self._lap_fuel_samples = fs["lap_fuel_samples"]
             self.fuelChanged.emit()
 
         # Live strategy recalculation on lap transitions
@@ -1305,16 +1174,12 @@ class OverlayViewModel(QObject):
         """Dismiss the current coaching card."""
         if self._coaching_cards:
             self._coaching_cards.pop(0)
-        if self._coaching_cards:
-            top = self._coaching_cards[0]
-            self._coaching_headline = str(top.get("headline", ""))
-            self._coaching_sub = str(top.get("sub", ""))
-            self._coaching_category = str(top.get("category", ""))
-            self._coaching_severity = str(top.get("severity", "caution"))
-            self._coaching_confidence = int(top.get("confidence", 80))
-            self._coaching_sector = str(top.get("sector", ""))
-        else:
-            self._coaching_visible = False
-            self._coaching_headline = ""
-            self._coaching_sub = ""
+        cinfo = extract_coaching_top_card(self._coaching_cards)
+        self._coaching_visible = cinfo["visible"]
+        self._coaching_headline = cinfo["headline"]
+        self._coaching_sub = cinfo["sub"]
+        self._coaching_category = cinfo["category"]
+        self._coaching_severity = cinfo["severity"]
+        self._coaching_confidence = cinfo["confidence"]
+        self._coaching_sector = cinfo["sector"]
         self.coachingChanged.emit()
