@@ -97,11 +97,7 @@ Item {
                     spacing: 0
 
                     Repeater {
-                        model: [
-                            { id: "practice", label: "PRACTICE" },
-                            { id: "build",    label: "BUILD" },
-                            { id: "raceplan", label: "RACE PLAN" }
-                        ]
+                        model: strategyVM ? strategyVM.tabsForMode : []
 
                         Rectangle {
                             required property var modelData
@@ -1582,6 +1578,406 @@ Item {
                                 color: Qt.rgba(Theme.Tokens.steel.r, Theme.Tokens.steel.g,
                                                Theme.Tokens.steel.b, 0.6)
                             }
+                        }
+                    }
+                }
+
+                // ================================================================
+                // SPRINT SETUP TAB
+                // ================================================================
+                Column {
+                    visible: root.activeTabId === "setup"
+                    width: parent.width
+                    spacing: Theme.Tokens.xl
+
+                    // ---- Fuel Calculator card ----
+                    Rectangle {
+                        width: parent.width
+                        implicitHeight: fuelCalcCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+
+                        Column {
+                            id: fuelCalcCol
+                            anchors {
+                                left: parent.left; right: parent.right; top: parent.top
+                                margins: Theme.Tokens.xl
+                            }
+                            spacing: Theme.Tokens.md
+
+                            Text {
+                                text: "FUEL CALCULATOR"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Theme.Typography.microWeight
+                                font.letterSpacing: Theme.Typography.microSpacing
+                                color: Theme.Tokens.steel
+                            }
+
+                            // Race laps input
+                            RowLayout {
+                                width: parent.width
+                                spacing: Theme.Tokens.md
+
+                                Text {
+                                    text: "Race laps"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.captionSize
+                                    color: Theme.Tokens.chalk
+                                    Layout.preferredWidth: 120
+                                }
+
+                                Rectangle {
+                                    Layout.preferredWidth: 80
+                                    height: 32
+                                    radius: Theme.Tokens.radiusSm
+                                    color: Theme.Tokens.elevated
+                                    border.width: 1
+                                    border.color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.15)
+
+                                    TextInput {
+                                        id: sprintLapsInput
+                                        anchors.fill: parent
+                                        anchors.margins: Theme.Tokens.xs
+                                        text: strategyVM ? strategyVM.totalLaps.toString() : "0"
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: Theme.Typography.bodySize
+                                        color: Theme.Tokens.chalk
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                        validator: IntValidator { bottom: 0; top: 999 }
+                                        onEditingFinished: {
+                                            if (strategyVM) strategyVM.setTotalLaps(parseInt(text) || 0)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Computed fuel needed
+                            RowLayout {
+                                width: parent.width
+                                spacing: Theme.Tokens.md
+
+                                Text {
+                                    text: "Fuel needed"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.captionSize
+                                    color: Theme.Tokens.chalk
+                                    Layout.preferredWidth: 120
+                                }
+
+                                Text {
+                                    property var profiles: strategyVM ? strategyVM.compoundProfiles : []
+                                    property real fuelPerLap: profiles.length > 0 ? (profiles[0].fuel_per_lap || 0) : 0
+                                    property int laps: strategyVM ? strategyVM.totalLaps : 0
+                                    text: fuelPerLap > 0 ? (laps * fuelPerLap).toFixed(1) + " L" : "--"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.bodySize
+                                    font.weight: Font.Bold
+                                    color: Theme.Tokens.pitOrange
+                                }
+                            }
+
+                            // Fuel capacity (read-only)
+                            RowLayout {
+                                width: parent.width
+                                spacing: Theme.Tokens.md
+
+                                Text {
+                                    text: "Fuel capacity"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.captionSize
+                                    color: Theme.Tokens.chalk
+                                    Layout.preferredWidth: 120
+                                }
+
+                                Text {
+                                    text: strategyVM ? strategyVM.fuelCapacity.toFixed(1) + " L" : "--"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.bodySize
+                                    color: Theme.Tokens.steel
+                                }
+                            }
+                        }
+                    }
+
+                    // ---- Pit Presets card ----
+                    Rectangle {
+                        width: parent.width
+                        implicitHeight: pitPresetsCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+
+                        Column {
+                            id: pitPresetsCol
+                            anchors {
+                                left: parent.left; right: parent.right; top: parent.top
+                                margins: Theme.Tokens.xl
+                            }
+                            spacing: Theme.Tokens.md
+
+                            Text {
+                                text: "PIT PRESETS"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Theme.Typography.microWeight
+                                font.letterSpacing: Theme.Typography.microSpacing
+                                color: Theme.Tokens.steel
+                            }
+
+                            Row {
+                                spacing: Theme.Tokens.md
+
+                                Repeater {
+                                    model: [
+                                        { label: "Fill to End" },
+                                        { label: "Splash & Go" },
+                                        { label: "Full Service" }
+                                    ]
+
+                                    Rectangle {
+                                        required property var modelData
+                                        width: presetLabel.implicitWidth + Theme.Tokens.xl * 2
+                                        height: 36
+                                        radius: Theme.Tokens.radiusMd
+                                        color: presetArea.containsMouse
+                                               ? Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.22)
+                                               : Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.12)
+                                        border.width: 1
+                                        border.color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.30)
+
+                                        Text {
+                                            id: presetLabel
+                                            anchors.centerIn: parent
+                                            text: modelData.label
+                                            font.family: Theme.Typography.monoFamily
+                                            font.pixelSize: Theme.Typography.captionSize
+                                            font.weight: Font.DemiBold
+                                            color: Theme.Tokens.pitOrange
+                                        }
+
+                                        MouseArea {
+                                            id: presetArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: { /* placeholder */ }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ================================================================
+                // SPRINT LIVE TAB
+                // ================================================================
+                Column {
+                    visible: root.activeTabId === "live"
+                    width: parent.width
+                    spacing: Theme.Tokens.xl
+
+                    // ---- Race Status card ----
+                    Rectangle {
+                        width: parent.width
+                        implicitHeight: raceStatusCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+
+                        Column {
+                            id: raceStatusCol
+                            anchors {
+                                left: parent.left; right: parent.right; top: parent.top
+                                margins: Theme.Tokens.xl
+                            }
+                            spacing: Theme.Tokens.md
+
+                            Text {
+                                text: "RACE STATUS"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Theme.Typography.microWeight
+                                font.letterSpacing: Theme.Typography.microSpacing
+                                color: Theme.Tokens.steel
+                            }
+
+                            // Fuel remaining (large)
+                            Column {
+                                width: parent.width
+                                spacing: Theme.Tokens.xs
+
+                                Text {
+                                    text: "Fuel remaining"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.captionSize
+                                    color: Theme.Tokens.steel
+                                }
+
+                                Text {
+                                    text: typeof overlayVM !== "undefined" && overlayVM
+                                          ? overlayVM.fuelLevel.toFixed(1) + " L"
+                                          : "--"
+                                    font.family: Theme.Typography.displayFamily
+                                    font.pixelSize: 36
+                                    font.weight: Font.Bold
+                                    color: Theme.Tokens.chalk
+                                }
+                            }
+
+                            // Laps remaining estimate
+                            RowLayout {
+                                width: parent.width
+                                spacing: Theme.Tokens.md
+
+                                Text {
+                                    text: "Laps remaining"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.captionSize
+                                    color: Theme.Tokens.chalk
+                                    Layout.preferredWidth: 120
+                                }
+
+                                Text {
+                                    text: typeof overlayVM !== "undefined" && overlayVM
+                                          ? overlayVM.fuelLapsLeft.toFixed(1)
+                                          : "--"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.bodySize
+                                    font.weight: Font.Bold
+                                    color: Theme.Tokens.pitOrange
+                                }
+                            }
+
+                            // Alerts
+                            Column {
+                                width: parent.width
+                                spacing: Theme.Tokens.xs
+                                visible: strategyVM && strategyVM.alerts.length > 0
+
+                                Text {
+                                    text: "ALERTS"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.microSize
+                                    font.weight: Theme.Typography.microWeight
+                                    font.letterSpacing: Theme.Typography.microSpacing
+                                    color: Theme.Tokens.safetyRed
+                                    topPadding: Theme.Tokens.md
+                                }
+
+                                Repeater {
+                                    model: strategyVM ? strategyVM.alerts : []
+
+                                    Text {
+                                        required property var modelData
+                                        text: modelData.message
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: Theme.Typography.captionSize
+                                        color: modelData.severity === "critical"
+                                               ? Theme.Tokens.safetyRed
+                                               : Theme.Tokens.marshalYellow
+                                        width: raceStatusCol.width
+                                        wrapMode: Text.WordWrap
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ================================================================
+                // COACHING PLACEHOLDERS
+                // ================================================================
+                Column {
+                    visible: root.activeTabId === "consistency"
+                    width: parent.width
+                    spacing: Theme.Tokens.xl
+
+                    Rectangle {
+                        width: parent.width; height: 200; radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface; border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Consistency analysis \u2014 coming soon"
+                            font.family: Theme.Typography.bodyFamily; font.pixelSize: Theme.Typography.bodySize
+                            color: Theme.Tokens.steel
+                        }
+                    }
+                }
+
+                Column {
+                    visible: root.activeTabId === "pace"
+                    width: parent.width
+                    spacing: Theme.Tokens.xl
+
+                    Rectangle {
+                        width: parent.width; height: 200; radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface; border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Pace analysis \u2014 coming soon"
+                            font.family: Theme.Typography.bodyFamily; font.pixelSize: Theme.Typography.bodySize
+                            color: Theme.Tokens.steel
+                        }
+                    }
+                }
+
+                Column {
+                    visible: root.activeTabId === "readiness"
+                    width: parent.width
+                    spacing: Theme.Tokens.xl
+
+                    Rectangle {
+                        width: parent.width; height: 200; radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface; border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Readiness analysis \u2014 coming soon"
+                            font.family: Theme.Typography.bodyFamily; font.pixelSize: Theme.Typography.bodySize
+                            color: Theme.Tokens.steel
+                        }
+                    }
+                }
+
+                // ================================================================
+                // DATA PLACEHOLDERS
+                // ================================================================
+                Column {
+                    visible: root.activeTabId === "telemetry"
+                    width: parent.width
+                    spacing: Theme.Tokens.xl
+
+                    Rectangle {
+                        width: parent.width; height: 200; radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface; border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Telemetry view \u2014 coming soon"
+                            font.family: Theme.Typography.bodyFamily; font.pixelSize: Theme.Typography.bodySize
+                            color: Theme.Tokens.steel
+                        }
+                    }
+                }
+
+                Column {
+                    visible: root.activeTabId === "export"
+                    width: parent.width
+                    spacing: Theme.Tokens.xl
+
+                    Rectangle {
+                        width: parent.width; height: 200; radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface; border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Export tools \u2014 coming soon"
+                            font.family: Theme.Typography.bodyFamily; font.pixelSize: Theme.Typography.bodySize
+                            color: Theme.Tokens.steel
                         }
                     }
                 }

@@ -53,6 +53,7 @@ class StrategyViewModel(QObject):
         self._race_mode = "laps"
         self._race_duration_hours = 0.0
         self._was_in_pits = False
+        self._mode = "sprint"
 
     # -- QML properties --------------------------------------------------------
 
@@ -201,12 +202,39 @@ class StrategyViewModel(QObject):
         )
 
     @Property(str, notify=planChanged)
+    def currentMode(self) -> str:  # noqa: N802
+        return self._mode
+
+    @Property(list, notify=planChanged)
+    def tabsForMode(self) -> list[dict]:  # noqa: N802
+        if self._mode == "sprint":
+            return [{"id": "setup", "label": "SETUP"}, {"id": "live", "label": "LIVE"}]
+        if self._mode == "endurance":
+            return [{"id": "practice", "label": "PRACTICE"}, {"id": "build", "label": "BUILD"}, {"id": "raceplan", "label": "RACE PLAN"}]
+        if self._mode == "coaching":
+            return [{"id": "consistency", "label": "CONSISTENCY"}, {"id": "pace", "label": "PACE"}, {"id": "readiness", "label": "READINESS"}]
+        if self._mode == "data":
+            return [{"id": "telemetry", "label": "TELEMETRY"}, {"id": "export", "label": "EXPORT"}]
+        return []
+
+    @Property(str, notify=planChanged)
     def activeTab(self) -> str:  # noqa: N802
+        if self._mode == "sprint":
+            return "live" if self._plan is not None else "setup"
+        if self._mode == "data":
+            return "telemetry"
+        # endurance + coaching: existing logic
         if self._plan is not None:
             return "raceplan"
         if self._profiles:
             return "build"
         return "practice"
+
+    # -- Mode setter (called from bootstrap wiring) ----------------------------
+
+    def set_mode(self, mode: str) -> None:
+        self._mode = mode
+        self.planChanged.emit()
 
     # -- Slots -----------------------------------------------------------------
 

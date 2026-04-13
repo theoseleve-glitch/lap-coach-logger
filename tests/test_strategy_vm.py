@@ -125,7 +125,41 @@ def test_vm_nudges_property(tmp_path: Path) -> None:
 def test_vm_active_tab_defaults_to_practice(tmp_path: Path) -> None:
     store = StintStore(tmp_path / "stints.json")
     vm = StrategyViewModel(store=store)
+    vm.set_mode("endurance")
     assert vm.activeTab == "practice"
+
+
+def test_vm_tabs_for_sprint_mode(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    vm.set_mode("sprint")
+    tabs = vm.tabsForMode
+    assert len(tabs) == 2
+    assert tabs[0]["id"] == "setup"
+    assert tabs[1]["id"] == "live"
+
+
+def test_vm_tabs_for_endurance_mode(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    vm.set_mode("endurance")
+    tabs = vm.tabsForMode
+    assert len(tabs) == 3
+    assert tabs[0]["id"] == "practice"
+
+
+def test_vm_active_tab_sprint_defaults_to_setup(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    vm.set_mode("sprint")
+    assert vm.activeTab == "setup"
+
+
+def test_vm_current_mode_property(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    vm.set_mode("endurance")
+    assert vm.currentMode == "endurance"
 
 
 def test_vm_autoOptimize_timed_race_produces_plan(tmp_path: Path) -> None:
