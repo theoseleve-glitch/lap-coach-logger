@@ -6,11 +6,14 @@ from typing import Any
 
 from PySide6.QtCore import QObject, Property, Signal, Slot
 
+from lap_coach_logger.core.consistency_analyzer import ConsistencyReport, analyze_consistency
+from lap_coach_logger.core.metric_state import MetricState, classify_metric
 from lap_coach_logger.core.practice_readiness import (
     compute_nudges,
     compute_race_statistics,
     compute_readiness,
 )
+from lap_coach_logger.core.mode_descriptor import get_mode
 from lap_coach_logger.core.race_strategy import (
     ConditionWindow,
     PlannedStint,
@@ -54,6 +57,9 @@ class StrategyViewModel(QObject):
         self._race_duration_hours = 0.0
         self._was_in_pits = False
         self._mode = "sprint"
+        self._lap_times_buffer: list[float] = []
+        self._prev_consistency_lap = 0
+        self._prev_consistency_time: float | None = None
 
     # -- QML properties --------------------------------------------------------
 
@@ -201,34 +207,46 @@ class StrategyViewModel(QObject):
             self._plan.total_race_time_s, self._plan.fuel_at_finish,
         )
 
+    @Property("QVariant", notify=planChanged)
+    def metricStates(self) -> dict[str, str]:  # noqa: N802
+        """Confidence state for each key strategy metric."""
+        return {
+            "fuel_capacity": classify_metric(
+                self._fuel_capacity if self._fuel_capacity > 0 else None
+            ).value,
+            "pit_time": classify_metric(
+                self._pit_time if self._pit_time != 25.0 else None,
+                is_derived=self._pit_time == 25.0,
+            ).value,
+            "fuel_per_lap": classify_metric(
+                next((p.fuel_per_lap for p in self._profiles.values()), None)
+            ).value,
+            "total_laps": classify_metric(
+                self._total_laps if self._total_laps > 0 else None
+            ).value,
+        }
+
+    @Property("QVariant", notify=profilesChanged)
+    def consistencyReport(self) -> dict:  # noqa: N802
+        report = analyze_consistency(self._lap_times_buffer)
+        if report is None:
+            return {}
+        return report.to_dict()
+
     @Property(str, notify=planChanged)
     def currentMode(self) -> str:  # noqa: N802
         return self._mode
 
     @Property(list, notify=planChanged)
     def tabsForMode(self) -> list[dict]:  # noqa: N802
-        if self._mode == "sprint":
-            return [{"id": "setup", "label": "SETUP"}, {"id": "live", "label": "LIVE"}]
-        if self._mode == "endurance":
-            return [{"id": "practice", "label": "PRACTICE"}, {"id": "build", "label": "BUILD"}, {"id": "raceplan", "label": "RACE PLAN"}]
-        if self._mode == "coaching":
-            return [{"id": "consistency", "label": "CONSISTENCY"}, {"id": "pace", "label": "PACE"}, {"id": "readiness", "label": "READINESS"}]
-        if self._mode == "data":
-            return [{"id": "telemetry", "label": "TELEMETRY"}, {"id": "export", "label": "EXPORT"}]
-        return []
+        return get_mode(self._mode).tab_dicts()
 
     @Property(str, notify=planChanged)
     def activeTab(self) -> str:  # noqa: N802
-        if self._mode == "sprint":
-            return "live" if self._plan is not None else "setup"
-        if self._mode == "data":
-            return "telemetry"
-        # endurance + coaching: existing logic
-        if self._plan is not None:
-            return "raceplan"
-        if self._profiles:
-            return "build"
-        return "practice"
+        return get_mode(self._mode).resolve_active_tab(
+            has_plan=self._plan is not None,
+            has_profiles=bool(self._profiles),
+        )
 
     # -- Mode setter (called from bootstrap wiring) ----------------------------
 
@@ -343,6 +361,9 @@ class StrategyViewModel(QObject):
     def on_session_detected(self, session_type: str, track: str, car: str) -> None:
         """Called when a new session is detected from telemetry."""
         self.setTrackCar(track, car)
+        self._lap_times_buffer = []
+        self._prev_consistency_lap = 0
+        self._prev_consistency_time = None
         if session_type.lower() in self._AUTO_RECORD_SESSIONS:
             self._recorder = StintRecorder(
                 store=self._store, track=self._track, car=self._car,
@@ -452,6 +473,22 @@ class StrategyViewModel(QObject):
         if is_in_pits and not was_in_pits:
             self.on_pit_detected()
         self._was_in_pits = is_in_pits
+
+        # Track lap times for consistency analysis
+        lap = snap.get("lap_number")
+        session_time = snap.get("session_time_s")
+        if lap is not None and session_time is not None:
+            current_lap = int(lap)
+            if hasattr(self, "_prev_consistency_lap") and current_lap != self._prev_consistency_lap:
+                if hasattr(self, "_prev_consistency_time") and self._prev_consistency_time is not None:
+                    lap_time = float(session_time) - self._prev_consistency_time
+                    if 20 < lap_time < 600:
+                        self._lap_times_buffer.append(lap_time)
+                        self.profilesChanged.emit()
+                self._prev_consistency_time = float(session_time)
+            elif not hasattr(self, "_prev_consistency_lap"):
+                self._prev_consistency_time = float(session_time)
+            self._prev_consistency_lap = current_lap
 
         if self._recorder and self._recorder.is_recording:
             self._recorder.push_snapshot(snap)

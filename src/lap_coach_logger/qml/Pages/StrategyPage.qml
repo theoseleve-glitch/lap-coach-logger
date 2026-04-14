@@ -1899,14 +1899,167 @@ Item {
                     width: parent.width
                     spacing: Theme.Tokens.xl
 
+                    // Consistency Score card
                     Rectangle {
-                        width: parent.width; height: 200; radius: Theme.Tokens.radiusLg
-                        color: Theme.Tokens.surface; border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Consistency analysis \u2014 coming soon"
-                            font.family: Theme.Typography.bodyFamily; font.pixelSize: Theme.Typography.bodySize
-                            color: Theme.Tokens.steel
+                        id: consistencyCard
+                        width: parent.width
+                        implicitHeight: consistencyCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+
+                        property var report: strategyVM ? strategyVM.consistencyReport : ({})
+                        property bool hasData: report && report.lap_count !== undefined && report.lap_count > 0
+
+                        Column {
+                            id: consistencyCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.Tokens.xl }
+                            spacing: Theme.Tokens.md
+
+                            Text {
+                                text: "CONSISTENCY SCORE"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Font.Bold; font.letterSpacing: 1.5
+                                color: Theme.Tokens.steel
+                            }
+
+                            // Score + progress bar
+                            Row {
+                                visible: consistencyCard.hasData
+                                spacing: Theme.Tokens.lg
+                                width: parent.width
+
+                                Text {
+                                    text: consistencyCard.report.consistency_pct !== undefined
+                                          ? Math.round(consistencyCard.report.consistency_pct) + "%"
+                                          : "--"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: 36; font.weight: Font.Bold
+                                    color: Theme.Tokens.chalk
+                                }
+
+                                Column {
+                                    spacing: 4
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    // Progress bar
+                                    Rectangle {
+                                        width: 200; height: 8; radius: 4
+                                        color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.08)
+                                        Rectangle {
+                                            width: parent.width * (consistencyCard.report.consistency_pct || 0) / 100
+                                            height: parent.height; radius: 4
+                                            color: Theme.Tokens.acidGreen
+                                        }
+                                    }
+
+                                    Text {
+                                        text: {
+                                            var r = consistencyCard.report
+                                            if (!r || !r.trend) return ""
+                                            var arrow = r.trend === "improving" ? "\u2191" : r.trend === "degrading" ? "\u2193" : "\u2192"
+                                            return arrow + " " + r.trend.charAt(0).toUpperCase() + r.trend.slice(1)
+                                        }
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: Theme.Typography.captionSize
+                                        color: {
+                                            var r = consistencyCard.report
+                                            if (!r) return Theme.Tokens.steel
+                                            if (r.trend === "improving") return Theme.Tokens.acidGreen
+                                            if (r.trend === "degrading") return Theme.Tokens.safetyRed
+                                            return Theme.Tokens.steel
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Lap stats row
+                            Row {
+                                visible: consistencyCard.hasData
+                                spacing: Theme.Tokens.xxl
+
+                                Column {
+                                    spacing: 2
+                                    Text { text: "BEST"; font.family: Theme.Typography.monoFamily; font.pixelSize: Theme.Typography.microSize; color: Theme.Tokens.steel }
+                                    Text {
+                                        text: root.formatTime(consistencyCard.report.best_lap_time_s || 0)
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 16; font.weight: Font.Bold
+                                        color: Theme.Tokens.acidGreen
+                                    }
+                                }
+                                Column {
+                                    spacing: 2
+                                    Text { text: "MEDIAN"; font.family: Theme.Typography.monoFamily; font.pixelSize: Theme.Typography.microSize; color: Theme.Tokens.steel }
+                                    Text {
+                                        text: root.formatTime(consistencyCard.report.median_lap_time_s || 0)
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 16; font.weight: Font.Bold
+                                        color: Theme.Tokens.chalk
+                                    }
+                                }
+                                Column {
+                                    spacing: 2
+                                    Text { text: "STD DEV"; font.family: Theme.Typography.monoFamily; font.pixelSize: Theme.Typography.microSize; color: Theme.Tokens.steel }
+                                    Text {
+                                        text: "\u00b1" + (consistencyCard.report.overall_std_dev_s || 0).toFixed(3) + "s"
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 16; font.weight: Font.Bold
+                                        color: Theme.Tokens.pitOrange
+                                    }
+                                }
+                                Column {
+                                    spacing: 2
+                                    Text { text: "LAPS"; font.family: Theme.Typography.monoFamily; font.pixelSize: Theme.Typography.microSize; color: Theme.Tokens.steel }
+                                    Text {
+                                        text: (consistencyCard.report.lap_count || 0).toString()
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 16; font.weight: Font.Bold
+                                        color: Theme.Tokens.chalk
+                                    }
+                                }
+                            }
+
+                            // No data state
+                            Text {
+                                visible: !consistencyCard.hasData
+                                text: "Drive at least 3 laps to see consistency analysis"
+                                font.family: Theme.Typography.bodyFamily
+                                font.pixelSize: Theme.Typography.bodySize
+                                color: Theme.Tokens.steel
+                            }
+                        }
+                    }
+
+                    // Focus recommendation card
+                    Rectangle {
+                        visible: strategyVM && strategyVM.consistencyReport && strategyVM.consistencyReport.focus_recommendation
+                        width: parent.width
+                        implicitHeight: focusCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.15)
+
+                        Column {
+                            id: focusCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.Tokens.xl }
+                            spacing: Theme.Tokens.sm
+
+                            Text {
+                                text: "FOCUS FOR NEXT 5 LAPS"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Font.Bold; font.letterSpacing: 1.5
+                                color: Theme.Tokens.pitOrange
+                            }
+
+                            Text {
+                                text: strategyVM && strategyVM.consistencyReport ? (strategyVM.consistencyReport.focus_recommendation || "") : ""
+                                font.family: Theme.Typography.bodyFamily
+                                font.pixelSize: Theme.Typography.bodySize
+                                color: Theme.Tokens.chalk
+                                wrapMode: Text.Wrap
+                                width: parent.width
+                            }
                         }
                     }
                 }
