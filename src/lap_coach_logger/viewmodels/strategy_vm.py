@@ -41,6 +41,8 @@ from lap_coach_logger.sync.schema import (
     SessionPayload,
     SyncEnvelope,
 )
+from lap_coach_logger.utils.qt_safe_slot import safe_slot
+from lap_coach_logger.utils.snapshot_validator import safe_get, validate_live
 
 log = logging.getLogger(__name__)
 
@@ -392,6 +394,7 @@ class StrategyViewModel(QObject):
 
     # -- Slots -----------------------------------------------------------------
 
+    @safe_slot()
     @Slot(str, str)
     def setTrackCar(self, track: str, car: str) -> None:  # noqa: N802
         self._track = track
@@ -400,32 +403,38 @@ class StrategyViewModel(QObject):
         self.profilesChanged.emit()
         self.stintLogChanged.emit()
 
+    @safe_slot()
     @Slot(int)
     def setTotalLaps(self, n: int) -> None:  # noqa: N802
         self._total_laps = max(0, n)
         self.planChanged.emit()
 
+    @safe_slot()
     @Slot(float)
     def setFuelCapacity(self, v: float) -> None:  # noqa: N802
         self._fuel_capacity = max(0, v)
         self.planChanged.emit()
 
+    @safe_slot()
     @Slot(float)
     def setPitTime(self, v: float) -> None:  # noqa: N802
         self._pit_time = max(0, v)
         self.planChanged.emit()
 
+    @safe_slot()
     @Slot(str)
     def setRaceMode(self, mode: str) -> None:  # noqa: N802
         if mode in ("laps", "timed"):
             self._race_mode = mode
             self.planChanged.emit()
 
+    @safe_slot()
     @Slot(float)
     def setRaceDurationHours(self, hours: float) -> None:  # noqa: N802
         self._race_duration_hours = max(0.0, hours)
         self.planChanged.emit()
 
+    @safe_slot()
     @Slot()
     def autoOptimize(self) -> None:  # noqa: N802
         if not self._profiles:
@@ -450,6 +459,7 @@ class StrategyViewModel(QObject):
         self.planChanged.emit()
         self.alertsChanged.emit()
 
+    @safe_slot()
     @Slot(str)
     def startRecording(self, compound: str) -> None:  # noqa: N802
         self._recorder = StintRecorder(
@@ -458,6 +468,7 @@ class StrategyViewModel(QObject):
         self._recorder.start(compound)
         self.recordingChanged.emit()
 
+    @safe_slot()
     @Slot()
     def stopRecording(self) -> None:  # noqa: N802
         if self._recorder and self._recorder.is_recording:
@@ -467,6 +478,7 @@ class StrategyViewModel(QObject):
             self.stintLogChanged.emit()
         self.recordingChanged.emit()
 
+    @safe_slot()
     @Slot(str)
     def excludeLoggedStint(self, stint_id: str) -> None:  # noqa: N802
         self._store.exclude_stint(stint_id)
@@ -474,6 +486,7 @@ class StrategyViewModel(QObject):
         self.profilesChanged.emit()
         self.stintLogChanged.emit()
 
+    @safe_slot()
     @Slot(str)
     def includeLoggedStint(self, stint_id: str) -> None:  # noqa: N802
         self._store.include_stint(stint_id)
@@ -481,6 +494,7 @@ class StrategyViewModel(QObject):
         self.profilesChanged.emit()
         self.stintLogChanged.emit()
 
+    @safe_slot()
     @Slot()
     def clearStints(self) -> None:  # noqa: N802
         self._store.clear(self._track, self._car)
@@ -488,6 +502,7 @@ class StrategyViewModel(QObject):
         self.profilesChanged.emit()
         self.stintLogChanged.emit()
 
+    @safe_slot()
     @Slot(result=str)
     def exportSessionJson(self) -> str:  # noqa: N802
         """Export current session snapshot to a JSON file. Returns the file path or empty string."""
@@ -625,6 +640,7 @@ class StrategyViewModel(QObject):
                 )
                 self._sync_queue.enqueue(envelope)
 
+    @safe_slot()
     @Slot(int, int)
     def editStintLaps(self, index: int, laps: int) -> None:  # noqa: N802
         if self._plan is None or index < 0 or index >= len(self._plan.stints):
@@ -642,6 +658,7 @@ class StrategyViewModel(QObject):
         )
         self.planChanged.emit()
 
+    @safe_slot()
     @Slot(str)
     def addStint(self, compound: str) -> None:  # noqa: N802
         if self._plan is None:
@@ -663,6 +680,7 @@ class StrategyViewModel(QObject):
         ))
         self.planChanged.emit()
 
+    @safe_slot()
     @Slot(int)
     def removeStint(self, index: int) -> None:  # noqa: N802
         if self._plan is None or index < 0 or index >= len(self._plan.stints):
@@ -752,6 +770,18 @@ class StrategyViewModel(QObject):
     # -- Live update -----------------------------------------------------------
 
     def update_live(self, snap: dict[str, Any]) -> None:
+        try:
+            self._update_live_impl(snap)
+        except Exception:
+            log.debug("update_live failed", exc_info=True)
+
+    def _update_live_impl(self, snap: dict[str, Any]) -> None:
+        validated = validate_live(snap)
+        if validated is None:
+            return
+        snap = validated.raw  # now guaranteed to be a real dict
+        if not snap:
+            return
         # Accumulate snapshots for data mode inspection
         self._snapshot_buffer.append(dict(snap))
         if len(self._snapshot_buffer) > self._snapshot_buffer_max:
