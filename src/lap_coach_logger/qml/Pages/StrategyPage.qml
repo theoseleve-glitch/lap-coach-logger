@@ -2062,38 +2062,316 @@ Item {
                             }
                         }
                     }
+
+                    // Active Coaching Plan card
+                    Rectangle {
+                        id: planCard
+                        property var plan: strategyVM ? strategyVM.activePlan : ({})
+                        property bool hasPlan: plan && plan.focus_area !== undefined && plan.focus_area !== ""
+                        visible: hasPlan
+
+                        width: parent.width
+                        implicitHeight: planCardCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.25)
+
+                        Column {
+                            id: planCardCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.Tokens.xl }
+                            spacing: Theme.Tokens.md
+
+                            Row {
+                                spacing: Theme.Tokens.sm
+
+                                Text {
+                                    text: "COACHING PLAN"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.microSize
+                                    font.weight: Font.Bold; font.letterSpacing: 1.5
+                                    color: Theme.Tokens.pitOrange
+                                }
+
+                                Rectangle {
+                                    visible: planCard.plan.laps_remaining !== undefined
+                                    width: lapsLbl.implicitWidth + 10; height: 16; radius: 3
+                                    color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.12)
+                                    Text {
+                                        id: lapsLbl
+                                        anchors.centerIn: parent
+                                        text: (planCard.plan.laps_remaining || 0) + " LAPS LEFT"
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 9; font.weight: Font.Bold
+                                        color: Theme.Tokens.pitOrange
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: "Focus: " + (planCard.plan.focus_area || "")
+                                font.family: Theme.Typography.bodyFamily
+                                font.pixelSize: 16; font.weight: Font.DemiBold
+                                color: Theme.Tokens.chalk
+                            }
+
+                            Text {
+                                text: planCard.plan.objective || ""
+                                font.family: Theme.Typography.bodyFamily
+                                font.pixelSize: Theme.Typography.bodySize
+                                color: Theme.Tokens.chalk
+                                wrapMode: Text.Wrap; width: parent.width
+                            }
+
+                            Text {
+                                text: "Target: " + (planCard.plan.measurable_target || "")
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.captionSize
+                                color: Theme.Tokens.acidGreen
+                                wrapMode: Text.Wrap; width: parent.width
+                            }
+
+                            Text {
+                                visible: planCard.plan.ignore_list && planCard.plan.ignore_list.length > 0
+                                text: "Ignore: " + (planCard.plan.ignore_list ? planCard.plan.ignore_list.join(", ") : "")
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.captionSize
+                                color: Theme.Tokens.steel
+                                wrapMode: Text.Wrap; width: parent.width
+                            }
+                        }
+                    }
                 }
 
+                // ================================================================
+                // PACE TAB
+                // ================================================================
                 Column {
                     visible: root.activeTabId === "pace"
                     width: parent.width
                     spacing: Theme.Tokens.xl
 
                     Rectangle {
-                        width: parent.width; height: 200; radius: Theme.Tokens.radiusLg
-                        color: Theme.Tokens.surface; border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Pace analysis \u2014 coming soon"
-                            font.family: Theme.Typography.bodyFamily; font.pixelSize: Theme.Typography.bodySize
-                            color: Theme.Tokens.steel
+                        id: paceCard
+                        property var pace: strategyVM ? strategyVM.paceBreakdown : ({})
+                        property bool hasPace: pace && pace.lap_count !== undefined && pace.lap_count > 0
+
+                        width: parent.width
+                        implicitHeight: paceCardCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+
+                        Column {
+                            id: paceCardCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.Tokens.xl }
+                            spacing: Theme.Tokens.md
+
+                            Text {
+                                text: "PACE BREAKDOWN"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Font.Bold; font.letterSpacing: 1.5
+                                color: Theme.Tokens.steel
+                            }
+
+                            Row {
+                                visible: paceCard.hasPace
+                                spacing: Theme.Tokens.xxl
+
+                                Column {
+                                    spacing: 2
+                                    Text {
+                                        text: "BEST LAP"
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: Theme.Typography.microSize
+                                        color: Theme.Tokens.steel
+                                    }
+                                    Text {
+                                        text: root.formatTime(paceCard.pace.best_lap_s || 0)
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 20; font.weight: Font.Bold
+                                        color: Theme.Tokens.chalk
+                                    }
+                                }
+                                Column {
+                                    spacing: 2
+                                    Text {
+                                        text: "THEORETICAL BEST"
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: Theme.Typography.microSize
+                                        color: Theme.Tokens.steel
+                                    }
+                                    Text {
+                                        text: root.formatTime(paceCard.pace.theoretical_best_s || 0)
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 20; font.weight: Font.Bold
+                                        color: Theme.Tokens.acidGreen
+                                    }
+                                }
+                                Column {
+                                    spacing: 2
+                                    Text {
+                                        text: "GAIN AVAILABLE"
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: Theme.Typography.microSize
+                                        color: Theme.Tokens.steel
+                                    }
+                                    Text {
+                                        text: "-" + (paceCard.pace.gain_available_s || 0).toFixed(3) + "s"
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 20; font.weight: Font.Bold
+                                        color: Theme.Tokens.pitOrange
+                                    }
+                                }
+                            }
+
+                            Text {
+                                visible: !paceCard.hasPace
+                                text: "Drive at least 3 laps to see pace breakdown"
+                                font.family: Theme.Typography.bodyFamily
+                                font.pixelSize: Theme.Typography.bodySize
+                                color: Theme.Tokens.steel
+                            }
                         }
                     }
                 }
 
+                // ================================================================
+                // READINESS TAB
+                // ================================================================
                 Column {
                     visible: root.activeTabId === "readiness"
                     width: parent.width
                     spacing: Theme.Tokens.xl
 
                     Rectangle {
-                        width: parent.width; height: 200; radius: Theme.Tokens.radiusLg
-                        color: Theme.Tokens.surface; border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Readiness analysis \u2014 coming soon"
-                            font.family: Theme.Typography.bodyFamily; font.pixelSize: Theme.Typography.bodySize
-                            color: Theme.Tokens.steel
+                        id: readyCard
+                        property var ready: strategyVM ? strategyVM.readinessState : ({})
+                        property bool hasReady: ready && ready.state !== undefined && ready.lap_count > 0
+
+                        width: parent.width
+                        implicitHeight: readyCardCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: {
+                            if (!readyCard.hasReady || !readyCard.ready) return Theme.Tokens.subtle(Theme.Tokens.chalk)
+                            if (readyCard.ready.state === "ready") return Theme.Tokens.subtle(Theme.Tokens.acidGreen, 0.4)
+                            if (readyCard.ready.state === "almost") return Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.4)
+                            return Theme.Tokens.subtle(Theme.Tokens.safetyRed, 0.25)
+                        }
+
+                        Column {
+                            id: readyCardCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.Tokens.xl }
+                            spacing: Theme.Tokens.md
+
+                            Text {
+                                text: "RACE READINESS"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Font.Bold; font.letterSpacing: 1.5
+                                color: Theme.Tokens.steel
+                            }
+
+                            // Big state label
+                            Text {
+                                visible: readyCard.hasReady
+                                text: (readyCard.ready.state || "").toUpperCase().replace("_", " ")
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: 36; font.weight: Font.Bold
+                                color: {
+                                    if (!readyCard.ready) return Theme.Tokens.chalk
+                                    if (readyCard.ready.state === "ready") return Theme.Tokens.acidGreen
+                                    if (readyCard.ready.state === "almost") return Theme.Tokens.marshalYellow
+                                    return Theme.Tokens.safetyRed
+                                }
+                            }
+
+                            // Check indicators
+                            Column {
+                                visible: readyCard.hasReady
+                                spacing: 6
+
+                                Row {
+                                    spacing: 8
+                                    Text {
+                                        text: readyCard.ready.consistency_ok ? "\u2713" : "\u2717"
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 14; font.weight: Font.Bold
+                                        color: readyCard.ready.consistency_ok ? Theme.Tokens.acidGreen : Theme.Tokens.safetyRed
+                                    }
+                                    Text {
+                                        text: "Consistency"
+                                        font.family: Theme.Typography.bodyFamily
+                                        font.pixelSize: Theme.Typography.bodySize
+                                        color: Theme.Tokens.chalk
+                                    }
+                                }
+                                Row {
+                                    spacing: 8
+                                    Text {
+                                        text: readyCard.ready.variance_stable ? "\u2713" : "\u2717"
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 14; font.weight: Font.Bold
+                                        color: readyCard.ready.variance_stable ? Theme.Tokens.acidGreen : Theme.Tokens.safetyRed
+                                    }
+                                    Text {
+                                        text: "Sector variance stable"
+                                        font.family: Theme.Typography.bodyFamily
+                                        font.pixelSize: Theme.Typography.bodySize
+                                        color: Theme.Tokens.chalk
+                                    }
+                                }
+                                Row {
+                                    spacing: 8
+                                    Text {
+                                        text: readyCard.ready.trend_ok ? "\u2713" : "\u2717"
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 14; font.weight: Font.Bold
+                                        color: readyCard.ready.trend_ok ? Theme.Tokens.acidGreen : Theme.Tokens.safetyRed
+                                    }
+                                    Text {
+                                        text: "Trend not degrading"
+                                        font.family: Theme.Typography.bodyFamily
+                                        font.pixelSize: Theme.Typography.bodySize
+                                        color: Theme.Tokens.chalk
+                                    }
+                                }
+                                Row {
+                                    spacing: 8
+                                    Text {
+                                        text: readyCard.ready.no_outlier_corners ? "\u2713" : "\u2717"
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 14; font.weight: Font.Bold
+                                        color: readyCard.ready.no_outlier_corners ? Theme.Tokens.acidGreen : Theme.Tokens.safetyRed
+                                    }
+                                    Text {
+                                        text: "No outlier corners"
+                                        font.family: Theme.Typography.bodyFamily
+                                        font.pixelSize: Theme.Typography.bodySize
+                                        color: Theme.Tokens.chalk
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: (readyCard.ready && readyCard.ready.reason) || ""
+                                font.family: Theme.Typography.bodyFamily
+                                font.pixelSize: Theme.Typography.captionSize
+                                color: Theme.Tokens.steel
+                                wrapMode: Text.Wrap; width: parent.width
+                            }
+
+                            Text {
+                                visible: !readyCard.hasReady
+                                text: "Drive more laps to assess race readiness"
+                                font.family: Theme.Typography.bodyFamily
+                                font.pixelSize: Theme.Typography.bodySize
+                                color: Theme.Tokens.steel
+                            }
                         }
                     }
                 }

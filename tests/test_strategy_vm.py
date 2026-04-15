@@ -162,6 +162,15 @@ def test_vm_current_mode_property(tmp_path: Path) -> None:
     assert vm.currentMode == "endurance"
 
 
+def test_vm_metric_states_initially_unavailable(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    states = vm.metricStates
+    assert states["fuel_capacity"] == "unavailable"
+    assert states["total_laps"] == "unavailable"
+    assert states["fuel_per_lap"] == "unavailable"
+
+
 def test_vm_autoOptimize_timed_race_produces_plan(tmp_path: Path) -> None:
     store = StintStore(tmp_path / "stints.json")
     store.log_stint("Monza", "GT3", StintRecord(
@@ -178,3 +187,17 @@ def test_vm_autoOptimize_timed_race_produces_plan(tmp_path: Path) -> None:
     vm.setRaceDurationHours(1.0)
     vm.autoOptimize()
     assert len(vm.racePlan) >= 1
+
+
+def test_vm_active_plan_empty_without_data(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    assert vm.activePlan == {}
+
+
+def test_vm_readiness_empty_without_data(tmp_path: Path) -> None:
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    state = vm.readinessState
+    assert "state" in state
+    assert state["state"] == "not_ready"

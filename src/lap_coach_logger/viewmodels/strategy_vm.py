@@ -6,6 +6,9 @@ from typing import Any
 
 from PySide6.QtCore import QObject, Property, Signal, Slot
 
+from lap_coach_logger.coaching.plan_engine import CoachingPlan, generate_plan
+from lap_coach_logger.coaching.plan_evaluator import PlanResult, evaluate_plan
+from lap_coach_logger.coaching.readiness import assess_readiness
 from lap_coach_logger.core.consistency_analyzer import ConsistencyReport, analyze_consistency
 from lap_coach_logger.core.metric_state import MetricState, classify_metric
 from lap_coach_logger.core.practice_readiness import (
@@ -60,6 +63,10 @@ class StrategyViewModel(QObject):
         self._lap_times_buffer: list[float] = []
         self._prev_consistency_lap = 0
         self._prev_consistency_time: float | None = None
+        self._active_plan: CoachingPlan | None = None
+        self._last_plan_result: PlanResult | None = None
+        self._laps_since_plan: int = 0
+        self._pre_plan_lap_times: list[float] = []
 
     # -- QML properties --------------------------------------------------------
 
@@ -233,6 +240,73 @@ class StrategyViewModel(QObject):
             return {}
         return report.to_dict()
 
+    @Property("QVariant", notify=profilesChanged)
+    def activePlan(self) -> dict:  # noqa: N802
+        """Current coaching focus plan with measurable target."""
+        if self._active_plan is None:
+            return {}
+        return {
+            "focus_area": self._active_plan.focus_area,
+            "objective": self._active_plan.objective,
+            "measurable_target": self._active_plan.measurable_target,
+            "ignore_list": list(self._active_plan.ignore_list),
+            "evaluation_window": self._active_plan.evaluation_window,
+            "confidence": self._active_plan.confidence.value,
+            "reason": self._active_plan.reason,
+            "laps_remaining": max(
+                0, self._active_plan.evaluation_window - self._laps_since_plan
+            ),
+        }
+
+    @Property("QVariant", notify=profilesChanged)
+    def planResult(self) -> dict:  # noqa: N802
+        """Result of the most recently evaluated plan."""
+        if self._last_plan_result is None:
+            return {}
+        return {
+            "success": self._last_plan_result.success,
+            "delta_vs_target": self._last_plan_result.delta_vs_target,
+            "updated_std_dev": self._last_plan_result.updated_std_dev,
+            "next_action": self._last_plan_result.next_action,
+            "confidence": self._last_plan_result.confidence.value,
+            "reason": self._last_plan_result.reason,
+        }
+
+    @Property("QVariant", notify=profilesChanged)
+    def readinessState(self) -> dict:  # noqa: N802
+        """Race readiness assessment based on consistency."""
+        report = analyze_consistency(self._lap_times_buffer)
+        output = assess_readiness(report)
+        assessment = output.value
+        return {
+            "state": assessment.state.value,
+            "consistency_ok": assessment.consistency_ok,
+            "variance_stable": assessment.variance_stable,
+            "trend_ok": assessment.trend_ok,
+            "no_outlier_corners": assessment.no_outlier_corners,
+            "lap_count": assessment.lap_count,
+            "confidence": output.confidence.value,
+            "reason": output.reason,
+        }
+
+    @Property("QVariant", notify=profilesChanged)
+    def paceBreakdown(self) -> dict:  # noqa: N802
+        """Theoretical best and per-sector gains from consistency report."""
+        report = analyze_consistency(self._lap_times_buffer)
+        if report is None:
+            return {}
+        return {
+            "best_lap_s": round(report.best_lap_time_s, 3),
+            "median_lap_s": round(report.median_lap_time_s, 3),
+            "theoretical_best_s": round(report.theoretical_best_s, 3),
+            "gain_available_s": round(
+                report.best_lap_time_s - report.theoretical_best_s, 3
+            ),
+            "per_sector_std_dev": [round(s, 3) for s in report.per_sector_std_dev],
+            "worst_sector": report.worst_sector,
+            "lap_count": report.lap_count,
+        }
+
     @Property(str, notify=planChanged)
     def currentMode(self) -> str:  # noqa: N802
         return self._mode
@@ -364,6 +438,10 @@ class StrategyViewModel(QObject):
         self._lap_times_buffer = []
         self._prev_consistency_lap = 0
         self._prev_consistency_time = None
+        self._active_plan = None
+        self._last_plan_result = None
+        self._laps_since_plan = 0
+        self._pre_plan_lap_times = []
         if session_type.lower() in self._AUTO_RECORD_SESSIONS:
             self._recorder = StintRecorder(
                 store=self._store, track=self._track, car=self._car,
@@ -439,6 +517,57 @@ class StrategyViewModel(QObject):
         self._plan.stints.pop(index)
         self.planChanged.emit()
 
+    # -- Coaching loop ---------------------------------------------------------
+
+    def _maybe_update_coaching_plan(self) -> None:
+        """Generate a new plan or evaluate an existing one based on lap progress."""
+        report = analyze_consistency(self._lap_times_buffer)
+        if report is None:
+            return
+
+        # If we have an active plan, check if evaluation window elapsed
+        if (
+            self._active_plan is not None
+            and self._laps_since_plan >= self._active_plan.evaluation_window
+        ):
+            post_laps = self._lap_times_buffer[-self._active_plan.evaluation_window:]
+            if len(self._pre_plan_lap_times) >= self._active_plan.evaluation_window:
+                pre_laps = self._pre_plan_lap_times[-self._active_plan.evaluation_window:]
+            else:
+                pre_laps = self._pre_plan_lap_times
+            if pre_laps:
+                result_output = evaluate_plan(self._active_plan, pre_laps, post_laps)
+                self._last_plan_result = result_output.value
+                plan_output = generate_plan(
+                    report, len(self._lap_times_buffer), self._last_plan_result,
+                )
+            else:
+                plan_output = generate_plan(
+                    report, len(self._lap_times_buffer), None,
+                )
+        else:
+            # No active plan or still evaluating — generate/refresh
+            plan_output = generate_plan(
+                report, len(self._lap_times_buffer), self._last_plan_result,
+            )
+
+        # Update active plan if we got a fresh one
+        new_plan = (
+            plan_output.value
+            if plan_output.value is not None
+            and hasattr(plan_output.value, "focus_area")
+            else None
+        )
+        if new_plan is not None and (
+            self._active_plan is None
+            or new_plan.focus_area != self._active_plan.focus_area
+        ):
+            self._active_plan = new_plan
+            self._pre_plan_lap_times = list(self._lap_times_buffer)
+            self._laps_since_plan = 0
+        else:
+            self._laps_since_plan += 1
+
     # -- Weather ---------------------------------------------------------------
 
     def set_weather_conditions(self, conditions: list[ConditionWindow]) -> None:
@@ -484,6 +613,7 @@ class StrategyViewModel(QObject):
                     lap_time = float(session_time) - self._prev_consistency_time
                     if 20 < lap_time < 600:
                         self._lap_times_buffer.append(lap_time)
+                        self._maybe_update_coaching_plan()
                         self.profilesChanged.emit()
                 self._prev_consistency_time = float(session_time)
             elif not hasattr(self, "_prev_consistency_lap"):
