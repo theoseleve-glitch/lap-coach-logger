@@ -201,3 +201,40 @@ def test_vm_readiness_empty_without_data(tmp_path: Path) -> None:
     state = vm.readinessState
     assert "state" in state
     assert state["state"] == "not_ready"
+
+
+# ---------------------------------------------------------------------------
+# Sync queue wiring -- INT-2
+# ---------------------------------------------------------------------------
+
+def test_vm_enqueues_session_payload_on_detection(tmp_path: Path) -> None:
+    from lap_coach_logger.sync.queue import SyncQueue
+    store = StintStore(tmp_path / "stints.json")
+    queue = SyncQueue(tmp_path)
+    vm = StrategyViewModel(store=store)
+    vm.set_sync_queue(queue)
+    vm.on_session_detected("practice", "Monza", "GT3")
+    assert queue.depth >= 1
+
+
+def test_vm_enqueues_session_end_payload(tmp_path: Path) -> None:
+    from lap_coach_logger.sync.queue import SyncQueue
+    store = StintStore(tmp_path / "stints.json")
+    queue = SyncQueue(tmp_path)
+    vm = StrategyViewModel(store=store)
+    vm.set_sync_queue(queue)
+    vm.on_session_detected("practice", "Monza", "GT3")
+    depth_before = queue.depth
+    vm.on_session_ended()
+    assert queue.depth > depth_before
+
+
+def test_vm_sync_status_reports_queue_depth(tmp_path: Path) -> None:
+    from lap_coach_logger.sync.queue import SyncQueue
+    store = StintStore(tmp_path / "stints.json")
+    queue = SyncQueue(tmp_path)
+    vm = StrategyViewModel(store=store)
+    vm.set_sync_queue(queue)
+    status = vm.syncStatus
+    assert status["enabled"] is True
+    assert status["queue_depth"] == 0

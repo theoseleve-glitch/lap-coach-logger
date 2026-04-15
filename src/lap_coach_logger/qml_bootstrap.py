@@ -35,6 +35,8 @@ from lap_coach_logger.viewmodels.mode_vm import ModeViewModel
 from lap_coach_logger.viewmodels.strategy_vm import StrategyViewModel
 from lap_coach_logger.viewmodels.tray_vm import TrayViewModel
 from lap_coach_logger.core.stint_store import StintStore
+from lap_coach_logger.sync.client import SyncClient
+from lap_coach_logger.sync.queue import SyncQueue
 from lap_coach_logger.utils.paths import runtime_dir
 
 if TYPE_CHECKING:
@@ -105,6 +107,25 @@ def build_view_models(service: DesktopService) -> dict:
     service.snapshot_changed.connect(
         lambda payload: strategy_vm.update_live(payload.get("live", {}) if isinstance(payload, dict) else {})
     )
+
+    # -- Sync wiring: queue feeds events, client drains them over HTTP ---------
+    sync_queue = SyncQueue(runtime_dir())
+    strategy_vm.set_sync_queue(sync_queue)
+
+    sync_client: SyncClient | None = None
+    sync_cfg = getattr(service.config, "sync", None)
+    if (
+        sync_cfg is not None
+        and getattr(sync_cfg, "enabled", False)
+        and getattr(sync_cfg, "api_url", "")
+    ):
+        sync_client = SyncClient(
+            queue=sync_queue,
+            api_url=sync_cfg.api_url,
+            device_token=getattr(sync_cfg, "device_token", ""),
+        )
+        sync_client.start()
+        service._sync_client = sync_client  # keep alive for lifecycle
 
     # -- Wire mode changes to strategy VM and overlay defaults ------------------
     mode_vm.modeChanged.connect(lambda: strategy_vm.set_mode(mode_vm.activeMode))

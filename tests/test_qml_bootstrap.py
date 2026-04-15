@@ -35,6 +35,10 @@ def _make_service_mock() -> MagicMock:
     svc.settings_failed = _FakeSignalInstance()
     svc.action_message = _FakeSignalInstance()
     svc.action_failed = _FakeSignalInstance()
+    # Disable sync by default so tests do not spawn background threads.
+    svc.config.sync.enabled = False
+    svc.config.sync.api_url = ""
+    svc.config.sync.device_token = ""
     svc.settings_snapshot.return_value = {
         "output_dir": "C:/sessions",
         "sample_rate_hz": 10.0,

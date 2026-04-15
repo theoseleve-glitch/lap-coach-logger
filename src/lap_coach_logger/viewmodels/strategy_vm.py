@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from PySide6.QtCore import QObject, Property, Signal, Slot
@@ -27,6 +29,14 @@ from lap_coach_logger.core.race_strategy import (
 from lap_coach_logger.core.stint_recorder import StintRecorder
 from lap_coach_logger.core.stint_store import CompoundProfile, StintStore
 from lap_coach_logger.core.strategy_models import PitProfile  # noqa: F401
+from lap_coach_logger.sync.queue import SyncQueue
+from lap_coach_logger.sync.schema import (
+    CoachingPayload,
+    EventPayload,
+    LapPayload,
+    SessionPayload,
+    SyncEnvelope,
+)
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +77,17 @@ class StrategyViewModel(QObject):
         self._last_plan_result: PlanResult | None = None
         self._laps_since_plan: int = 0
         self._pre_plan_lap_times: list[float] = []
+        # -- Sync wiring -------------------------------------------------------
+        self._sync_queue: SyncQueue | None = None
+        self._session_id: str = ""
+        self._session_started_at: str = ""
+        self._last_synced_lap: int = 0
+
+    # -- Sync setter (called from bootstrap wiring) ---------------------------
+
+    def set_sync_queue(self, queue: SyncQueue) -> None:
+        """Inject the sync queue. Not a Slot -- called once at startup."""
+        self._sync_queue = queue
 
     # -- QML properties --------------------------------------------------------
 
@@ -307,6 +328,17 @@ class StrategyViewModel(QObject):
             "lap_count": report.lap_count,
         }
 
+    @Property("QVariant", notify=profilesChanged)
+    def syncStatus(self) -> dict:  # noqa: N802
+        """Sync queue depth and state for UI display."""
+        if self._sync_queue is None:
+            return {"enabled": False, "queue_depth": 0, "session_id": ""}
+        return {
+            "enabled": True,
+            "queue_depth": self._sync_queue.depth,
+            "session_id": self._session_id,
+        }
+
     @Property(str, notify=planChanged)
     def currentMode(self) -> str:  # noqa: N802
         return self._mode
@@ -442,6 +474,30 @@ class StrategyViewModel(QObject):
         self._last_plan_result = None
         self._laps_since_plan = 0
         self._pre_plan_lap_times = []
+
+        # Generate a new session_id and enqueue a SessionPayload
+        self._session_id = str(uuid.uuid4())
+        self._session_started_at = datetime.now(timezone.utc).isoformat()
+        self._last_synced_lap = 0
+
+        if self._sync_queue is not None:
+            payload = SessionPayload(
+                session_id=self._session_id,
+                sim="unknown",  # enriched by the adapter layer once known
+                track=track,
+                car=car,
+                mode=self._mode,
+                start_time=self._session_started_at,
+                end_time="",
+            )
+            # validate() returns [] when valid -- use "if not payload.validate()"
+            if not payload.validate():
+                envelope = SyncEnvelope(
+                    payload_type="session",
+                    payload=payload.to_dict(),
+                )
+                self._sync_queue.enqueue(envelope)
+
         if session_type.lower() in self._AUTO_RECORD_SESSIONS:
             self._recorder = StintRecorder(
                 store=self._store, track=self._track, car=self._car,
@@ -462,6 +518,21 @@ class StrategyViewModel(QObject):
         self._recorder.start(compound="unknown")
         self.recordingChanged.emit()
 
+        # Emit pit_stop EventPayload
+        if self._sync_queue is not None and self._session_id:
+            event_payload = EventPayload(
+                session_id=self._session_id,
+                event_type="pit_stop",
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                payload={"lap_number": self._prev_consistency_lap},
+            )
+            if not event_payload.validate():
+                envelope = SyncEnvelope(
+                    payload_type="event",
+                    payload=event_payload.to_dict(),
+                )
+                self._sync_queue.enqueue(envelope)
+
     def on_session_ended(self) -> None:
         """Called when the session ends."""
         if self._recorder and self._recorder.is_recording:
@@ -471,6 +542,24 @@ class StrategyViewModel(QObject):
             self.stintLogChanged.emit()
         self._recorder = None
         self.recordingChanged.emit()
+
+        # Emit final SessionPayload with end_time
+        if self._sync_queue is not None and self._session_id:
+            payload = SessionPayload(
+                session_id=self._session_id,
+                sim="unknown",
+                track=self._track,
+                car=self._car,
+                mode=self._mode,
+                start_time=self._session_started_at,
+                end_time=datetime.now(timezone.utc).isoformat(),
+            )
+            if not payload.validate():
+                envelope = SyncEnvelope(
+                    payload_type="session_end",
+                    payload=payload.to_dict(),
+                )
+                self._sync_queue.enqueue(envelope)
 
     @Slot(int, int)
     def editStintLaps(self, index: int, laps: int) -> None:  # noqa: N802
@@ -565,6 +654,28 @@ class StrategyViewModel(QObject):
             self._active_plan = new_plan
             self._pre_plan_lap_times = list(self._lap_times_buffer)
             self._laps_since_plan = 0
+
+            # Emit CoachingPayload whenever the active plan changes
+            if (
+                self._sync_queue is not None
+                and self._session_id
+                and self._active_plan is not None
+            ):
+                if report is not None:
+                    coaching_payload = CoachingPayload(
+                        session_id=self._session_id,
+                        consistency_score=report.consistency_pct,
+                        trend=report.trend,
+                        focus_area=self._active_plan.focus_area,
+                        recommendation=self._active_plan.objective,
+                        confidence=self._active_plan.confidence.value,
+                    )
+                    if not coaching_payload.validate():
+                        envelope = SyncEnvelope(
+                            payload_type="coaching",
+                            payload=coaching_payload.to_dict(),
+                        )
+                        self._sync_queue.enqueue(envelope)
         else:
             self._laps_since_plan += 1
 
@@ -613,6 +724,27 @@ class StrategyViewModel(QObject):
                     lap_time = float(session_time) - self._prev_consistency_time
                     if 20 < lap_time < 600:
                         self._lap_times_buffer.append(lap_time)
+
+                        # Emit LapPayload for the lap that just completed
+                        if self._sync_queue is not None and self._session_id:
+                            lap_payload = LapPayload(
+                                session_id=self._session_id,
+                                lap_number=self._prev_consistency_lap,
+                                lap_time_s=lap_time,
+                                valid=True,  # detailed validity flag comes later
+                                fuel_used_l=0.0,  # populated when fuel delta is tracked
+                                sector_times_s=[],
+                                consistency_pct=None,
+                                std_dev_s=None,
+                            )
+                            if not lap_payload.validate():
+                                envelope = SyncEnvelope(
+                                    payload_type="lap",
+                                    payload=lap_payload.to_dict(),
+                                )
+                                self._sync_queue.enqueue(envelope)
+                                self._last_synced_lap = self._prev_consistency_lap
+
                         self._maybe_update_coaching_plan()
                         self.profilesChanged.emit()
                 self._prev_consistency_time = float(session_time)
