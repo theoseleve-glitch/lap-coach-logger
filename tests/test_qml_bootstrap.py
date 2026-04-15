@@ -62,12 +62,15 @@ class TestBuildViewModelsKeys:
 
     def test_returns_all_keys(self) -> None:
         vms = build_view_models(_make_service_mock())
-        expected = {"service", "session", "history", "review", "settings", "overlay", "onboarding", "mode", "strategy"}
+        expected = {
+            "service", "session", "history", "review", "settings", "overlay",
+            "onboarding", "mode", "strategy", "syncStatus",
+        }
         assert set(vms.keys()) == expected
 
     def test_returns_expected_entry_count(self) -> None:
         vms = build_view_models(_make_service_mock())
-        assert len(vms) == 9
+        assert len(vms) == 10
 
 
 # ---------------------------------------------------------------------------

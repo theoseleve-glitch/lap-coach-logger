@@ -35,9 +35,11 @@ from lap_coach_logger.viewmodels.mode_vm import ModeViewModel
 from lap_coach_logger.viewmodels.strategy_vm import StrategyViewModel
 from lap_coach_logger.viewmodels.tray_vm import TrayViewModel
 from lap_coach_logger.core.stint_store import StintStore
-from lap_coach_logger.sync.client import SyncClient
+from lap_coach_logger.sync.client import SyncClient, build_sync_client
+from lap_coach_logger.sync.failure_store import SyncFailureStore
 from lap_coach_logger.sync.queue import SyncQueue
 from lap_coach_logger.utils.paths import runtime_dir
+from lap_coach_logger.viewmodels.sync_status_vm import SyncStatusViewModel
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -110,6 +112,7 @@ def build_view_models(service: DesktopService) -> dict:
 
     # -- Sync wiring: queue feeds events, client drains them over HTTP ---------
     sync_queue = SyncQueue(runtime_dir())
+    sync_failures = SyncFailureStore(runtime_dir())
     strategy_vm.set_sync_queue(sync_queue)
 
     sync_client: SyncClient | None = None
@@ -119,13 +122,19 @@ def build_view_models(service: DesktopService) -> dict:
         and getattr(sync_cfg, "enabled", False)
         and getattr(sync_cfg, "api_url", "")
     ):
-        sync_client = SyncClient(
+        sync_client = build_sync_client(
             queue=sync_queue,
-            api_url=sync_cfg.api_url,
+            failure_store=sync_failures,
+            base_url=sync_cfg.api_url,
             device_token=getattr(sync_cfg, "device_token", ""),
+            api_key=getattr(sync_cfg, "api_key", "")
+            if hasattr(sync_cfg, "api_key")
+            else "",
         )
         sync_client.start()
         service._sync_client = sync_client  # keep alive for lifecycle
+
+    sync_status_vm = SyncStatusViewModel(client=sync_client)
 
     # -- Wire mode changes to strategy VM and overlay defaults ------------------
     mode_vm.modeChanged.connect(lambda: strategy_vm.set_mode(mode_vm.activeMode))
@@ -141,6 +150,7 @@ def build_view_models(service: DesktopService) -> dict:
         "onboarding": onboarding_vm,
         "mode": mode_vm,
         "strategy": strategy_vm,
+        "syncStatus": sync_status_vm,
     }
 
 

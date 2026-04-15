@@ -128,16 +128,19 @@ def _mock_service() -> MagicMock:
 # ---------------------------------------------------------------------------
 
 class TestAllViewModelsInstantiate:
-    """build_view_models must return all 8 VMs with correct types."""
+    """build_view_models must return all VMs with correct types."""
 
     def test_returns_all_nine_keys(self) -> None:
         vms = build_view_models(_mock_service())
-        expected = {"service", "session", "history", "review", "settings", "overlay", "onboarding", "mode", "strategy"}
+        expected = {
+            "service", "session", "history", "review", "settings", "overlay",
+            "onboarding", "mode", "strategy", "syncStatus",
+        }
         assert set(vms.keys()) == expected
 
     def test_returns_exactly_nine_entries(self) -> None:
         vms = build_view_models(_mock_service())
-        assert len(vms) == 9
+        assert len(vms) == 10
 
     def test_service_vm_type(self) -> None:
         vms = build_view_models(_mock_service())
