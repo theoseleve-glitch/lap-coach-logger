@@ -238,3 +238,42 @@ def test_vm_sync_status_reports_queue_depth(tmp_path: Path) -> None:
     status = vm.syncStatus
     assert status["enabled"] is True
     assert status["queue_depth"] == 0
+
+
+def test_vm_data_inspection_empty_initially(tmp_path):
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    inspection = vm.dataInspection
+    assert inspection["total_samples"] == 0
+    assert inspection["overall_quality"] == "poor"
+
+
+def test_vm_has_data_inspection_false_initially(tmp_path):
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    assert vm.hasDataInspection is False
+
+
+def test_vm_accumulates_snapshots_for_inspection(tmp_path):
+    store = StintStore(tmp_path / "stints.json")
+    vm = StrategyViewModel(store=store)
+    for i in range(10):
+        snap = {
+            "lap_number": 1,
+            "fuel_level": 50.0 - i * 0.1,
+            "session_time_s": i * 0.1,
+            "speed_kph": 200.0,
+            "tyre_temp_lf": 85.0,
+            "tyre_temp_rf": 85.0,
+            "tyre_temp_lr": 85.0,
+            "tyre_temp_rr": 85.0,
+            "track_temp_c": 30.0,
+            "air_temp_c": 22.0,
+            "throttle_pct": 0.8,
+            "brake_pct": 0.0,
+            "is_in_pits": False,
+        }
+        vm.update_live(snap)
+    assert vm.hasDataInspection is True
+    inspection = vm.dataInspection
+    assert inspection["total_samples"] == 10

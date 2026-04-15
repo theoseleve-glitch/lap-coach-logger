@@ -13,6 +13,10 @@ from lap_coach_logger.coaching.plan_evaluator import PlanResult, evaluate_plan
 from lap_coach_logger.coaching.readiness import assess_readiness
 from lap_coach_logger.core.consistency_analyzer import ConsistencyReport, analyze_consistency
 from lap_coach_logger.core.metric_state import MetricState, classify_metric
+from lap_coach_logger.data_mode.inspector import (
+    InspectionReport,
+    inspect_channels,
+)
 from lap_coach_logger.core.practice_readiness import (
     compute_nudges,
     compute_race_statistics,
@@ -82,6 +86,11 @@ class StrategyViewModel(QObject):
         self._session_id: str = ""
         self._session_started_at: str = ""
         self._last_synced_lap: int = 0
+        # -- Data mode inspection buffer --------------------------------------
+        self._snapshot_buffer: list[dict] = []
+        self._snapshot_buffer_max = 500  # rolling window for inspection
+        self._sample_rate_hz: float = 0.0
+        self._last_snapshot_time: float | None = None
 
     # -- Sync setter (called from bootstrap wiring) ---------------------------
 
@@ -339,6 +348,27 @@ class StrategyViewModel(QObject):
             "session_id": self._session_id,
         }
 
+    @Property("QVariant", notify=profilesChanged)
+    def dataInspection(self) -> dict:  # noqa: N802
+        """Full channel inspection report for Data mode."""
+        if not self._snapshot_buffer:
+            return {
+                "channels": [],
+                "total_samples": 0,
+                "sample_rate_hz": 0.0,
+                "available_count": 0,
+                "estimated_count": 0,
+                "unavailable_count": 0,
+                "warnings": ["No telemetry data yet"],
+                "overall_quality": "poor",
+            }
+        report = inspect_channels(self._snapshot_buffer, self._sample_rate_hz)
+        return report.to_dict()
+
+    @Property(bool, notify=profilesChanged)
+    def hasDataInspection(self) -> bool:  # noqa: N802
+        return len(self._snapshot_buffer) > 0
+
     @Property(str, notify=planChanged)
     def currentMode(self) -> str:  # noqa: N802
         return self._mode
@@ -458,6 +488,37 @@ class StrategyViewModel(QObject):
         self.profilesChanged.emit()
         self.stintLogChanged.emit()
 
+    @Slot(result=str)
+    def exportSessionJson(self) -> str:  # noqa: N802
+        """Export current session snapshot to a JSON file. Returns the file path or empty string."""
+        import json
+        from datetime import datetime, timezone
+        from pathlib import Path
+        from lap_coach_logger.utils.paths import default_output_dir
+
+        try:
+            ts = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+            filename = f"data_export_{ts}.json"
+            out_path = default_output_dir() / filename
+            payload = {
+                "exported_at": datetime.now(timezone.utc).isoformat(),
+                "track": self._track,
+                "car": self._car,
+                "mode": self._mode,
+                "session_id": getattr(self, "_session_id", ""),
+                "sample_count": len(self._snapshot_buffer),
+                "sample_rate_hz": self._sample_rate_hz,
+                "lap_times_s": list(self._lap_times_buffer),
+                "inspection": self.dataInspection,
+                "sync_status": self.syncStatus if hasattr(self, "syncStatus") else {},
+            }
+            out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            log.info("Exported session data to %s", out_path)
+            return str(out_path)
+        except Exception:
+            log.exception("Failed to export session JSON")
+            return ""
+
     # -- Auto-capture lifecycle ------------------------------------------------
 
     _AUTO_RECORD_SESSIONS = frozenset({
@@ -474,6 +535,9 @@ class StrategyViewModel(QObject):
         self._last_plan_result = None
         self._laps_since_plan = 0
         self._pre_plan_lap_times = []
+        self._snapshot_buffer = []
+        self._sample_rate_hz = 0.0
+        self._last_snapshot_time = None
 
         # Generate a new session_id and enqueue a SessionPayload
         self._session_id = str(uuid.uuid4())
@@ -688,6 +752,33 @@ class StrategyViewModel(QObject):
     # -- Live update -----------------------------------------------------------
 
     def update_live(self, snap: dict[str, Any]) -> None:
+        # Accumulate snapshots for data mode inspection
+        self._snapshot_buffer.append(dict(snap))
+        if len(self._snapshot_buffer) > self._snapshot_buffer_max:
+            self._snapshot_buffer = self._snapshot_buffer[-self._snapshot_buffer_max:]
+
+        # Estimate sample rate from session_time_s deltas
+        t = snap.get("session_time_s")
+        if t is not None and self._last_snapshot_time is not None:
+            try:
+                dt = float(t) - self._last_snapshot_time
+                if 0 < dt < 1.0:  # plausible sample interval
+                    instant_hz = 1.0 / dt
+                    # Exponential moving average for stability
+                    if self._sample_rate_hz == 0:
+                        self._sample_rate_hz = instant_hz
+                    else:
+                        self._sample_rate_hz = (
+                            self._sample_rate_hz * 0.9 + instant_hz * 0.1
+                        )
+            except (ValueError, TypeError):
+                pass
+        if t is not None:
+            try:
+                self._last_snapshot_time = float(t)
+            except (ValueError, TypeError):
+                pass
+
         # Auto-detect fuel capacity from telemetry
         if self._fuel_capacity <= 0:
             fuel_cap = snap.get("fuel_capacity")

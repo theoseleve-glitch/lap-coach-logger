@@ -2377,38 +2377,402 @@ Item {
                 }
 
                 // ================================================================
-                // DATA PLACEHOLDERS
+                // DATA MODE — TELEMETRY TAB
                 // ================================================================
                 Column {
                     visible: root.activeTabId === "telemetry"
                     width: parent.width
                     spacing: Theme.Tokens.xl
 
+                    // Overall quality card
                     Rectangle {
-                        width: parent.width; height: 200; radius: Theme.Tokens.radiusLg
-                        color: Theme.Tokens.surface; border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Telemetry view \u2014 coming soon"
-                            font.family: Theme.Typography.bodyFamily; font.pixelSize: Theme.Typography.bodySize
-                            color: Theme.Tokens.steel
+                        id: qualityCard
+                        property var inspection: strategyVM ? strategyVM.dataInspection : ({})
+                        property bool hasData: strategyVM ? strategyVM.hasDataInspection : false
+
+                        width: parent.width
+                        implicitHeight: qualityCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: {
+                            if (!qualityCard.hasData) return Theme.Tokens.subtle(Theme.Tokens.chalk)
+                            var q = qualityCard.inspection.overall_quality
+                            if (q === "good") return Theme.Tokens.subtle(Theme.Tokens.acidGreen, 0.3)
+                            if (q === "degraded") return Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.3)
+                            return Theme.Tokens.subtle(Theme.Tokens.safetyRed, 0.25)
+                        }
+
+                        Column {
+                            id: qualityCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.Tokens.xl }
+                            spacing: Theme.Tokens.md
+
+                            Text {
+                                text: "DATA QUALITY"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Font.Bold; font.letterSpacing: 1.5
+                                color: Theme.Tokens.steel
+                            }
+
+                            Row {
+                                visible: qualityCard.hasData
+                                spacing: Theme.Tokens.xxl
+
+                                Column {
+                                    spacing: 2
+                                    Text { text: "OVERALL"; font.family: Theme.Typography.monoFamily; font.pixelSize: Theme.Typography.microSize; color: Theme.Tokens.steel }
+                                    Text {
+                                        text: (qualityCard.inspection.overall_quality || "").toUpperCase()
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 20; font.weight: Font.Bold
+                                        color: {
+                                            var q = qualityCard.inspection.overall_quality
+                                            if (q === "good") return Theme.Tokens.acidGreen
+                                            if (q === "degraded") return Theme.Tokens.marshalYellow
+                                            return Theme.Tokens.safetyRed
+                                        }
+                                    }
+                                }
+                                Column {
+                                    spacing: 2
+                                    Text { text: "SAMPLES"; font.family: Theme.Typography.monoFamily; font.pixelSize: Theme.Typography.microSize; color: Theme.Tokens.steel }
+                                    Text {
+                                        text: (qualityCard.inspection.total_samples || 0).toString()
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 20; font.weight: Font.Bold
+                                        color: Theme.Tokens.chalk
+                                    }
+                                }
+                                Column {
+                                    spacing: 2
+                                    Text { text: "SAMPLE RATE"; font.family: Theme.Typography.monoFamily; font.pixelSize: Theme.Typography.microSize; color: Theme.Tokens.steel }
+                                    Text {
+                                        text: (qualityCard.inspection.sample_rate_hz || 0).toFixed(1) + " Hz"
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 20; font.weight: Font.Bold
+                                        color: Theme.Tokens.chalk
+                                    }
+                                }
+                            }
+
+                            Row {
+                                visible: qualityCard.hasData
+                                spacing: Theme.Tokens.lg
+
+                                Rectangle {
+                                    width: availLbl.implicitWidth + 12; height: 20; radius: 3
+                                    color: Theme.Tokens.subtle(Theme.Tokens.acidGreen, 0.12)
+                                    Text {
+                                        id: availLbl
+                                        anchors.centerIn: parent
+                                        text: (qualityCard.inspection.available_count || 0) + " AVAILABLE"
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 9; font.weight: Font.Bold
+                                        color: Theme.Tokens.acidGreen
+                                    }
+                                }
+                                Rectangle {
+                                    width: estLbl.implicitWidth + 12; height: 20; radius: 3
+                                    color: Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.12)
+                                    Text {
+                                        id: estLbl
+                                        anchors.centerIn: parent
+                                        text: (qualityCard.inspection.estimated_count || 0) + " ESTIMATED"
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 9; font.weight: Font.Bold
+                                        color: Theme.Tokens.marshalYellow
+                                    }
+                                }
+                                Rectangle {
+                                    width: unavLbl.implicitWidth + 12; height: 20; radius: 3
+                                    color: Theme.Tokens.subtle(Theme.Tokens.safetyRed, 0.12)
+                                    Text {
+                                        id: unavLbl
+                                        anchors.centerIn: parent
+                                        text: (qualityCard.inspection.unavailable_count || 0) + " UNAVAILABLE"
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 9; font.weight: Font.Bold
+                                        color: Theme.Tokens.safetyRed
+                                    }
+                                }
+                            }
+
+                            Text {
+                                visible: !qualityCard.hasData
+                                text: "No telemetry data yet \u2014 connect to a sim and drive"
+                                font.family: Theme.Typography.bodyFamily
+                                font.pixelSize: Theme.Typography.bodySize
+                                color: Theme.Tokens.steel
+                            }
+                        }
+                    }
+
+                    // Warnings card (only if there are warnings)
+                    Rectangle {
+                        id: warningsCard
+                        property var warnings: strategyVM && strategyVM.dataInspection ? (strategyVM.dataInspection.warnings || []) : []
+                        visible: warningsCard.warnings.length > 0
+
+                        width: parent.width
+                        implicitHeight: warnCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.2)
+
+                        Column {
+                            id: warnCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.Tokens.xl }
+                            spacing: Theme.Tokens.sm
+
+                            Text {
+                                text: "WARNINGS"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Font.Bold; font.letterSpacing: 1.5
+                                color: Theme.Tokens.marshalYellow
+                            }
+
+                            Repeater {
+                                model: warningsCard.warnings
+                                delegate: Text {
+                                    required property string modelData
+                                    text: "\u26a0 " + modelData
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.captionSize
+                                    color: Theme.Tokens.steel
+                                    wrapMode: Text.Wrap
+                                    width: warnCol.width
+                                }
+                            }
+                        }
+                    }
+
+                    // Channel inventory card
+                    Rectangle {
+                        id: channelCard
+                        property var channels: strategyVM && strategyVM.dataInspection ? (strategyVM.dataInspection.channels || []) : []
+                        visible: channelCard.channels.length > 0
+
+                        width: parent.width
+                        implicitHeight: channelCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+
+                        Column {
+                            id: channelCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.Tokens.xl }
+                            spacing: Theme.Tokens.sm
+
+                            Text {
+                                text: "CHANNEL INVENTORY"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Font.Bold; font.letterSpacing: 1.5
+                                color: Theme.Tokens.steel
+                            }
+
+                            // Header row
+                            Row {
+                                width: channelCol.width
+                                spacing: 12
+                                Text { text: "CHANNEL"; width: 180; font.family: Theme.Typography.monoFamily; font.pixelSize: 9; color: Theme.Tokens.steel }
+                                Text { text: "STATE"; width: 100; font.family: Theme.Typography.monoFamily; font.pixelSize: 9; color: Theme.Tokens.steel }
+                                Text { text: "LAST"; width: 120; font.family: Theme.Typography.monoFamily; font.pixelSize: 9; color: Theme.Tokens.steel }
+                                Text { text: "NULL %"; width: 60; font.family: Theme.Typography.monoFamily; font.pixelSize: 9; color: Theme.Tokens.steel }
+                            }
+
+                            Repeater {
+                                model: channelCard.channels
+                                delegate: Row {
+                                    required property var modelData
+                                    width: channelCol.width
+                                    spacing: 12
+
+                                    Text {
+                                        text: modelData.name
+                                        width: 180
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 11
+                                        color: Theme.Tokens.chalk
+                                        elide: Text.ElideRight
+                                    }
+                                    Text {
+                                        text: (modelData.state || "").toUpperCase()
+                                        width: 100
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 11; font.weight: Font.Bold
+                                        color: {
+                                            if (modelData.state === "available") return Theme.Tokens.acidGreen
+                                            if (modelData.state === "estimated") return Theme.Tokens.marshalYellow
+                                            return Theme.Tokens.safetyRed
+                                        }
+                                    }
+                                    Text {
+                                        text: modelData.last_value !== null && modelData.last_value !== undefined
+                                              ? (typeof modelData.last_value === "number" ? modelData.last_value.toFixed(2) : modelData.last_value.toString())
+                                              : "\u2014"
+                                        width: 120
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 11
+                                        color: Theme.Tokens.steel
+                                        elide: Text.ElideRight
+                                    }
+                                    Text {
+                                        text: ((modelData.null_ratio || 0) * 100).toFixed(0) + "%"
+                                        width: 60
+                                        font.family: Theme.Typography.monoFamily
+                                        font.pixelSize: 11
+                                        color: Theme.Tokens.steel
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
+                // ================================================================
+                // DATA MODE — EXPORT TAB
+                // ================================================================
                 Column {
                     visible: root.activeTabId === "export"
                     width: parent.width
                     spacing: Theme.Tokens.xl
 
+                    // Sync status card
                     Rectangle {
-                        width: parent.width; height: 200; radius: Theme.Tokens.radiusLg
-                        color: Theme.Tokens.surface; border.width: 1; border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Export tools \u2014 coming soon"
-                            font.family: Theme.Typography.bodyFamily; font.pixelSize: Theme.Typography.bodySize
-                            color: Theme.Tokens.steel
+                        id: syncCard
+                        property var sync: strategyVM ? strategyVM.syncStatus : ({})
+
+                        width: parent.width
+                        implicitHeight: syncCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+
+                        Column {
+                            id: syncCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.Tokens.xl }
+                            spacing: Theme.Tokens.md
+
+                            Text {
+                                text: "WEBAPP SYNC"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Font.Bold; font.letterSpacing: 1.5
+                                color: Theme.Tokens.steel
+                            }
+
+                            Row {
+                                spacing: Theme.Tokens.xxl
+
+                                Column {
+                                    spacing: 2
+                                    Text { text: "STATUS"; font.family: Theme.Typography.monoFamily; font.pixelSize: Theme.Typography.microSize; color: Theme.Tokens.steel }
+                                    Text {
+                                        text: (syncCard.sync && syncCard.sync.enabled) ? "ENABLED" : "OFF"
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 16; font.weight: Font.Bold
+                                        color: (syncCard.sync && syncCard.sync.enabled) ? Theme.Tokens.acidGreen : Theme.Tokens.steel
+                                    }
+                                }
+                                Column {
+                                    spacing: 2
+                                    Text { text: "QUEUE DEPTH"; font.family: Theme.Typography.monoFamily; font.pixelSize: Theme.Typography.microSize; color: Theme.Tokens.steel }
+                                    Text {
+                                        text: (syncCard.sync ? (syncCard.sync.queue_depth || 0) : 0).toString()
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 16; font.weight: Font.Bold
+                                        color: Theme.Tokens.chalk
+                                    }
+                                }
+                                Column {
+                                    spacing: 2
+                                    Text { text: "SESSION ID"; font.family: Theme.Typography.monoFamily; font.pixelSize: Theme.Typography.microSize; color: Theme.Tokens.steel }
+                                    Text {
+                                        text: {
+                                            var sid = syncCard.sync ? (syncCard.sync.session_id || "") : ""
+                                            return sid ? sid.substring(0, 8) + "..." : "\u2014"
+                                        }
+                                        font.family: Theme.Typography.monoFamily; font.pixelSize: 14
+                                        color: Theme.Tokens.steel
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Export card
+                    Rectangle {
+                        id: exportCard
+                        width: parent.width
+                        implicitHeight: exportCol.implicitHeight + Theme.Tokens.xl * 2
+                        radius: Theme.Tokens.radiusLg
+                        color: Theme.Tokens.surface
+                        border.width: 1
+                        border.color: Theme.Tokens.subtle(Theme.Tokens.chalk)
+
+                        Column {
+                            id: exportCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.Tokens.xl }
+                            spacing: Theme.Tokens.md
+
+                            Text {
+                                text: "EXPORT SESSION"
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.microSize
+                                font.weight: Font.Bold; font.letterSpacing: 1.5
+                                color: Theme.Tokens.steel
+                            }
+
+                            Text {
+                                text: "Export channel inventory, lap times, and sync status to a JSON file in your output directory."
+                                font.family: Theme.Typography.bodyFamily
+                                font.pixelSize: Theme.Typography.captionSize
+                                color: Theme.Tokens.steel
+                                wrapMode: Text.Wrap
+                                width: exportCol.width
+                            }
+
+                            Rectangle {
+                                id: exportBtn
+                                property string lastPath: ""
+                                width: exportBtnText.implicitWidth + Theme.Tokens.xl * 2
+                                height: 36
+                                radius: Theme.Tokens.radiusMd
+                                color: exportArea.containsMouse
+                                       ? Qt.lighter(Theme.Tokens.pitOrange, 1.1)
+                                       : Theme.Tokens.pitOrange
+
+                                Text {
+                                    id: exportBtnText
+                                    anchors.centerIn: parent
+                                    text: "Export JSON"
+                                    font.family: Theme.Typography.bodyFamily
+                                    font.pixelSize: Theme.Typography.captionSize
+                                    font.weight: Font.DemiBold
+                                    color: Theme.Tokens.void_
+                                }
+
+                                MouseArea {
+                                    id: exportArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (strategyVM) {
+                                            exportBtn.lastPath = strategyVM.exportSessionJson()
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text {
+                                visible: exportBtn.lastPath !== ""
+                                text: "Saved to: " + exportBtn.lastPath
+                                font.family: Theme.Typography.monoFamily
+                                font.pixelSize: Theme.Typography.captionSize
+                                color: Theme.Tokens.acidGreen
+                                wrapMode: Text.WrapAnywhere
+                                width: exportCol.width
+                            }
                         }
                     }
                 }
