@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run tests
+        run: |
+          python -m pytest tests/ -q --tb=short --ignore=tests/test_desktop_workspaces.py --ignore=tests/test_ghost_widget.py --ignore=tests/test_overlay_browser_frontend.py --ignore=tests/test_overlay_window_manager.py
+
+  build:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[build,dev]"
+
+      - name: Build executable
+        run: python -m PyInstaller --noconfirm --clean lap_coach_logger.spec
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LapCoachLogger-${{ github.ref_name }}
+          path: dist/LapCoachLogger/
+          retention-days: 30

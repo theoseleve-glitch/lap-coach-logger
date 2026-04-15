@@ -11,6 +11,7 @@ import sys
 import threading
 from logging.handlers import RotatingFileHandler
 
+from lap_coach_logger.utils.log_dedupe import DedupFilter
 from lap_coach_logger.utils.paths import logs_dir
 
 
@@ -53,6 +54,9 @@ def setup_logging(*, debug: bool = False) -> None:
     # Quieten noisy third-party loggers
     for name in ("PIL", "pyarrow", "pystray", "PySide6", "PySide6.QtDBus"):
         logging.getLogger(name).setLevel(logging.WARNING)
+
+    # Install dedupe filter on root logger so all handlers benefit
+    root.addFilter(DedupFilter(window_s=30.0))
 
     _install_global_exception_logging()
 

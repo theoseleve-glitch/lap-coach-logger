@@ -61,6 +61,8 @@ def run(*, debug_override: bool = False) -> None:
 
     # 3. Logging (after config so we know debug flag)
     setup_logging(debug=config.debug)
+    from lap_coach_logger.utils.runtime_check import check_runtime
+    check_runtime(strict=False)  # warn only, don't block startup
     from lap_coach_logger import __version__
     log.info("Lap Coach Logger v%s starting up", __version__)
     log.info("Output dir: %s", config.output_path)
