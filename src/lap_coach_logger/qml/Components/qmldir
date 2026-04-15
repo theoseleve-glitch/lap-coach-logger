@@ -15,3 +15,5 @@ LapTimeChart 1.0 LapTimeChart.qml
 ShortcutHelpOverlay 1.0 ShortcutHelpOverlay.qml
 ToastNotification 1.0 ToastNotification.qml
 ModeBanner 1.0 ModeBanner.qml
+DemoBadge 1.0 DemoBadge.qml
+DemoControls 1.0 DemoControls.qml

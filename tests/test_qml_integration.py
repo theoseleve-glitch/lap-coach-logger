@@ -134,13 +134,13 @@ class TestAllViewModelsInstantiate:
         vms = build_view_models(_mock_service())
         expected = {
             "service", "session", "history", "review", "settings", "overlay",
-            "onboarding", "mode", "strategy", "syncStatus",
+            "onboarding", "mode", "strategy", "syncStatus", "demo",
         }
         assert set(vms.keys()) == expected
 
     def test_returns_exactly_nine_entries(self) -> None:
         vms = build_view_models(_mock_service())
-        assert len(vms) == 10
+        assert len(vms) == 11
 
     def test_service_vm_type(self) -> None:
         vms = build_view_models(_mock_service())

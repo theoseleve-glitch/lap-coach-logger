@@ -197,6 +197,32 @@ Item {
         }
     }
 
+    // === 2a2. Demo Mode badge — always visible when demo is active ===
+    Components.DemoBadge {
+        id: demoBadge
+        active: typeof demoVM !== "undefined" && demoVM ? demoVM.isActive : false
+        currentLap: typeof demoVM !== "undefined" && demoVM ? demoVM.currentLap : 0
+        totalLaps: typeof demoVM !== "undefined" && demoVM ? demoVM.totalLaps : 0
+        phase: typeof demoVM !== "undefined" && demoVM ? demoVM.phase : ""
+        momentTitle: typeof demoVM !== "undefined" && demoVM ? demoVM.lastMomentTitle : ""
+    }
+
+    // === 2a3. Demo controls — compact transport panel while demo is active ===
+    Components.DemoControls {
+        anchors {
+            bottom: statusBar.top
+            horizontalCenter: parent.horizontalCenter
+            bottomMargin: 16
+        }
+        active: typeof demoVM !== "undefined" && demoVM ? demoVM.isActive : false
+        playing: typeof demoVM !== "undefined" && demoVM ? demoVM.isPlaying : false
+
+        onPlayRequested: if (typeof demoVM !== "undefined" && demoVM) demoVM.play()
+        onPauseRequested: if (typeof demoVM !== "undefined" && demoVM) demoVM.pause()
+        onStepRequested: if (typeof demoVM !== "undefined" && demoVM) demoVM.stepLap()
+        onResetRequested: if (typeof demoVM !== "undefined" && demoVM) demoVM.reset()
+    }
+
     // === 2b. Status bar ===
     Rectangle {
         id: statusBar

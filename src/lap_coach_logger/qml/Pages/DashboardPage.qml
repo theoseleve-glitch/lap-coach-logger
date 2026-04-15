@@ -54,6 +54,79 @@ Item {
                     }
                 }
 
+                // === 1b. Demo launcher — shown only when demo is not yet active ===
+                Rectangle {
+                    visible: typeof demoVM !== "undefined" && demoVM && !demoVM.isActive
+                    width: parent.width
+                    implicitHeight: demoPromoCol.implicitHeight + Theme.Tokens.xl * 2
+                    radius: Theme.Tokens.radiusLg
+                    color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.08)
+                    border.width: 1
+                    border.color: Theme.Tokens.subtle(Theme.Tokens.racingPurple, 0.25)
+
+                    Column {
+                        id: demoPromoCol
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            top: parent.top
+                            margins: Theme.Tokens.xl
+                        }
+                        spacing: Theme.Tokens.md
+
+                        Text {
+                            text: "TRY THE DEMO"
+                            font.family: Theme.Typography.monoFamily
+                            font.pixelSize: Theme.Typography.microSize
+                            font.weight: Font.Bold; font.letterSpacing: 2.0
+                            color: Theme.Tokens.racingPurple
+                        }
+
+                        Text {
+                            text: "Explore all four modes in 3 minutes with synthetic data. Perfect for seeing what the app does without connecting a sim."
+                            font.family: Theme.Typography.bodyFamily
+                            font.pixelSize: Theme.Typography.bodySize
+                            color: Theme.Tokens.steel
+                            wrapMode: Text.Wrap
+                            width: parent.width
+                        }
+
+                        Row {
+                            spacing: Theme.Tokens.sm
+
+                            Rectangle {
+                                width: startBtnText.implicitWidth + Theme.Tokens.xl * 2
+                                height: 40
+                                radius: Theme.Tokens.radiusMd
+                                color: startArea.containsMouse
+                                       ? Qt.lighter(Theme.Tokens.racingPurple, 1.15)
+                                       : Theme.Tokens.racingPurple
+                                Text {
+                                    id: startBtnText
+                                    anchors.centerIn: parent
+                                    text: "Start Demo"
+                                    font.family: Theme.Typography.bodyFamily
+                                    font.pixelSize: Theme.Typography.bodySize
+                                    font.weight: Font.DemiBold
+                                    color: Theme.Tokens.void_
+                                }
+                                MouseArea {
+                                    id: startArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (typeof demoVM !== "undefined" && demoVM) {
+                                            demoVM.start()
+                                            demoVM.play()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // === 2. Hero Card (recent session) ===
                 Rectangle {
                     id: heroCard

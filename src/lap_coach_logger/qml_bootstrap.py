@@ -31,6 +31,8 @@ from lap_coach_logger.viewmodels import (
     SessionViewModel,
     SettingsViewModel,
 )
+from lap_coach_logger.demo.runner import DemoRunner
+from lap_coach_logger.viewmodels.demo_vm import DemoViewModel
 from lap_coach_logger.viewmodels.mode_vm import ModeViewModel
 from lap_coach_logger.viewmodels.strategy_vm import StrategyViewModel
 from lap_coach_logger.viewmodels.tray_vm import TrayViewModel
@@ -140,6 +142,13 @@ def build_view_models(service: DesktopService) -> dict:
     mode_vm.modeChanged.connect(lambda: strategy_vm.set_mode(mode_vm.activeMode))
     mode_vm.modeChanged.connect(lambda: overlay_vm.apply_mode_defaults(mode_vm.activeMode))
 
+    # -- Demo Mode -- feeds synthetic snapshots into strategy_vm ----------------
+    demo_runner = DemoRunner(
+        snapshot_sink=strategy_vm.update_live,
+    )
+    demo_vm = DemoViewModel(runner=demo_runner)
+    demo_vm.set_mode_vm(mode_vm)
+
     return {
         "service": svc_vm,
         "session": session_vm,
@@ -151,6 +160,7 @@ def build_view_models(service: DesktopService) -> dict:
         "mode": mode_vm,
         "strategy": strategy_vm,
         "syncStatus": sync_status_vm,
+        "demo": demo_vm,
     }
 
 
