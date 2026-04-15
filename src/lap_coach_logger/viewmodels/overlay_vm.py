@@ -13,6 +13,7 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 from lap_coach_logger.core.live_telemetry_processor import LiveTelemetryProcessor
 from lap_coach_logger.core.race_strategy import RaceStrategy, calculate_strategy, recalculate_live
 from lap_coach_logger.utils.overlay_hwnd import apply_overlay_flags, apply_overlay_flags_to_all_overlays, remove_overlay_flags
+from lap_coach_logger.utils.qt_safe_slot import safe_slot
 from lap_coach_logger.viewmodels.overlay_helpers import (
     ACCENT_COLORS,
     LAYOUT_PRESETS,
@@ -33,15 +34,7 @@ from lap_coach_logger.viewmodels.overlay_helpers import (
 
 log = logging.getLogger(__name__)
 
-_MODE_OVERLAY_DEFAULTS: dict[str, set[str]] = {
-    "sprint": {"relatives", "radar", "fuel_strategy", "standings", "track_map"},
-    "endurance": {
-        "relatives", "radar", "fuel_strategy", "standings", "track_map",
-        "race_strategy", "tire_life", "session_timer",
-    },
-    "coaching": {"delta_timing", "inputs_grip", "coaching", "delta_bar"},
-    "data": {"relatives", "radar", "fuel_strategy", "track_map"},
-}
+from lap_coach_logger.core.mode_descriptor import get_mode
 
 
 class OverlayViewModel(QObject):
@@ -538,6 +531,7 @@ class OverlayViewModel(QObject):
     def tireTempRR(self) -> float:  # noqa: N802
         return self._tire_temp_rr
 
+    @safe_slot()
     @Slot(int, float, float, int)
     def calculatePreRaceStrategy(self, total_laps: int, fuel_capacity: float, pit_time: float, tire_life: int) -> None:  # noqa: N802
         """Calculate and store pre-race strategy."""
@@ -556,6 +550,7 @@ class OverlayViewModel(QObject):
         )
         self._apply_strategy(self._strategy)
 
+    @safe_slot()
     @Slot()
     def recalculateLiveStrategy(self) -> None:  # noqa: N802
         """Recalculate strategy from current telemetry."""
@@ -615,6 +610,7 @@ class OverlayViewModel(QObject):
         """Active accent colour key (e.g. 'purple', 'orange')."""
         return self._overlay_accent
 
+    @safe_slot()
     @Slot(str)
     def setOverlayAccent(self, accent: str) -> None:  # noqa: N802
         """Switch the overlay accent colour."""
@@ -623,16 +619,19 @@ class OverlayViewModel(QObject):
             self.accentChanged.emit()
             self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot(result=str)
     def getAccentHex(self) -> str:  # noqa: N802
         """Return the hex value for the current accent colour."""
         return self._ACCENT_COLORS.get(self._overlay_accent, "#8B5CF6")
 
+    @safe_slot()
     @Slot(result="QVariant")
     def getAccentOptions(self) -> list:  # noqa: N802
         """Return the full palette as a list of {id, hex} dicts for QML."""
         return [{"id": k, "hex": v} for k, v in self._ACCENT_COLORS.items()]
 
+    @safe_slot()
     @Slot()
     def toggleOverlayLock(self) -> None:  # noqa: N802
         """Toggle the overlay lock state."""
@@ -644,6 +643,7 @@ class OverlayViewModel(QObject):
         """Whether overlay widgets snap to screen edges when dragged."""
         return self._snap_enabled
 
+    @safe_slot()
     @Slot()
     def toggleSnap(self) -> None:  # noqa: N802
         """Toggle the snap-to-edge behavior."""
@@ -660,12 +660,14 @@ class OverlayViewModel(QObject):
         """Whether auto-hide is active (hides overlays when not recording)."""
         return self._auto_hide_enabled
 
+    @safe_slot()
     @Slot()
     def toggleAutoHide(self) -> None:  # noqa: N802
         """Toggle the auto-hide behavior for overlays."""
         self._auto_hide_enabled = not self._auto_hide_enabled
         self.contextChanged.emit()
 
+    @safe_slot()
     @Slot(float)
     def adjustAllOpacity(self, delta: float) -> None:  # noqa: N802
         """Increase or decrease opacity for every widget by *delta*."""
@@ -681,6 +683,7 @@ class OverlayViewModel(QObject):
         """Currently selected widget id in the overlay manager."""
         return self._selected_widget
 
+    @safe_slot()
     @Slot(str)
     def selectWidget(self, widget_id: str) -> None:  # noqa: N802
         """Select a widget in the overlay manager UI."""
@@ -688,6 +691,7 @@ class OverlayViewModel(QObject):
             self._selected_widget = widget_id
             self.selectedWidgetChanged.emit()
 
+    @safe_slot()
     @Slot(str, str, "QVariant")
     def setWidgetSetting(self, widget_id: str, key: str, value: object) -> None:  # noqa: N802
         """Update a single setting for a widget and notify QML."""
@@ -703,6 +707,7 @@ class OverlayViewModel(QObject):
             self.widgetSettingsChanged.emit()
             self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot(str)
     def toggleWidget(self, widget_id: str) -> None:  # noqa: N802
         """Toggle the enabled state of a widget."""
@@ -719,6 +724,7 @@ class OverlayViewModel(QObject):
         """Return the category for a widget ID, or empty string if unknown."""
         return self._WIDGET_CATEGORIES.get(widget_id, "")
 
+    @safe_slot()
     @Slot()
     def enableAllWidgets(self) -> None:  # noqa: N802
         """Enable every widget."""
@@ -727,6 +733,7 @@ class OverlayViewModel(QObject):
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot()
     def disableAllWidgets(self) -> None:  # noqa: N802
         """Disable every widget."""
@@ -735,6 +742,7 @@ class OverlayViewModel(QObject):
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot(str)
     def enableCategory(self, category: str) -> None:  # noqa: N802
         """Enable all widgets matching *category*."""
@@ -744,6 +752,7 @@ class OverlayViewModel(QObject):
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot(str)
     def disableCategory(self, category: str) -> None:  # noqa: N802
         """Disable all widgets matching *category*."""
@@ -755,7 +764,7 @@ class OverlayViewModel(QObject):
 
     def apply_mode_defaults(self, mode: str) -> None:
         """Enable/disable overlays based on the selected mode."""
-        defaults = _MODE_OVERLAY_DEFAULTS.get(mode, set())
+        defaults = get_mode(mode).overlay_profile
         if not defaults:
             return
         for widget_id in self._widget_settings:
@@ -766,11 +775,13 @@ class OverlayViewModel(QObject):
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot(result=int)
     def enabledWidgetCount(self) -> int:  # noqa: N802
         """Return the number of currently enabled widgets."""
         return sum(1 for s in self._widget_settings.values() if s.get("enabled"))
 
+    @safe_slot()
     @Slot(result=int)
     def totalWidgetCount(self) -> int:  # noqa: N802
         """Return the total number of widgets."""
@@ -778,39 +789,48 @@ class OverlayViewModel(QObject):
 
     # -- Slot-based getters (QML can't access nested dict properties) --------
 
+    @safe_slot()
     @Slot(str, result=bool)
     def isWidgetEnabled(self, widget_id: str) -> bool:  # noqa: N802
         s = self._widget_settings.get(widget_id)
         return bool(s.get("enabled")) if s else False
 
+    @safe_slot()
     @Slot(str, result=int)
     def getWidgetWidth(self, widget_id: str) -> int:  # noqa: N802
         return get_widget_int(self._widget_settings, widget_id, "width", 300)
 
+    @safe_slot()
     @Slot(str, result=int)
     def getWidgetHeight(self, widget_id: str) -> int:  # noqa: N802
         return get_widget_int(self._widget_settings, widget_id, "height", 200)
 
+    @safe_slot()
     @Slot(str, result=float)
     def getWidgetOpacity(self, widget_id: str) -> float:  # noqa: N802
         return get_widget_float(self._widget_settings, widget_id, "opacity", 0.92)
 
+    @safe_slot()
     @Slot(str, result=float)
     def getWidgetFontScale(self, widget_id: str) -> float:  # noqa: N802
         return get_widget_float(self._widget_settings, widget_id, "font_scale", 1.0)
 
+    @safe_slot()
     @Slot(str, result=int)
     def getWidgetRefreshHz(self, widget_id: str) -> int:  # noqa: N802
         return get_widget_int(self._widget_settings, widget_id, "refresh_hz", 60)
 
+    @safe_slot()
     @Slot(str, result=int)
     def getWidgetBorderRadius(self, widget_id: str) -> int:  # noqa: N802
         return get_widget_int(self._widget_settings, widget_id, "border_radius", 12)
 
+    @safe_slot()
     @Slot(str, result=float)
     def getWidgetScale(self, widget_id: str) -> float:  # noqa: N802
         return get_widget_float(self._widget_settings, widget_id, "scale", 1.0)
 
+    @safe_slot()
     @Slot(str, float)
     def setWidgetScale(self, widget_id: str, scale: float) -> None:  # noqa: N802
         """Set scale — proportionally adjusts width/height/border_radius from defaults."""
@@ -823,6 +843,7 @@ class OverlayViewModel(QObject):
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot(int)
     def toggleWidgetByIndex(self, index: int) -> None:  # noqa: N802
         """Toggle the Nth enabled-capable widget (1-based, for keyboard shortcuts)."""
@@ -833,21 +854,25 @@ class OverlayViewModel(QObject):
             self.widgetSettingsChanged.emit()
             self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot(str, result="QVariant")
     def getWidgetSettingsMap(self, widget_id: str) -> dict:  # noqa: N802
         """Return a single widget's full settings as a flat dict."""
         return dict(self._widget_settings.get(widget_id, {}))
 
+    @safe_slot()
     @Slot(result="QVariant")
     def getEnabledWidgetIds(self) -> list:  # noqa: N802
         """Return list of widget IDs that are currently enabled."""
         return [wid for wid, s in self._widget_settings.items() if s.get("enabled")]
 
+    @safe_slot()
     @Slot(result="QVariant")
     def getAllWidgetIds(self) -> list:  # noqa: N802
         """Return list of all widget IDs."""
         return list(self._widget_settings.keys())
 
+    @safe_slot()
     @Slot(int)
     def applyOverlayFlags(self, hwnd: int) -> None:  # noqa: N802
         """Apply TOPMOST + NOACTIVATE flags to overlay windows.
@@ -862,11 +887,13 @@ class OverlayViewModel(QObject):
         else:
             apply_overlay_flags(hwnd)
 
+    @safe_slot()
     @Slot(int)
     def removeOverlayFlags(self, hwnd: int) -> None:  # noqa: N802
         """Remove overlay flags (restore normal window behavior)."""
         remove_overlay_flags(hwnd)
 
+    @safe_slot()
     @Slot(str)
     def resetWidget(self, widget_id: str) -> None:  # noqa: N802
         """Reset a widget's settings to factory defaults."""
@@ -877,6 +904,7 @@ class OverlayViewModel(QObject):
             self.widgetSettingsChanged.emit()
             self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot(str)
     def centerWidget(self, widget_id: str) -> None:  # noqa: N802
         """Move a widget to the center of the primary screen."""
@@ -894,6 +922,7 @@ class OverlayViewModel(QObject):
         except Exception:
             pass
 
+    @safe_slot()
     @Slot()
     def resetAllPositions(self) -> None:  # noqa: N802
         """Reset all widget positions to cascade defaults."""
@@ -905,6 +934,7 @@ class OverlayViewModel(QObject):
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot()
     def autoArrangeOverlays(self) -> None:  # noqa: N802
         """Arrange enabled overlays in a clean grid layout."""
@@ -930,6 +960,7 @@ class OverlayViewModel(QObject):
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot(str)
     def loadPreset(self, preset_id: str) -> None:  # noqa: N802
         """Apply a layout preset, disabling all widgets first."""
@@ -946,15 +977,18 @@ class OverlayViewModel(QObject):
         self.widgetSettingsChanged.emit()
         self.settingsSaveRequested.emit()
 
+    @safe_slot()
     @Slot(result="QVariant")
     def getPresetList(self) -> list:  # noqa: N802
         """Return the list of available layout presets for QML."""
         return list(PRESET_LIST)
 
+    @safe_slot()
     @Slot(str, result=int)
     def getWidgetX(self, widget_id: str) -> int:  # noqa: N802
         return get_widget_int(self._widget_settings, widget_id, "x", 100)
 
+    @safe_slot()
     @Slot(str, result=int)
     def getWidgetY(self, widget_id: str) -> int:  # noqa: N802
         return get_widget_int(self._widget_settings, widget_id, "y", 80)
@@ -963,6 +997,7 @@ class OverlayViewModel(QObject):
         """Return a serialisable copy of all widget settings for persistence."""
         return {wid: dict(s) for wid, s in self._widget_settings.items()}
 
+    @safe_slot()
     @Slot(str, int, int, result="QVariant")
     def clampToScreen(self, widget_id: str, x: int, y: int) -> dict:  # noqa: N802
         """Clamp x/y so overlay is visible on at least one monitor."""
@@ -984,6 +1019,7 @@ class OverlayViewModel(QObject):
         except Exception:
             return {"x": x, "y": y}
 
+    @safe_slot()
     @Slot(result="QVariant")
     def getScreenInfo(self) -> list:  # noqa: N802
         """Return info about all connected monitors."""
@@ -994,6 +1030,7 @@ class OverlayViewModel(QObject):
         except Exception:
             return []
 
+    @safe_slot()
     @Slot(result=str)
     @Slot()
     def copyLayoutToClipboard(self) -> None:  # noqa: N802
@@ -1005,6 +1042,7 @@ class OverlayViewModel(QObject):
         if clipboard:
             clipboard.setText(text)
 
+    @safe_slot()
     @Slot(result=bool)
     def pasteLayoutFromClipboard(self) -> bool:  # noqa: N802
         """Import layout from system clipboard JSON."""
@@ -1020,6 +1058,7 @@ class OverlayViewModel(QObject):
         import json
         return json.dumps(self.export_settings(), indent=2)
 
+    @safe_slot()
     @Slot(str, result=bool)
     def importLayoutJson(self, json_str: str) -> bool:  # noqa: N802
         """Import overlay layout from JSON string."""
@@ -1039,26 +1078,32 @@ class OverlayViewModel(QObject):
 
     # -- public API ------------------------------------------------------------
 
+    @safe_slot()
     def update_from_snapshot(self, snap: dict) -> None:
         """Read a coordinator snapshot and update all overlay properties."""
+        if not isinstance(snap, dict):
+            return
         live = snap.get("live") or {}
 
         # Telemetry inputs
-        inputs = extract_telemetry_inputs(live)
-        self._speed_kph = inputs["speed_kph"]
-        self._throttle_pct = inputs["throttle_pct"]
-        self._brake_pct = inputs["brake_pct"]
-        self._steering_deg = inputs["steering_deg"]
-        self._lat_accel_g = inputs["lat_accel_g"]
-        self._long_accel_g = inputs["long_accel_g"]
-        self._clutch_pct = inputs["clutch_pct"]
-        self._lap_dist_pct = inputs["lap_dist_pct"]
+        try:
+            inputs = extract_telemetry_inputs(live)
+        except (KeyError, TypeError, ValueError):
+            return
+        self._speed_kph = inputs.get("speed_kph", 0.0)
+        self._throttle_pct = inputs.get("throttle_pct", 0.0)
+        self._brake_pct = inputs.get("brake_pct", 0.0)
+        self._steering_deg = inputs.get("steering_deg", 0.0)
+        self._lat_accel_g = inputs.get("lat_accel_g", 0.0)
+        self._long_accel_g = inputs.get("long_accel_g", 0.0)
+        self._clutch_pct = inputs.get("clutch_pct", 0.0)
+        self._lap_dist_pct = inputs.get("lap_dist_pct", 0.0)
         self._lap_progress = self._lap_dist_pct * 100.0
-        self._lap_number = inputs["lap_number"]
-        self._gear = inputs["gear"]
-        self._rpm = inputs["rpm"]
-        self._position = inputs["position"]
-        self._num_cars = inputs["num_cars"]
+        self._lap_number = inputs.get("lap_number", 0)
+        self._gear = inputs.get("gear", 0)
+        self._rpm = inputs.get("rpm", 0)
+        self._position = inputs.get("position", 0)
+        self._num_cars = inputs.get("num_cars", 0)
 
         self._tyre_temp_avg = calc_tyre_temp_avg(live)
         self._brake_temp_max = calc_brake_temp_max(live)
@@ -1169,6 +1214,7 @@ class OverlayViewModel(QObject):
             self._strategy_prev_lap = self._lap_number
             self.recalculateLiveStrategy()
 
+    @safe_slot()
     @Slot()
     def dismissCoaching(self) -> None:
         """Dismiss the current coaching card."""
