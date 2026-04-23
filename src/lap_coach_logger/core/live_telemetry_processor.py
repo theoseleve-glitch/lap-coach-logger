@@ -2,6 +2,26 @@
 
 Composes tracker instances (lap comparison, corner tracking) into a
 single ``process()`` call that returns aggregated overlay state.
+
+Import audit (sprint T001)
+--------------------------
+Every external symbol referenced at module load resolves against the current
+tree. Reproduce with
+``python -c "import lap_coach_logger.core.live_telemetry_processor"``.
+
+- ``lap_coach_logger.core.live_coach.LiveCoachTracker`` -- present
+- ``lap_coach_logger.core.live_dashboard.LiveCornerTracker`` -- present
+- ``lap_coach_logger.core.live_input_diagnostics.LiveInputDiagnosticsTracker`` -- present
+- ``lap_coach_logger.core.live_lap_compare.LiveLapComparisonTracker`` -- present
+- ``lap_coach_logger.core.schema.TelemetrySample`` -- present
+- ``lap_coach_logger.core.tire_model.TireDegradationTracker`` -- present
+
+Missing module references: none.
+
+Note: T002-T006 will split this monolith into a ``LiveProcessor`` ABC plus
+``CoachingLiveProcessor``/``DashboardLiveProcessor``/``InputDiagnosticsProcessor``
+composed via that ABC. Those targets are not missing today -- they do not yet
+exist -- so they are out of scope for this audit.
 """
 
 from __future__ import annotations
