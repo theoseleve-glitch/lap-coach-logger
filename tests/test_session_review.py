@@ -80,11 +80,8 @@ class TestSessionReview:
         assert review["sync_status"] == "sync_blocked"
 
         manifest = json.loads((bundle / "session.json").read_text(encoding="utf-8"))
-        metadata = json.loads((bundle / "metadata.json").read_text(encoding="utf-8"))
         assert manifest["review_status"] == REVIEW_STATUS_IGNORED
-        assert metadata["review_status"] == REVIEW_STATUS_IGNORED
         assert manifest["review_updated_at_utc"]
-        assert metadata["review_updated_at_utc"]
 
     def test_reprocess_bundle_rebuilds_review_data_from_saved_telemetry(self, tmp_path: Path) -> None:
         bundle = _finalize_bundle(tmp_path)
@@ -100,12 +97,8 @@ class TestSessionReview:
 
         laps = json.loads((bundle / "laps.json").read_text(encoding="utf-8"))
         quality = json.loads((bundle / "quality_report.json").read_text(encoding="utf-8"))
-        metadata = json.loads((bundle / "metadata.json").read_text(encoding="utf-8"))
 
         assert len(laps) == 3
-        assert metadata["total_laps"] == 3
-        assert metadata["quality_classification"] == quality["recommended_classification"]
-        assert metadata["review_status"] == REVIEW_STATUS_IGNORED
 
     def test_load_session_review_reads_saved_bundle_artifacts(self, tmp_path: Path) -> None:
         bundle = _finalize_bundle(tmp_path)

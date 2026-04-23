@@ -71,6 +71,18 @@ class SimAdapter(abc.ABC):
         """Return the flattened session-info YAML as a dict. None if unavailable."""
         return None
 
+    def read_relative(self) -> dict[str, Any] | None:
+        """Read gap-to-neighbour data. None when the sim doesn't expose it.
+
+        When available, returns a dict with any subset of:
+          - gap_ahead_s: float (seconds behind car in front; > 0 if behind)
+          - gap_behind_s: float (seconds ahead of car behind; > 0)
+          - position_ahead: int
+          - position_behind: int
+        Adapters must NOT fabricate values — omit keys rather than guess.
+        """
+        return None
+
     def get_sdk_metadata(self) -> dict[str, Any]:
         """Return SDK runtime metadata (tick rate, buffer info, etc.)."""
         return {}

@@ -2,7 +2,7 @@
 
 Mocks the HTTP layer to simulate:
 1. Offline -> reconnect: envelopes queue up, then drain after network comes back
-2. Duplicate replay: same envelope_id submitted twice is accepted (409 = success)
+2. Duplicate replay: same envelope_id submitted twice — backend returns 200 with already_seen=true; 409 is reserved for precondition failures (missing_session)
 3. Partial failure: some payloads get 500s, retry, eventually succeed or move to failures
 4. Invalid payload: 400 -> moves straight to failure store, never retried
 """
@@ -122,12 +122,35 @@ class TestOfflineReconnect:
 
 
 class TestDuplicateReplay:
-    def test_409_is_acked_as_success(self, tmp_path):
+    """Connected v1: backend returns HTTP 200 with body {already_seen: true}
+    on replay, not 409. The desktop treats this identically to a fresh 200."""
+
+    def test_200_already_seen_is_acked(self, tmp_path):
         client, queue, failures = _build_client(tmp_path)
         queue.enqueue(_make_session_envelope("dup-1"))
 
+        resp = _mock_response(
+            200,
+            body=b'{"ok":true,"envelope_id":"dup-1","already_seen":true}',
+        )
+        with patch(
+            "lap_coach_logger.sync.http_transport.urlopen", return_value=resp
+        ):
+            client.start()
+            _wait_for(lambda: queue.depth == 0, timeout=3.0)
+            client.stop()
+
+        assert queue.depth == 0
+        assert failures.count() == 0
+
+    def test_409_missing_session_lands_in_failures(self, tmp_path):
+        """409 now means 'precondition failed' — audit it, don't drop silently."""
+        client, queue, failures = _build_client(tmp_path)
+        queue.enqueue(_make_session_envelope("orphan-1"))
+
         err = HTTPError(
-            "x", 409, "Conflict", {}, MagicMock(read=lambda: b'{"duplicate": true}')
+            "x", 409, "Conflict", {},
+            MagicMock(read=lambda: b'{"ok":false,"code":"missing_session"}'),
         )
         with patch(
             "lap_coach_logger.sync.http_transport.urlopen", side_effect=err
@@ -136,9 +159,8 @@ class TestDuplicateReplay:
             _wait_for(lambda: queue.depth == 0, timeout=3.0)
             client.stop()
 
-        # 409 is success — envelope acked, no failure recorded
         assert queue.depth == 0
-        assert failures.count() == 0
+        assert failures.count() == 1  # surfaced for audit
 
 
 class TestPartialFailure:

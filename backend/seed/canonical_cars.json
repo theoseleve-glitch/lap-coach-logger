@@ -1,0 +1,552 @@
+[
+  {
+    "canonical_id": "b0000001-0001-7000-8000-000000000001",
+    "canonical_name": "Ferrari 296 GT3",
+    "car_class": "GT3",
+    "manufacturer": "Ferrari",
+    "model": "296 GT3",
+    "year": 2023,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Ferrari 296 GT3"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "ferrari_296_gt3"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "ks_ferrari_296_gt3"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0002-7000-8000-000000000002",
+    "canonical_name": "Porsche 911 GT3 R (992)",
+    "car_class": "GT3",
+    "manufacturer": "Porsche",
+    "model": "911 GT3 R",
+    "year": 2023,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Porsche 911 GT3 R (992)"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "porsche_992_gt3_r"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "ks_porsche_911_gt3_r_2"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0003-7000-8000-000000000003",
+    "canonical_name": "BMW M4 GT3",
+    "car_class": "GT3",
+    "manufacturer": "BMW",
+    "model": "M4 GT3",
+    "year": 2022,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "BMW M4 GT3"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "bmw_m4_gt3"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "ks_bmw_m4_gt3"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0004-7000-8000-000000000004",
+    "canonical_name": "McLaren 720S GT3 Evo",
+    "car_class": "GT3",
+    "manufacturer": "McLaren",
+    "model": "720S GT3 Evo",
+    "year": 2023,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "McLaren 720S GT3 EVO"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "mclaren_720s_gt3_evo"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "ks_mclaren_720s_gt3"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0005-7000-8000-000000000005",
+    "canonical_name": "Mercedes-AMG GT3 (2020)",
+    "car_class": "GT3",
+    "manufacturer": "Mercedes-AMG",
+    "model": "GT3",
+    "year": 2020,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Mercedes-AMG GT3 2020"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "mercedes_amg_gt3_evo"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "ks_mercedes_amg_gt3_evo"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0006-7000-8000-000000000006",
+    "canonical_name": "Aston Martin Vantage GT3",
+    "car_class": "GT3",
+    "manufacturer": "Aston Martin",
+    "model": "Vantage GT3",
+    "year": 2024,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Aston Martin Vantage GT3"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "aston_martin_v8_vantage_gt3"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0007-7000-8000-000000000007",
+    "canonical_name": "Lamborghini Huracán GT3 Evo2",
+    "car_class": "GT3",
+    "manufacturer": "Lamborghini",
+    "model": "Huracán GT3 Evo2",
+    "year": 2023,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Lamborghini Huracán GT3 EVO"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "lamborghini_huracan_gt3_evo2"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0008-7000-8000-000000000008",
+    "canonical_name": "Audi R8 LMS GT3 Evo II",
+    "car_class": "GT3",
+    "manufacturer": "Audi",
+    "model": "R8 LMS GT3 Evo II",
+    "year": 2022,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Audi R8 LMS GT3 evo II"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "audi_r8_lms_evo_ii"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "ks_audi_r8_lms_2019"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0009-7000-8000-000000000009",
+    "canonical_name": "Ferrari 488 GTE",
+    "car_class": "GTE",
+    "manufacturer": "Ferrari",
+    "model": "488 GTE",
+    "year": 2018,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Ferrari 488 GTE"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0010-7000-8000-000000000010",
+    "canonical_name": "Porsche 911 RSR",
+    "car_class": "GTE",
+    "manufacturer": "Porsche",
+    "model": "911 RSR",
+    "year": 2020,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Porsche 911 RSR"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0011-7000-8000-000000000011",
+    "canonical_name": "Corvette C8.R GTE",
+    "car_class": "GTE",
+    "manufacturer": "Chevrolet",
+    "model": "Corvette C8.R",
+    "year": 2020,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Chevrolet Corvette C8.R GTE"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0012-7000-8000-000000000012",
+    "canonical_name": "Toyota GR010 Hybrid",
+    "car_class": "Hypercar",
+    "manufacturer": "Toyota",
+    "model": "GR010 Hybrid",
+    "year": 2021,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Toyota GR010 (Hybrid)"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Toyota GR010 HYBRID"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0013-7000-8000-000000000013",
+    "canonical_name": "Porsche 963",
+    "car_class": "Hypercar",
+    "manufacturer": "Porsche",
+    "model": "963",
+    "year": 2023,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Porsche 963 GTP"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Porsche 963"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0014-7000-8000-000000000014",
+    "canonical_name": "Ferrari 499P",
+    "car_class": "Hypercar",
+    "manufacturer": "Ferrari",
+    "model": "499P",
+    "year": 2023,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Ferrari 499P"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Ferrari 499P"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0015-7000-8000-000000000015",
+    "canonical_name": "Cadillac V-Series.R",
+    "car_class": "Hypercar",
+    "manufacturer": "Cadillac",
+    "model": "V-Series.R",
+    "year": 2023,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Cadillac V-Series.R"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Cadillac V-Series.R"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0016-7000-8000-000000000016",
+    "canonical_name": "BMW M Hybrid V8",
+    "car_class": "Hypercar",
+    "manufacturer": "BMW",
+    "model": "M Hybrid V8",
+    "year": 2024,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "BMW M Hybrid V8"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "BMW M Hybrid V8"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0017-7000-8000-000000000017",
+    "canonical_name": "Dallara P217 LMP2",
+    "car_class": "LMP2",
+    "manufacturer": "Dallara",
+    "model": "P217",
+    "year": 2017,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Dallara P217"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Dallara P217 LMP2"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0018-7000-8000-000000000018",
+    "canonical_name": "Dallara IR18 (IndyCar)",
+    "car_class": "Formula",
+    "manufacturer": "Dallara",
+    "model": "IR18",
+    "year": 2018,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Dallara IR18"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0019-7000-8000-000000000019",
+    "canonical_name": "Mercedes W13",
+    "car_class": "Formula",
+    "manufacturer": "Mercedes",
+    "model": "W13",
+    "year": 2022,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Mercedes-AMG W13 E Performance"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0020-7000-8000-000000000020",
+    "canonical_name": "Dallara F3",
+    "car_class": "Formula",
+    "manufacturer": "Dallara",
+    "model": "F3",
+    "year": 2019,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Dallara F3"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0021-7000-8000-000000000021",
+    "canonical_name": "Porsche 911 Cup (992)",
+    "car_class": "Cup",
+    "manufacturer": "Porsche",
+    "model": "911 Cup",
+    "year": 2021,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Porsche 911 GT3 Cup (992)"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0022-7000-8000-000000000022",
+    "canonical_name": "Porsche 718 Cayman GT4 Clubsport MR",
+    "car_class": "GT4",
+    "manufacturer": "Porsche",
+    "model": "718 Cayman GT4 Clubsport MR",
+    "year": 2019,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Porsche 718 Cayman GT4 Clubsport MR"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0023-7000-8000-000000000023",
+    "canonical_name": "Hyundai Elantra N TC",
+    "car_class": "Touring",
+    "manufacturer": "Hyundai",
+    "model": "Elantra N TC",
+    "year": 2022,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Hyundai Elantra N TC"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0024-7000-8000-000000000024",
+    "canonical_name": "Honda Civic Type R TC",
+    "car_class": "Touring",
+    "manufacturer": "Honda",
+    "model": "Civic Type R",
+    "year": 2023,
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Honda Civic Type R"
+      }
+    ]
+  },
+  {
+    "canonical_id": "b0000001-0025-7000-8000-000000000025",
+    "canonical_name": "Peugeot 9X8",
+    "car_class": "Hypercar",
+    "manufacturer": "Peugeot",
+    "model": "9X8",
+    "year": 2024,
+    "aliases": [
+      {
+        "sim_id": "lmu",
+        "raw_id": "Peugeot 9X8"
+      }
+    ]
+  },
+  {
+    "canonical_id": "c28c0eda-8b62-40b4-bf02-59c89fbca4e2",
+    "canonical_name": "Ford Mustang GT3",
+    "car_class": "GT3",
+    "manufacturer": "Ford",
+    "model": "Mustang GT3",
+    "year": 2024,
+    "aliases": [
+      {
+        "sim_id": "acc",
+        "raw_id": "ford_mustang_gt3"
+      }
+    ]
+  },
+  {
+    "canonical_id": "201b04fa-b3c4-46ff-b652-b6dd9a2618df",
+    "canonical_name": "Lexus RC F GT3",
+    "car_class": "GT3",
+    "manufacturer": "Lexus",
+    "model": "RC F GT3",
+    "year": 2019,
+    "aliases": [
+      {
+        "sim_id": "acc",
+        "raw_id": "lexus_rc_f_gt3"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "ks_lexus_rc_f_gt3"
+      }
+    ]
+  },
+  {
+    "canonical_id": "00caa056-11fc-485c-b6f9-1d2cbbe09ddb",
+    "canonical_name": "Nissan GT-R Nismo GT3",
+    "car_class": "GT3",
+    "manufacturer": "Nissan",
+    "model": "GT-R Nismo GT3",
+    "year": 2018,
+    "aliases": [
+      {
+        "sim_id": "acc",
+        "raw_id": "nissan_gt_r_gt3_2018"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "ks_nissan_gtr_gt3"
+      }
+    ]
+  },
+  {
+    "canonical_id": "8515bd6e-afe3-42f2-8be1-240955ebd067",
+    "canonical_name": "Alpine A110 GT4",
+    "car_class": "GT4",
+    "manufacturer": "Alpine",
+    "model": "A110 GT4",
+    "year": 2019,
+    "aliases": [
+      {
+        "sim_id": "acc",
+        "raw_id": "alpine_a110_gt4"
+      }
+    ]
+  },
+  {
+    "canonical_id": "87618605-2f27-47d1-95bc-0f5eb6fd8383",
+    "canonical_name": "BMW M4 GT4",
+    "car_class": "GT4",
+    "manufacturer": "BMW",
+    "model": "M4 GT4",
+    "year": 2022,
+    "aliases": [
+      {
+        "sim_id": "acc",
+        "raw_id": "bmw_m4_gt4"
+      }
+    ]
+  },
+  {
+    "canonical_id": "605e0385-206d-4649-a683-02422bae0b5f",
+    "canonical_name": "Alpine A424",
+    "car_class": "Hypercar",
+    "manufacturer": "Alpine",
+    "model": "A424",
+    "year": 2024,
+    "aliases": [
+      {
+        "sim_id": "lmu",
+        "raw_id": "Alpine A424"
+      }
+    ]
+  },
+  {
+    "canonical_id": "bb2b7484-3414-4659-8b20-179bb98128e6",
+    "canonical_name": "Lamborghini SC63",
+    "car_class": "Hypercar",
+    "manufacturer": "Lamborghini",
+    "model": "SC63",
+    "year": 2024,
+    "aliases": [
+      {
+        "sim_id": "lmu",
+        "raw_id": "Lamborghini SC63"
+      }
+    ]
+  },
+  {
+    "canonical_id": "8d94e15c-9a73-4af2-8340-2fc949f431a2",
+    "canonical_name": "ORECA 07 LMP2",
+    "car_class": "LMP2",
+    "manufacturer": "ORECA",
+    "model": "07",
+    "year": 2017,
+    "aliases": [
+      {
+        "sim_id": "lmu",
+        "raw_id": "ORECA 07 LMP2"
+      }
+    ]
+  }
+]

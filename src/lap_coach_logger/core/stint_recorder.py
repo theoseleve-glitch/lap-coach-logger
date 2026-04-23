@@ -99,9 +99,18 @@ class StintRecorder:
         if not self._recording:
             return
 
-        lap = int(snap["lap_number"])
-        fuel = float(snap["fuel_level"])
-        session_time = float(snap["session_time_s"])
+        if not isinstance(snap, dict):
+            return
+
+        raw_lap = snap.get("lap_number")
+        raw_fuel = snap.get("fuel_level")
+        raw_time = snap.get("session_time_s")
+        if raw_lap is None or raw_fuel is None or raw_time is None:
+            return
+
+        lap = int(raw_lap)
+        fuel = float(raw_fuel)
+        session_time = float(raw_time)
 
         # Auto-detect fuel capacity from first available value
         fuel_cap = snap.get("fuel_capacity")
@@ -142,15 +151,20 @@ class StintRecorder:
             self._pit_entry_time = None
             self._fuel_at_pit_entry = None
         self._in_pits = is_in_pits
-        avg_temp = (
-            float(snap["tyre_temp_lf"])
-            + float(snap["tyre_temp_rf"])
-            + float(snap["tyre_temp_lr"])
-            + float(snap["tyre_temp_rr"])
-        ) / 4.0
+        tl = snap.get("tyre_temp_lf")
+        tr = snap.get("tyre_temp_rf")
+        bl = snap.get("tyre_temp_lr")
+        br = snap.get("tyre_temp_rr")
+        if tl is None or tr is None or bl is None or br is None:
+            return
+        avg_temp = (float(tl) + float(tr) + float(bl) + float(br)) / 4.0
 
-        self._track_temps.append(float(snap["track_temp_c"]))
-        self._air_temps.append(float(snap["air_temp_c"]))
+        track_t = snap.get("track_temp_c")
+        air_t = snap.get("air_temp_c")
+        if track_t is not None:
+            self._track_temps.append(float(track_t))
+        if air_t is not None:
+            self._air_temps.append(float(air_t))
 
         if self._prev_lap is None:
             # First snapshot -- seed state

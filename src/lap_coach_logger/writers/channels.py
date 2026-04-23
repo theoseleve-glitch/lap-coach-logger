@@ -134,3 +134,69 @@ def build_raw_iracing_channels_payload(
         "channel_count": len(channels),
         "channels": channels,
     }
+
+
+def _detect_column_prefix(column_names: list[str]) -> str | None:
+    """Detect common ``<sim>__`` prefix from column names.
+
+    For example, columns like ``["ac__physics__gas", "ac__graphics__status"]``
+    share the prefix ``"ac__"``.
+    """
+    if not column_names:
+        return None
+    # Take the first column, find the first "__" — that's the sim tag boundary
+    first = column_names[0]
+    sep_idx = first.find("__")
+    if sep_idx < 1:
+        return None
+    candidate = first[: sep_idx + 2]  # e.g. "ac__"
+    # Verify at least half the columns share this prefix
+    matching = sum(1 for col in column_names if col.startswith(candidate))
+    if matching >= len(column_names) // 2:
+        return candidate
+    return None
+
+
+def build_raw_channels_payload(
+    column_names: list[str],
+    raw_samples: list[dict[str, Any]],
+    sim_prefix: str,
+) -> dict[str, object]:
+    """Build a channels_<sim>_raw.json payload for generic raw capture.
+
+    Inspects *raw_samples* to infer dtype per column.
+    Strips the common column prefix to derive ``raw_field_name``.
+    """
+    channels: list[dict[str, Any]] = []
+    first_row = raw_samples[0] if raw_samples else {}
+
+    # Detect common prefix from actual column names (e.g. "ac__" for Assetto Corsa)
+    detected_prefix = _detect_column_prefix(column_names)
+
+    for col in column_names:
+        # Strip detected prefix to get raw_field_name
+        raw_field = col[len(detected_prefix):] if detected_prefix and col.startswith(detected_prefix) else col
+
+        # Infer dtype from first row value
+        value = first_row.get(col)
+        if isinstance(value, float):
+            dtype = "float64"
+        elif isinstance(value, int):
+            dtype = "int64"
+        elif isinstance(value, str):
+            dtype = "string"
+        else:
+            dtype = "object"
+
+        channels.append({
+            "column_name": col,
+            "raw_field_name": raw_field,
+            "dtype": dtype,
+            "missing_allowed": True,
+        })
+
+    return {
+        "schema_version": TELEMETRY_SCHEMA_VERSION,
+        "channel_count": len(channels),
+        "channels": channels,
+    }

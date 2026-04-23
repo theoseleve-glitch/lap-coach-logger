@@ -17,9 +17,11 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import math
 import mmap
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from lap_coach_logger.adapters.acc_shm_structs import (
     SESSION_TYPE_MAP,
@@ -179,6 +181,73 @@ class ACCAdapter(SimAdapter):
     def connected(self) -> bool:
         return self._connected
 
+    def supports_raw_capture(self) -> bool:
+        return True
+
+    def read_raw_sample(self) -> dict[str, Any] | None:
+        if not self._connected:
+            return None
+        try:
+            row: dict[str, Any] = {}
+            self._flatten_struct(self._read_physics(), "acc__physics", row)
+            self._flatten_struct(self._read_graphics(), "acc__graphics", row)
+            row["acc__sample_timestamp_utc"] = datetime.now(timezone.utc).isoformat()
+            return row
+        except Exception:
+            log.debug("Error reading ACC raw sample", exc_info=True)
+            return None
+
+    def read_session_info_snapshot(self) -> dict[str, Any] | None:
+        if not self._connected:
+            return None
+        try:
+            return {
+                "static": self._struct_to_dict(self._read_static()),
+                "graphics": self._struct_to_dict(self._read_graphics()),
+            }
+        except Exception:
+            log.debug("Error reading ACC session info snapshot", exc_info=True)
+            return None
+
+    def read_dashboard_state(self) -> dict[str, Any] | None:
+        if not self._connected:
+            return None
+        try:
+            phys = self._read_physics()
+            gfx = self._read_graphics()
+            return {
+                "lap_time_s": _ms_to_s(gfx.iCurrentTime),
+                "last_lap_time_s": _ms_to_s(gfx.iLastTime),
+                "best_lap_time_s": _ms_to_s(gfx.iBestTime),
+                "live_delta_s": _ms_to_s(gfx.iDeltaLapTime) if gfx.isDeltaPositive else _negate(_ms_to_s(gfx.iDeltaLapTime)),
+                "current_sector_index": max(1, int(gfx.currentSectorIndex) + 1),
+                "last_sector_time_s": _ms_to_s(gfx.lastSectorTime),
+                "fuel_level": _clean_float(phys.fuel),
+                "fuel_per_lap_l": _clean_float(gfx.fuelXLap),
+                "fuel_estimated_laps": _clean_float(gfx.fuelEstimatedLaps),
+                "flag_state": _acc_flag_state(gfx),
+                "tc_level": int(gfx.TC),
+                "abs_level": int(gfx.ABS),
+                "engine_map": int(gfx.EngineMap),
+                "rpm": _clean_float(phys.rpms),
+                "tyre_pressure_lf": _clean_float(phys.wheelsPressure[0]),
+                "tyre_pressure_rf": _clean_float(phys.wheelsPressure[1]),
+                "tyre_pressure_lr": _clean_float(phys.wheelsPressure[2]),
+                "tyre_pressure_rr": _clean_float(phys.wheelsPressure[3]),
+                "tyre_wear_lf": _clean_float(phys.tyrewear[0]),
+                "tyre_wear_rf": _clean_float(phys.tyrewear[1]),
+                "tyre_wear_lr": _clean_float(phys.tyrewear[2]),
+                "tyre_wear_rr": _clean_float(phys.tyrewear[3]),
+                "brake_temp_lf": _clean_float(phys.brakeTemp[0]),
+                "brake_temp_rf": _clean_float(phys.brakeTemp[1]),
+                "brake_temp_lr": _clean_float(phys.brakeTemp[2]),
+                "brake_temp_rr": _clean_float(phys.brakeTemp[3]),
+                "brake_bias_pct": _clean_float(phys.brakeBias),
+            }
+        except Exception:
+            log.debug("Error reading ACC dashboard state", exc_info=True)
+            return None
+
     # -- internals ----------------------------------------------------------
 
     def _read_physics(self) -> SPageFilePhysics:
@@ -222,3 +291,74 @@ class ACCAdapter(SimAdapter):
                 except Exception:
                     pass
                 setattr(self, attr, None)
+
+    @classmethod
+    def _flatten_struct(cls, struct_obj: ctypes.Structure, prefix: str, out: dict[str, Any]) -> None:
+        for field_name, _ in getattr(struct_obj, "_fields_", []):
+            cls._flatten_value(f"{prefix}__{field_name}", getattr(struct_obj, field_name), out)
+
+    @classmethod
+    def _flatten_value(cls, prefix: str, value: Any, out: dict[str, Any]) -> None:
+        if isinstance(value, ctypes.Array):
+            for idx, item in enumerate(value):
+                cls._flatten_value(f"{prefix}__{idx}", item, out)
+            return
+        out[prefix] = cls._safe_raw_value(value)
+
+    @classmethod
+    def _struct_to_dict(cls, struct_obj: ctypes.Structure) -> dict[str, Any]:
+        data: dict[str, Any] = {}
+        for field_name, _ in getattr(struct_obj, "_fields_", []):
+            data[field_name] = cls._to_python(getattr(struct_obj, field_name))
+        return data
+
+    @classmethod
+    def _to_python(cls, value: Any) -> Any:
+        if isinstance(value, ctypes.Array):
+            return [cls._to_python(item) for item in value]
+        return cls._safe_raw_value(value)
+
+    @staticmethod
+    def _safe_raw_value(value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, float):
+            return None if math.isnan(value) or math.isinf(value) else value
+        if isinstance(value, (int, bool, str)):
+            return value
+        return str(value)
+
+
+def _clean_float(value: object) -> float | None:
+    if not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    if math.isnan(number) or math.isinf(number):
+        return None
+    return number
+
+
+def _ms_to_s(value: object) -> float | None:
+    number = _clean_float(value)
+    if number is None or number <= 0:
+        return None
+    return number / 1000.0
+
+
+def _negate(value: float | None) -> float | None:
+    return -value if value is not None else None
+
+
+def _acc_flag_state(gfx: SPageFileGraphic) -> str | None:
+    try:
+        if int(gfx.GlobalGreen) == 1:
+            return "green"
+        if int(gfx.GlobalYellow) == 1:
+            return "yellow"
+        if int(gfx.GlobalRed) == 1:
+            return "red"
+        if int(gfx.GlobalWhite) == 1:
+            return "white"
+    except Exception:
+        pass
+    return None

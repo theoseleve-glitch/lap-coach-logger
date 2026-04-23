@@ -154,7 +154,11 @@ class TestSessionIndexSqlite:
         # Simulate reprocess/update by editing manifest and bumping directory mtime.
         session_path = bundle / "session.json"
         manifest = json.loads(session_path.read_text(encoding="utf-8"))
-        manifest["duration_s"] = 999.0
+        # v2: duration_s lives in the session block
+        if "session" in manifest and isinstance(manifest["session"], dict):
+            manifest["session"]["duration_s"] = 999.0
+        else:
+            manifest["duration_s"] = 999.0
         session_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         os.utime(bundle, None)
 

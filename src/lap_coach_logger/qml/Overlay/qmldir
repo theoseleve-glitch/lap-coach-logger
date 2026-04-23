@@ -7,3 +7,8 @@ DeltaTimeWidget 1.0 widgets/DeltaTimeWidget.qml
 InputsWidget 1.0 widgets/InputsWidget.qml
 FuelWidget 1.0 widgets/FuelWidget.qml
 CoachingWidget 1.0 widgets/CoachingWidget.qml
+PitCountdownWidget 1.0 widgets/PitCountdownWidget.qml
+StrategyStatusWidget 1.0 widgets/StrategyStatusWidget.qml
+SectorDeltaWidget 1.0 widgets/SectorDeltaWidget.qml
+PushManageWidget 1.0 widgets/PushManageWidget.qml
+GapTimingWidget 1.0 widgets/GapTimingWidget.qml

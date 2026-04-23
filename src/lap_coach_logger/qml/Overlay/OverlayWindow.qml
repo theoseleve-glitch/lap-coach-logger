@@ -140,6 +140,111 @@ Item {
         }
     }
 
+    // -- Redesign v2: strategy + coaching widgets ----------------------------
+
+    OW {
+        _wid: "pit_countdown"; widgetId: "pit_countdown"; category: "strategy"
+        // Only render when pit_countdown has content AND the user enabled it.
+        // This keeps screen clean outside the pit window — even when enabled.
+        visible: root.isOn("pit_countdown") && (overlayVM ? overlayVM.pitCountdownVisible : false)
+        width: root.gw("pit_countdown","width",240)
+        height: root.gw("pit_countdown","height",80)
+        opacity: root.gw("pit_countdown","opacity",0.92)
+        fontScale: root.gw("pit_countdown","fontScale",1.0)
+        borderRadius: root.gw("pit_countdown","borderRadius",10)
+        Widgets.PitCountdownWidget {
+            anchors.fill: parent; anchors.margins: 4
+            headline: overlayVM ? overlayVM.pitCountdownHeadline || "" : ""
+            sub: overlayVM ? overlayVM.pitCountdownSub || "" : ""
+            severity: overlayVM ? overlayVM.pitCountdownSeverity || "ok" : "ok"
+        }
+    }
+
+    OW {
+        _wid: "strategy_status"; widgetId: "strategy_status"; category: "strategy"
+        visible: root.isOn("strategy_status")
+        width: root.gw("strategy_status","width",400)
+        height: root.gw("strategy_status","height",40)
+        opacity: root.gw("strategy_status","opacity",0.92)
+        fontScale: root.gw("strategy_status","fontScale",1.0)
+        borderRadius: root.gw("strategy_status","borderRadius",8)
+        Widgets.StrategyStatusWidget {
+            anchors.fill: parent; anchors.margins: 4
+            line: overlayVM ? overlayVM.strategyStatusLine || "" : ""
+            severity: overlayVM ? overlayVM.strategyStatusSeverity || "ok" : "ok"
+        }
+    }
+
+    OW {
+        _wid: "sector_delta"; widgetId: "sector_delta"; category: "timing"
+        visible: root.isOn("sector_delta")
+        width: root.gw("sector_delta","width",300)
+        height: root.gw("sector_delta","height",60)
+        opacity: root.gw("sector_delta","opacity",0.92)
+        fontScale: root.gw("sector_delta","fontScale",1.0)
+        borderRadius: root.gw("sector_delta","borderRadius",8)
+        Widgets.SectorDeltaWidget {
+            anchors.fill: parent; anchors.margins: 4
+            deltas: overlayVM ? overlayVM.sectorDeltas || [] : []
+        }
+    }
+
+    OW {
+        _wid: "push_manage"; widgetId: "push_manage"; category: "strategy"
+        visible: root.isOn("push_manage")
+        width: root.gw("push_manage","width",200)
+        height: root.gw("push_manage","height",60)
+        opacity: root.gw("push_manage","opacity",0.92)
+        fontScale: root.gw("push_manage","fontScale",1.0)
+        borderRadius: root.gw("push_manage","borderRadius",8)
+        Widgets.PushManageWidget {
+            anchors.fill: parent; anchors.margins: 4
+            state: overlayVM ? overlayVM.pushManageState || "PUSH" : "PUSH"
+            reason: overlayVM ? overlayVM.pushManageReason || "" : ""
+        }
+    }
+
+    OW {
+        _wid: "gap_timing"; widgetId: "gap_timing"; category: "awareness"
+        visible: root.isOn("gap_timing")
+        width: root.gw("gap_timing","width",280)
+        height: root.gw("gap_timing","height",60)
+        opacity: root.gw("gap_timing","opacity",0.92)
+        fontScale: root.gw("gap_timing","fontScale",1.0)
+        borderRadius: root.gw("gap_timing","borderRadius",8)
+        Widgets.GapTimingWidget {
+            anchors.fill: parent; anchors.margins: 4
+            // NaN default means "no data" — widget renders degraded state
+            gapAhead: overlayVM && overlayVM.gapAhead !== undefined ? overlayVM.gapAhead : NaN
+            gapBehind: overlayVM && overlayVM.gapBehind !== undefined ? overlayVM.gapBehind : NaN
+            positionAhead: overlayVM ? overlayVM.positionAhead || 0 : 0
+            positionBehind: overlayVM ? overlayVM.positionBehind || 0 : 0
+        }
+    }
+
+    OW {
+        _wid: "race_reminder"; widgetId: "race_reminder"; category: "awareness"
+        visible: root.isOn("race_reminder")
+            && overlayVM
+            && overlayVM.coachingSurfaceVisible === true
+        width: root.gw("race_reminder","width",320)
+        height: root.gw("race_reminder","height",64)
+        opacity: root.gw("race_reminder","opacity",0.92)
+        fontScale: root.gw("race_reminder","fontScale",1.0)
+        borderRadius: root.gw("race_reminder","borderRadius",10)
+        Widgets.RaceReminderWidget {
+            anchors.fill: parent; anchors.margins: 4
+            surfaceVisible: overlayVM ? overlayVM.coachingSurfaceVisible === true : false
+            headline: overlayVM ? overlayVM.coachingSurfaceHeadline || "" : ""
+            sub: overlayVM ? overlayVM.coachingSurfaceSub || "" : ""
+            severity: overlayVM ? overlayVM.coachingSurfaceSeverity || "ok" : "ok"
+            category: overlayVM ? overlayVM.coachingSurfaceCategory || "" : ""
+            focus: overlayVM ? overlayVM.coachingSurfaceFocus || "" : ""
+            freshness: overlayVM ? overlayVM.coachingSurfaceFreshness || "stale" : "stale"
+            confidence: overlayVM ? overlayVM.techniqueConfidence || "low" : "low"
+        }
+    }
+
     OW {
         _wid: "session_timer"; widgetId: "session_timer"; category: "timing"
         visible: root.isOn("session_timer")

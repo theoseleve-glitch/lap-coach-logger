@@ -2021,6 +2021,7 @@ Item {
             fuelAtFinish: overlayVM && overlayVM.strategyFuelAtFinish !== 0 ? overlayVM.strategyFuelAtFinish : 2.3
             totalLaps: overlayVM && overlayVM.strategyTotalLaps > 0 ? overlayVM.strategyTotalLaps : 35
             currentLap: overlayVM ? overlayVM.lapNumber : 5
+            weatherAlert: overlayVM ? (overlayVM.strategyWeatherAlert || "") : ""
         }
     }
 

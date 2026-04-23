@@ -19,6 +19,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from lap_coach_logger import __version__
 from lap_coach_logger.config.manager import ConfigManager
 from lap_coach_logger.config.models import AppConfig
+from lap_coach_logger.config.save_scheduler import SaveScheduler
 from lap_coach_logger.core.session_coordinator import SessionCoordinator
 from lap_coach_logger.core.session_review import (
     REVIEW_STATUS_IGNORED,
@@ -157,12 +158,14 @@ class DesktopService(QObject):
         *,
         config: AppConfig,
         config_manager: ConfigManager,
+        config_saver: SaveScheduler,
         coordinator: SessionCoordinator,
         watcher: ProcessWatcher,
     ) -> None:
         super().__init__()
         self._config = config
         self._config_manager = config_manager
+        self._config_saver = config_saver
         self._coordinator = coordinator
         self._watcher = watcher
         self._latest_session: dict[str, object] | None = None
@@ -212,6 +215,13 @@ class DesktopService(QObject):
     @property
     def config_manager(self) -> ConfigManager:
         return self._config_manager
+
+    @property
+    def config_saver(self) -> SaveScheduler:
+        """The debounced save scheduler. Use ``request_save()`` for routine
+        writes and ``flush()`` when the caller needs synchronous persistence.
+        """
+        return self._config_saver
 
     # -- lifecycle -----------------------------------------------------
 
@@ -278,7 +288,10 @@ class DesktopService(QObject):
                 sync_enabled=self._config.sync.enabled,
                 sync_service=_build_sync_service(self._config),
             )
-            self._config_manager.save(self._config)
+            # Explicit Save button: write synchronously so the "Saved"
+            # toast only appears after the bytes hit disk, and any I/O
+            # error surfaces via the outer except -> settings_failed.
+            self._config_saver.flush_now()
             self.settings_saved.emit("Settings saved")
             self._emit_snapshot()
             self.refresh_history()
@@ -624,6 +637,8 @@ class DesktopService(QObject):
                 latest_session=latest_session,
             ),
             "live": live,
+            # Relative/gap data (gap timing widget). None when sim doesn't expose it.
+            "relative": self._coordinator.latest_relative_snapshot(),
             "completed_session": self._last_completed_report,
             "sync_queue_depth": self._sync_queue.queue_depth(),
             "sync_feature_enabled": self._sync_queue.sync_enabled,

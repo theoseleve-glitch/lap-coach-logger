@@ -22,6 +22,7 @@ Rectangle {
     property real fuelAtFinish: 0.0
     property int  totalLaps: 0
     property int  currentLap: 0
+    property string weatherAlert: ""
 
     // -- helpers --
     function safeFix(v, d) { return isFinite(v) ? v.toFixed(d) : "--" }
@@ -141,6 +142,18 @@ Rectangle {
                 label: "FUEL AT FINISH"
                 value: root.finishSign + root.safeFix(root.fuelAtFinish, 1) + " L"
                 valueColor: root.finishColor
+            }
+
+            // Weather alert
+            Text {
+                visible: root.weatherAlert !== ""
+                text: root.weatherAlert
+                font.family: Theme.Typography.monoFamily
+                font.pixelSize: Math.round(9 * root.fontScale)
+                font.weight: Font.Bold
+                color: Theme.Tokens.racingPurple
+                Layout.fillWidth: true
+                Layout.topMargin: 4
             }
         }
 

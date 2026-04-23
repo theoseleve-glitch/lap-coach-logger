@@ -1,0 +1,1231 @@
+"""OverlayViewModel -- live HUD overlay bridge for QML.
+
+Reads coordinator snapshots and exposes telemetry and context
+properties for a floating overlay / HUD panel.
+"""
+
+from __future__ import annotations
+
+import logging
+
+from PySide6.QtCore import Property, QObject, Signal, Slot
+
+from lap_coach_logger.core.live_telemetry_processor import LiveTelemetryProcessor
+from lap_coach_logger.core.race_strategy import RaceStrategy, calculate_strategy, recalculate_live
+from lap_coach_logger.utils.overlay_hwnd import apply_overlay_flags, apply_overlay_flags_to_all_overlays, remove_overlay_flags
+from lap_coach_logger.utils.qt_safe_slot import safe_slot
+from lap_coach_logger.viewmodels.overlay_helpers import (
+    ACCENT_COLORS,
+    LAYOUT_PRESETS,
+    PRESET_LIST,
+    WIDGET_CATEGORIES,
+    build_sector_states,
+    calc_brake_temp_max,
+    calc_fuel_state,
+    calc_tyre_temp_avg,
+    compute_scaled_widget,
+    extract_coaching_top_card,
+    extract_context,
+    extract_telemetry_inputs,
+    get_widget_float,
+    get_widget_int,
+    make_default_widget_settings,
+)
+
+log = logging.getLogger(__name__)
+
+from lap_coach_logger.core.mode_descriptor import get_mode
+
+
+class OverlayViewModel(QObject):
+    """Exposes live overlay HUD state as flat, QML-bindable properties."""
+
+    # -- change signals --------------------------------------------------------
+    timesChanged = Signal()
+    inputsChanged = Signal()
+    contextChanged = Signal()
+    fuelChanged = Signal()
+    deltaChanged = Signal()
+    coachingChanged = Signal()
+    widgetSettingsChanged = Signal()
+    selectedWidgetChanged = Signal()
+    overlayLockChanged = Signal()
+    settingsSaveRequested = Signal()
+    accentChanged = Signal()
+    strategyChanged = Signal()
+    tireChanged = Signal()
+
+    # -- widget category mapping -----------------------------------------------
+
+    _WIDGET_CATEGORIES: dict[str, str] = WIDGET_CATEGORIES
+
+    # -- accent colour palette -------------------------------------------------
+
+    _ACCENT_COLORS: dict[str, str] = ACCENT_COLORS
+
+    # -- layout presets --------------------------------------------------------
+
+    _PRESETS: dict[str, dict[str, dict]] = LAYOUT_PRESETS
+
+    # -- construction ----------------------------------------------------------
+
+    def __init__(self, saved_settings: dict | None = None) -> None:
+        super().__init__()
+
+        # Live telemetry processor (lap delta pipeline)
+        self._processor = LiveTelemetryProcessor()
+
+        # Telemetry inputs
+        self._speed_kph: float = 0.0
+        self._throttle_pct: float = 0.0
+        self._brake_pct: float = 0.0
+        self._steering_deg: float = 0.0
+        self._lat_accel_g: float = 0.0
+        self._long_accel_g: float = 0.0
+        self._lap_progress: float = 0.0
+        self._lap_dist_pct: float = 0.0
+
+        # Lap timing
+        self._last_time: str = ""
+        self._best_time: str = ""
+        self._last_delta: str = ""
+        self._sector_states: list = []
+
+        # Live delta (processor-driven)
+        self._live_delta: float = 0.0
+        self._current_lap_time: str = ""
+
+        # Context
+        self._lap_number: int = 0
+        self._track: str = ""
+        self._car: str = ""
+        self._is_recording: bool = False
+        self._elapsed: str = ""
+        self._gear: int = 0
+        self._rpm: int = 0
+
+        # Additional vehicle state
+        self._clutch_pct: float = 0.0
+        self._position: int = 0
+        self._num_cars: int = 0
+
+        # Temperatures
+        self._tyre_temp_avg: float = 0.0
+        self._brake_temp_max: float = 0.0
+        self._track_temp: float = 0.0
+        self._air_temp: float = 0.0
+
+        # Session info
+        self._session_type: str = ""
+        self._track_length_m: float = 0.0
+
+        # Flag state
+        self._current_flag: str = "none"
+
+        # Detection flags
+        self._lockup_active: bool = False
+        self._wheelspin_active: bool = False
+        self._input_smoothness: float = 0.75
+
+        # Corner analysis
+        self._corner_rows: list[dict] = []
+
+        # Coaching
+        self._coaching_cards: list[dict] = []
+        self._coaching_visible: bool = False
+        self._coaching_headline: str = ""
+        self._coaching_sub: str = ""
+        self._coaching_category: str = ""
+        self._coaching_severity: str = "positive"
+        self._coaching_confidence: int = 0
+        self._coaching_sector: str = ""
+
+        # Fuel
+        self._fuel_level: float = 0.0
+        self._fuel_per_lap: float = 0.0
+        self._fuel_laps_left: float = 0.0
+        self._fuel_state: str = "SAFE"
+        self._prev_fuel_level: float = 0.0
+        self._lap_fuel_samples: list[float] = []
+
+        # Race strategy
+        self._strategy_vm: object | None = None  # StrategyViewModel reference
+        self._strategy: RaceStrategy | None = None
+        self._strategy_total_laps: int = 0
+        self._strategy_fuel_capacity: float = 65.0
+        self._strategy_pit_time: float = 25.0
+        self._strategy_tire_life: int = 30
+        self._strategy_next_pit_lap: int = 0
+        self._strategy_fuel_to_add: float = 0.0
+        self._strategy_stints_remaining: int = 0
+        self._strategy_pit_stops: list = []
+        self._strategy_fuel_at_finish: float = 0.0
+        self._strategy_prev_lap: int = -1
+        self._strategy_weather_alert: str = ""
+
+        # Tire state
+        self._tire_grip_pct: float = 100.0
+        self._tire_lap_count: int = 0
+        self._tire_laps_remaining: int = 99
+        self._tire_condition: str = "good"
+        self._tire_temp_lf: float = 0.0
+        self._tire_temp_rf: float = 0.0
+        self._tire_temp_lr: float = 0.0
+        self._tire_temp_rr: float = 0.0
+
+        # Per-widget settings (widget_id -> settings dict)
+        self._widget_settings: dict[str, dict] = make_default_widget_settings()
+        self._widget_defaults: dict[str, dict] = {
+            k: dict(v) for k, v in self._widget_settings.items()
+        }
+
+        # Merge persisted settings over defaults (saved values win)
+        if saved_settings:
+            for wid, saved in saved_settings.items():
+                if wid in self._widget_settings and isinstance(saved, dict):
+                    self._widget_settings[wid].update(saved)
+
+        self._selected_widget: str = "delta_timing"
+        self._overlay_locked: bool = False
+        self._overlay_accent: str = "purple"  # default Racing Purple
+        self._snap_enabled: bool = True
+
+        # Auto-hide overlays when not on track
+        self._auto_hide_enabled: bool = True
+        self._should_show_overlays: bool = True
+        self._has_been_recording: bool = False
+
+    # -- QML properties --------------------------------------------------------
+
+    @Property(float, notify=inputsChanged)
+    def speedKph(self) -> float:  # noqa: N802
+        """Current speed in km/h."""
+        return self._speed_kph
+
+    @Property(float, notify=inputsChanged)
+    def throttlePct(self) -> float:  # noqa: N802
+        """Throttle position as a percentage (0-100)."""
+        return self._throttle_pct
+
+    @Property(float, notify=inputsChanged)
+    def brakePct(self) -> float:  # noqa: N802
+        """Brake position as a percentage (0-100)."""
+        return self._brake_pct
+
+    @Property(str, notify=timesChanged)
+    def lastTime(self) -> str:  # noqa: N802
+        """Formatted last lap time."""
+        return self._last_time
+
+    @Property(str, notify=timesChanged)
+    def bestTime(self) -> str:  # noqa: N802
+        """Formatted best lap time."""
+        return self._best_time
+
+    @Property(str, notify=timesChanged)
+    def lastDelta(self) -> str:  # noqa: N802
+        """Delta vs best as ``+X.XXX`` / ``-X.XXX``."""
+        return self._last_delta
+
+    @Property("QVariant", notify=timesChanged)
+    def sectorStates(self) -> list:  # noqa: N802
+        """Sector state list for sector indicator display."""
+        return self._sector_states
+
+    @Property(int, notify=contextChanged)
+    def lapNumber(self) -> int:  # noqa: N802
+        """Current lap number."""
+        return self._lap_number
+
+    @Property(str, notify=contextChanged)
+    def track(self) -> str:
+        """Track name (falls back to sim name)."""
+        return self._track
+
+    @Property(bool, notify=contextChanged)
+    def isRecording(self) -> bool:  # noqa: N802
+        """Whether the session is actively recording."""
+        return self._is_recording
+
+    @Property(str, notify=contextChanged)
+    def elapsed(self) -> str:
+        """Formatted elapsed session time."""
+        return self._elapsed
+
+    @Property(float, notify=inputsChanged)
+    def steeringDeg(self) -> float:  # noqa: N802
+        return self._steering_deg
+
+    @Property(float, notify=inputsChanged)
+    def latAccelG(self) -> float:  # noqa: N802
+        return self._lat_accel_g
+
+    @Property(float, notify=inputsChanged)
+    def longAccelG(self) -> float:  # noqa: N802
+        return self._long_accel_g
+
+    @Property(int, notify=contextChanged)
+    def gear(self) -> int:
+        return self._gear
+
+    @Property(int, notify=contextChanged)
+    def rpm(self) -> int:
+        return self._rpm
+
+    @Property(str, notify=contextChanged)
+    def car(self) -> str:
+        return self._car
+
+    @Property(float, notify=inputsChanged)
+    def clutchPct(self) -> float:  # noqa: N802
+        """Clutch position as a percentage (0-100)."""
+        return self._clutch_pct
+
+    @Property(int, notify=contextChanged)
+    def position(self) -> int:
+        """Race position (1-based)."""
+        return self._position
+
+    @Property(int, notify=contextChanged)
+    def numCars(self) -> int:  # noqa: N802
+        """Total cars in session."""
+        return self._num_cars
+
+    @Property(float, notify=inputsChanged)
+    def tyreTempAvg(self) -> float:  # noqa: N802
+        """Average tyre temperature across all four corners."""
+        return self._tyre_temp_avg
+
+    @Property(float, notify=inputsChanged)
+    def brakeTempMax(self) -> float:  # noqa: N802
+        """Maximum brake temperature across all four corners."""
+        return self._brake_temp_max
+
+    @Property(float, notify=contextChanged)
+    def trackTemp(self) -> float:  # noqa: N802
+        """Track surface temperature in degrees C."""
+        return self._track_temp
+
+    @Property(float, notify=contextChanged)
+    def airTemp(self) -> float:  # noqa: N802
+        """Ambient air temperature in degrees C."""
+        return self._air_temp
+
+    @Property(str, notify=contextChanged)
+    def sessionType(self) -> str:  # noqa: N802
+        """Session type (Practice, Qualifying, Race, etc.)."""
+        return self._session_type
+
+    @Property(float, notify=contextChanged)
+    def trackLengthM(self) -> float:  # noqa: N802
+        """Track length in metres."""
+        return self._track_length_m
+
+    @Property(str, notify=contextChanged)
+    def currentFlag(self) -> str:  # noqa: N802
+        """Current flag state (none, green, yellow, red, blue, white, checkered)."""
+        return self._current_flag
+
+    @Property(float, notify=inputsChanged)
+    def lapProgress(self) -> float:  # noqa: N802
+        return self._lap_progress
+
+    @Property(float, notify=inputsChanged)
+    def lapDistPct(self) -> float:  # noqa: N802
+        return self._lap_dist_pct
+
+    @Property(bool, notify=inputsChanged)
+    def lockupActive(self) -> bool:  # noqa: N802
+        """True while a wheel-lockup condition is detected."""
+        return self._lockup_active
+
+    @Property(bool, notify=inputsChanged)
+    def wheelspinActive(self) -> bool:  # noqa: N802
+        """True while a wheelspin condition is detected."""
+        return self._wheelspin_active
+
+    @Property(float, notify=inputsChanged)
+    def inputSmoothness(self) -> float:  # noqa: N802
+        return self._input_smoothness
+
+    @Property(bool, notify=coachingChanged)
+    def coachingVisible(self) -> bool:  # noqa: N802
+        return self._coaching_visible
+
+    @Property(str, notify=coachingChanged)
+    def coachingHeadline(self) -> str:  # noqa: N802
+        return self._coaching_headline
+
+    @Property(str, notify=coachingChanged)
+    def coachingSub(self) -> str:  # noqa: N802
+        return self._coaching_sub
+
+    @Property(str, notify=coachingChanged)
+    def coachingCategory(self) -> str:  # noqa: N802
+        return self._coaching_category
+
+    @Property(str, notify=coachingChanged)
+    def coachingSeverity(self) -> str:  # noqa: N802
+        return self._coaching_severity
+
+    @Property(int, notify=coachingChanged)
+    def coachingConfidence(self) -> int:  # noqa: N802
+        return self._coaching_confidence
+
+    @Property(str, notify=coachingChanged)
+    def coachingSector(self) -> str:  # noqa: N802
+        return self._coaching_sector
+
+    @Property("QVariant", notify=deltaChanged)
+    def cornerRows(self) -> list:  # noqa: N802
+        return self._corner_rows
+
+    @Property(float, notify=deltaChanged)
+    def liveDelta(self) -> float:  # noqa: N802
+        """Real-time delta vs best lap in seconds (from processor)."""
+        return self._live_delta
+
+    @Property(str, notify=deltaChanged)
+    def currentLapTime(self) -> str:  # noqa: N802
+        """Formatted elapsed time for the current lap (from processor)."""
+        return self._current_lap_time
+
+    @Property(float, notify=fuelChanged)
+    def fuelLevel(self) -> float:  # noqa: N802
+        return self._fuel_level
+
+    @Property(float, notify=fuelChanged)
+    def fuelPerLap(self) -> float:  # noqa: N802
+        return self._fuel_per_lap
+
+    @Property(float, notify=fuelChanged)
+    def fuelLapsLeft(self) -> float:  # noqa: N802
+        return self._fuel_laps_left
+
+    @Property(str, notify=fuelChanged)
+    def fuelState(self) -> str:  # noqa: N802
+        return self._fuel_state
+
+    # -- Strategy properties ---------------------------------------------------
+
+    @Property(int, notify=strategyChanged)
+    def strategyNextPitLap(self) -> int:  # noqa: N802
+        """Lap number for the next planned pit stop."""
+        return self._strategy_next_pit_lap
+
+    @Property(float, notify=strategyChanged)
+    def strategyFuelToAdd(self) -> float:  # noqa: N802
+        """Liters of fuel to add at the next pit stop."""
+        return self._strategy_fuel_to_add
+
+    @Property(int, notify=strategyChanged)
+    def strategyStintsRemaining(self) -> int:  # noqa: N802
+        """Number of pit stops still remaining."""
+        return self._strategy_stints_remaining
+
+    @Property("QVariant", notify=strategyChanged)
+    def strategyPitStops(self) -> list:  # noqa: N802
+        """List of pit stop dicts for QML display."""
+        return self._strategy_pit_stops
+
+    @Property(float, notify=strategyChanged)
+    def strategyFuelAtFinish(self) -> float:  # noqa: N802
+        """Estimated fuel remaining at the chequered flag."""
+        return self._strategy_fuel_at_finish
+
+    @Property(int, notify=strategyChanged)
+    def strategyTotalLaps(self) -> int:  # noqa: N802
+        """Total laps in the current strategy."""
+        return self._strategy_total_laps
+
+    @Property(str, notify=strategyChanged)
+    def strategyWeatherAlert(self) -> str:  # noqa: N802
+        """One-line weather alert text from the strategy plan."""
+        return self._strategy_weather_alert
+
+    # -- Strategy VM wiring ----------------------------------------------------
+
+    def set_strategy_vm(self, vm: object) -> None:
+        """Store a reference to the StrategyViewModel and connect its signals."""
+        self._strategy_vm = vm
+        vm.planChanged.connect(self._sync_strategy_from_vm)
+        vm.alertsChanged.connect(self._sync_strategy_from_vm)
+
+    def _sync_strategy_from_vm(self) -> None:
+        """Read strategy VM state and update overlay properties."""
+        vm = self._strategy_vm
+        if vm is None:
+            return
+
+        plan = vm.racePlan
+        if plan:
+            # Update total laps from strategy VM
+            self._strategy_total_laps = vm.totalLaps
+
+            # Find upcoming stints (fuel_to_add > 0 means a pit stop before it)
+            upcoming_stops = [s for s in plan if s.get("start_lap", 0) > self._lap_number and s.get("fuel_to_add", 0) > 0]
+            if upcoming_stops:
+                first = upcoming_stops[0]
+                self._strategy_next_pit_lap = first.get("start_lap", 0)
+                self._strategy_fuel_to_add = first.get("fuel_to_add", 0.0)
+                self._strategy_stints_remaining = len(upcoming_stops)
+            else:
+                self._strategy_next_pit_lap = 0
+                self._strategy_fuel_to_add = 0.0
+                self._strategy_stints_remaining = 0
+
+            self._strategy_pit_stops = [
+                {"lap": s.get("start_lap", 0), "fuel": s.get("fuel_to_add", 0.0), "compound": s.get("compound", "")}
+                for s in plan
+                if s.get("fuel_to_add", 0) > 0
+            ]
+
+            # Fuel at finish from last stint
+            if plan:
+                last = plan[-1]
+                laps_in_stint = last.get("end_lap", 0) - last.get("start_lap", 0) + 1
+                self._strategy_fuel_at_finish = round(vm.planFuelAtFinish, 1)
+
+        # Weather alert from first weather-category alert
+        alerts = vm.alerts
+        weather_alert = ""
+        for a in alerts:
+            if a.get("category") == "weather":
+                weather_alert = a.get("message", "")
+                break
+        self._strategy_weather_alert = weather_alert
+
+        self.strategyChanged.emit()
+
+    # -- Tire properties -------------------------------------------------------
+
+    @Property(float, notify=tireChanged)
+    def tireGripPct(self) -> float:  # noqa: N802
+        return self._tire_grip_pct
+
+    @Property(int, notify=tireChanged)
+    def tireLapCount(self) -> int:  # noqa: N802
+        return self._tire_lap_count
+
+    @Property(int, notify=tireChanged)
+    def tireLapsRemaining(self) -> int:  # noqa: N802
+        return self._tire_laps_remaining
+
+    @Property(str, notify=tireChanged)
+    def tireCondition(self) -> str:  # noqa: N802
+        return self._tire_condition
+
+    @Property(float, notify=tireChanged)
+    def tireTempLF(self) -> float:  # noqa: N802
+        return self._tire_temp_lf
+
+    @Property(float, notify=tireChanged)
+    def tireTempRF(self) -> float:  # noqa: N802
+        return self._tire_temp_rf
+
+    @Property(float, notify=tireChanged)
+    def tireTempLR(self) -> float:  # noqa: N802
+        return self._tire_temp_lr
+
+    @Property(float, notify=tireChanged)
+    def tireTempRR(self) -> float:  # noqa: N802
+        return self._tire_temp_rr
+
+    @safe_slot()
+    @Slot(int, float, float, int)
+    def calculatePreRaceStrategy(self, total_laps: int, fuel_capacity: float, pit_time: float, tire_life: int) -> None:  # noqa: N802
+        """Calculate and store pre-race strategy."""
+        self._strategy_total_laps = total_laps
+        self._strategy_fuel_capacity = fuel_capacity
+        self._strategy_pit_time = pit_time
+        self._strategy_tire_life = tire_life
+
+        fpl = self._fuel_per_lap if self._fuel_per_lap > 0 else 3.0
+        self._strategy = calculate_strategy(
+            total_laps=total_laps,
+            fuel_capacity=fuel_capacity,
+            fuel_per_lap=fpl,
+            tire_life_laps=tire_life,
+            pit_time_s=pit_time,
+        )
+        self._apply_strategy(self._strategy)
+
+    @safe_slot()
+    @Slot()
+    def recalculateLiveStrategy(self) -> None:  # noqa: N802
+        """Recalculate strategy from current telemetry."""
+        if self._strategy is None:
+            return
+        fpl = self._fuel_per_lap if self._fuel_per_lap > 0 else self._strategy.fuel_per_lap
+        laps_remaining = self._strategy.total_laps - self._lap_number
+        if laps_remaining <= 0:
+            return
+        new_strategy = recalculate_live(
+            strategy=self._strategy,
+            current_lap=self._lap_number,
+            current_fuel=self._fuel_level,
+            actual_fuel_per_lap=fpl,
+            laps_remaining=laps_remaining,
+        )
+        self._strategy = new_strategy
+        self._apply_strategy(new_strategy)
+
+    def _apply_strategy(self, strat: RaceStrategy) -> None:
+        """Push strategy results into QML-bindable properties."""
+        stops = strat.pit_stops
+        # Find the next upcoming pit stop (first with lap > current)
+        upcoming = [s for s in stops if s.lap > self._lap_number]
+        if upcoming:
+            self._strategy_next_pit_lap = upcoming[0].lap
+            self._strategy_fuel_to_add = round(upcoming[0].fuel_to_add, 1)
+            self._strategy_stints_remaining = len(upcoming)
+        else:
+            self._strategy_next_pit_lap = 0
+            self._strategy_fuel_to_add = 0.0
+            self._strategy_stints_remaining = 0
+
+        self._strategy_pit_stops = [
+            {"lap": s.lap, "fuel": round(s.fuel_to_add, 1), "compound": s.tire_compound}
+            for s in stops
+        ]
+        self._strategy_fuel_at_finish = round(strat.fuel_at_finish, 1)
+        self.strategyChanged.emit()
+
+    # -- Widget settings properties --------------------------------------------
+
+    @Property("QVariant", notify=widgetSettingsChanged)
+    def widgetSettings(self) -> dict:  # noqa: N802
+        """Full dict of widget_id -> settings for QML binding."""
+        return self._widget_settings
+
+    @Property(bool, notify=overlayLockChanged)
+    def overlayLocked(self) -> bool:  # noqa: N802
+        """Whether overlay widgets are locked (non-draggable)."""
+        return self._overlay_locked
+
+    # -- Accent colour properties ----------------------------------------------
+
+    @Property(str, notify=accentChanged)
+    def overlayAccent(self) -> str:  # noqa: N802
+        """Active accent colour key (e.g. 'purple', 'orange')."""
+        return self._overlay_accent
+
+    @safe_slot()
+    @Slot(str)
+    def setOverlayAccent(self, accent: str) -> None:  # noqa: N802
+        """Switch the overlay accent colour."""
+        if accent in self._ACCENT_COLORS and accent != self._overlay_accent:
+            self._overlay_accent = accent
+            self.accentChanged.emit()
+            self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot(result=str)
+    def getAccentHex(self) -> str:  # noqa: N802
+        """Return the hex value for the current accent colour."""
+        return self._ACCENT_COLORS.get(self._overlay_accent, "#8B5CF6")
+
+    @safe_slot()
+    @Slot(result="QVariant")
+    def getAccentOptions(self) -> list:  # noqa: N802
+        """Return the full palette as a list of {id, hex} dicts for QML."""
+        return [{"id": k, "hex": v} for k, v in self._ACCENT_COLORS.items()]
+
+    @safe_slot()
+    @Slot()
+    def toggleOverlayLock(self) -> None:  # noqa: N802
+        """Toggle the overlay lock state."""
+        self._overlay_locked = not self._overlay_locked
+        self.overlayLockChanged.emit()
+
+    @Property(bool, notify=overlayLockChanged)
+    def snapEnabled(self) -> bool:  # noqa: N802
+        """Whether overlay widgets snap to screen edges when dragged."""
+        return self._snap_enabled
+
+    @safe_slot()
+    @Slot()
+    def toggleSnap(self) -> None:  # noqa: N802
+        """Toggle the snap-to-edge behavior."""
+        self._snap_enabled = not self._snap_enabled
+        self.overlayLockChanged.emit()
+
+    @Property(bool, notify=contextChanged)
+    def shouldShowOverlays(self) -> bool:  # noqa: N802
+        """Whether overlays should be visible (respects auto-hide logic)."""
+        return self._should_show_overlays
+
+    @Property(bool, notify=contextChanged)
+    def autoHideEnabled(self) -> bool:  # noqa: N802
+        """Whether auto-hide is active (hides overlays when not recording)."""
+        return self._auto_hide_enabled
+
+    @safe_slot()
+    @Slot()
+    def toggleAutoHide(self) -> None:  # noqa: N802
+        """Toggle the auto-hide behavior for overlays."""
+        self._auto_hide_enabled = not self._auto_hide_enabled
+        self.contextChanged.emit()
+
+    @safe_slot()
+    @Slot(float)
+    def adjustAllOpacity(self, delta: float) -> None:  # noqa: N802
+        """Increase or decrease opacity for every widget by *delta*."""
+        for wid in self._widget_settings:
+            current = self._widget_settings[wid].get("opacity", 0.92)
+            new_val = max(0.3, min(1.0, current + delta))
+            self._widget_settings[wid]["opacity"] = round(new_val, 2)
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @Property(str, notify=selectedWidgetChanged)
+    def selectedWidget(self) -> str:  # noqa: N802
+        """Currently selected widget id in the overlay manager."""
+        return self._selected_widget
+
+    @safe_slot()
+    @Slot(str)
+    def selectWidget(self, widget_id: str) -> None:  # noqa: N802
+        """Select a widget in the overlay manager UI."""
+        if widget_id != self._selected_widget:
+            self._selected_widget = widget_id
+            self.selectedWidgetChanged.emit()
+
+    @safe_slot()
+    @Slot(str, str, "QVariant")
+    def setWidgetSetting(self, widget_id: str, key: str, value: object) -> None:  # noqa: N802
+        """Update a single setting for a widget and notify QML."""
+        if self._overlay_locked and key not in ("enabled",):
+            return  # locked — only toggle enabled is allowed
+        if widget_id in self._widget_settings:
+            # Coerce numeric types for clean storage
+            if key in ("width", "height", "refresh_hz", "border_radius", "x", "y"):
+                value = int(value)
+            elif key in ("opacity", "font_scale"):
+                value = float(value)
+            self._widget_settings[widget_id][key] = value
+            self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot(str)
+    def toggleWidget(self, widget_id: str) -> None:  # noqa: N802
+        """Toggle the enabled state of a widget."""
+        if widget_id in self._widget_settings:
+            self._widget_settings[widget_id]["enabled"] = (
+                not self._widget_settings[widget_id]["enabled"]
+            )
+            self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
+
+    # -- Batch enable / disable ------------------------------------------------
+
+    def _get_category(self, widget_id: str) -> str:
+        """Return the category for a widget ID, or empty string if unknown."""
+        return self._WIDGET_CATEGORIES.get(widget_id, "")
+
+    @safe_slot()
+    @Slot()
+    def enableAllWidgets(self) -> None:  # noqa: N802
+        """Enable every widget."""
+        for wid in self._widget_settings:
+            self._widget_settings[wid]["enabled"] = True
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot()
+    def disableAllWidgets(self) -> None:  # noqa: N802
+        """Disable every widget."""
+        for wid in self._widget_settings:
+            self._widget_settings[wid]["enabled"] = False
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot(str)
+    def enableCategory(self, category: str) -> None:  # noqa: N802
+        """Enable all widgets matching *category*."""
+        for wid in self._widget_settings:
+            if self._get_category(wid) == category:
+                self._widget_settings[wid]["enabled"] = True
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot(str)
+    def disableCategory(self, category: str) -> None:  # noqa: N802
+        """Disable all widgets matching *category*."""
+        for wid in self._widget_settings:
+            if self._get_category(wid) == category:
+                self._widget_settings[wid]["enabled"] = False
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    def apply_mode_defaults(self, mode: str) -> None:
+        """Enable/disable overlays based on the selected mode."""
+        defaults = get_mode(mode).overlay_profile
+        if not defaults:
+            return
+        for widget_id in self._widget_settings:
+            was_enabled = self._widget_settings[widget_id].get("enabled", False)
+            should_enable = widget_id in defaults
+            if was_enabled != should_enable:
+                self._widget_settings[widget_id]["enabled"] = should_enable
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot(result=int)
+    def enabledWidgetCount(self) -> int:  # noqa: N802
+        """Return the number of currently enabled widgets."""
+        return sum(1 for s in self._widget_settings.values() if s.get("enabled"))
+
+    @safe_slot()
+    @Slot(result=int)
+    def totalWidgetCount(self) -> int:  # noqa: N802
+        """Return the total number of widgets."""
+        return len(self._widget_settings)
+
+    # -- Slot-based getters (QML can't access nested dict properties) --------
+
+    @safe_slot()
+    @Slot(str, result=bool)
+    def isWidgetEnabled(self, widget_id: str) -> bool:  # noqa: N802
+        s = self._widget_settings.get(widget_id)
+        return bool(s.get("enabled")) if s else False
+
+    @safe_slot()
+    @Slot(str, result=int)
+    def getWidgetWidth(self, widget_id: str) -> int:  # noqa: N802
+        return get_widget_int(self._widget_settings, widget_id, "width", 300)
+
+    @safe_slot()
+    @Slot(str, result=int)
+    def getWidgetHeight(self, widget_id: str) -> int:  # noqa: N802
+        return get_widget_int(self._widget_settings, widget_id, "height", 200)
+
+    @safe_slot()
+    @Slot(str, result=float)
+    def getWidgetOpacity(self, widget_id: str) -> float:  # noqa: N802
+        return get_widget_float(self._widget_settings, widget_id, "opacity", 0.92)
+
+    @safe_slot()
+    @Slot(str, result=float)
+    def getWidgetFontScale(self, widget_id: str) -> float:  # noqa: N802
+        return get_widget_float(self._widget_settings, widget_id, "font_scale", 1.0)
+
+    @safe_slot()
+    @Slot(str, result=int)
+    def getWidgetRefreshHz(self, widget_id: str) -> int:  # noqa: N802
+        return get_widget_int(self._widget_settings, widget_id, "refresh_hz", 60)
+
+    @safe_slot()
+    @Slot(str, result=int)
+    def getWidgetBorderRadius(self, widget_id: str) -> int:  # noqa: N802
+        return get_widget_int(self._widget_settings, widget_id, "border_radius", 12)
+
+    @safe_slot()
+    @Slot(str, result=float)
+    def getWidgetScale(self, widget_id: str) -> float:  # noqa: N802
+        return get_widget_float(self._widget_settings, widget_id, "scale", 1.0)
+
+    @safe_slot()
+    @Slot(str, float)
+    def setWidgetScale(self, widget_id: str, scale: float) -> None:  # noqa: N802
+        """Set scale — proportionally adjusts width/height/border_radius from defaults."""
+        if self._overlay_locked:
+            return
+        if widget_id not in self._widget_settings:
+            return
+        scaled = compute_scaled_widget(self._widget_defaults.get(widget_id, {}), scale)
+        self._widget_settings[widget_id].update(scaled)
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot(int)
+    def toggleWidgetByIndex(self, index: int) -> None:  # noqa: N802
+        """Toggle the Nth enabled-capable widget (1-based, for keyboard shortcuts)."""
+        ids = list(self._widget_settings.keys())
+        if 0 < index <= len(ids):
+            wid = ids[index - 1]
+            self._widget_settings[wid]["enabled"] = not self._widget_settings[wid]["enabled"]
+            self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot(str, result="QVariant")
+    def getWidgetSettingsMap(self, widget_id: str) -> dict:  # noqa: N802
+        """Return a single widget's full settings as a flat dict."""
+        return dict(self._widget_settings.get(widget_id, {}))
+
+    @safe_slot()
+    @Slot(result="QVariant")
+    def getEnabledWidgetIds(self) -> list:  # noqa: N802
+        """Return list of widget IDs that are currently enabled."""
+        return [wid for wid, s in self._widget_settings.items() if s.get("enabled")]
+
+    @safe_slot()
+    @Slot(result="QVariant")
+    def getAllWidgetIds(self) -> list:  # noqa: N802
+        """Return list of all widget IDs."""
+        return list(self._widget_settings.keys())
+
+    @safe_slot()
+    @Slot(int)
+    def applyOverlayFlags(self, hwnd: int) -> None:  # noqa: N802
+        """Apply TOPMOST + NOACTIVATE flags to overlay windows.
+
+        If hwnd is 0, applies to ALL overlay windows in this process.
+        Called from QML after OverlayWidget windows are created.
+        Ensures overlays stay above borderless-fullscreen sims.
+        """
+        if hwnd == 0:
+            count = apply_overlay_flags_to_all_overlays()
+            log.debug("Applied overlay flags to %d windows", count)
+        else:
+            apply_overlay_flags(hwnd)
+
+    @safe_slot()
+    @Slot(int)
+    def removeOverlayFlags(self, hwnd: int) -> None:  # noqa: N802
+        """Remove overlay flags (restore normal window behavior)."""
+        remove_overlay_flags(hwnd)
+
+    @safe_slot()
+    @Slot(str)
+    def resetWidget(self, widget_id: str) -> None:  # noqa: N802
+        """Reset a widget's settings to factory defaults."""
+        if self._overlay_locked:
+            return
+        if widget_id in self._widget_defaults:
+            self._widget_settings[widget_id] = dict(self._widget_defaults[widget_id])
+            self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot(str)
+    def centerWidget(self, widget_id: str) -> None:  # noqa: N802
+        """Move a widget to the center of the primary screen."""
+        try:
+            from PySide6.QtWidgets import QApplication
+            screen = QApplication.primaryScreen()
+            geo = screen.geometry()
+            s = self._widget_settings.get(widget_id, {})
+            w = s.get("width", 300)
+            h = s.get("height", 200)
+            self._widget_settings[widget_id]["x"] = geo.x() + (geo.width() - w) // 2
+            self._widget_settings[widget_id]["y"] = geo.y() + (geo.height() - h) // 2
+            self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
+        except Exception:
+            pass
+
+    @safe_slot()
+    @Slot()
+    def resetAllPositions(self) -> None:  # noqa: N802
+        """Reset all widget positions to cascade defaults."""
+        idx = 0
+        for wid in self._widget_settings:
+            self._widget_settings[wid]["x"] = 100 + (idx % 6) * 50
+            self._widget_settings[wid]["y"] = 80 + (idx % 6) * 50
+            idx += 1
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot()
+    def autoArrangeOverlays(self) -> None:  # noqa: N802
+        """Arrange enabled overlays in a clean grid layout."""
+        try:
+            from PySide6.QtWidgets import QApplication
+            screen = QApplication.primaryScreen()
+            geo = screen.geometry()
+            sw, sh = geo.width(), geo.height()
+        except Exception:
+            sw, sh = 1920, 1080
+        enabled = [(wid, s) for wid, s in self._widget_settings.items() if s.get("enabled")]
+        if not enabled:
+            return
+        margin, gap = 20, 12
+        x, y, row_h = margin, margin, 0
+        for wid, s in enabled:
+            w, h = s.get("width", 300), s.get("height", 200)
+            if x + w > sw - margin and x > margin:
+                x, y, row_h = margin, y + row_h + gap, 0
+            s["x"], s["y"] = x, y
+            x += w + gap
+            row_h = max(row_h, h)
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot(str)
+    def loadPreset(self, preset_id: str) -> None:  # noqa: N802
+        """Apply a layout preset, disabling all widgets first."""
+        preset = self._PRESETS.get(preset_id)
+        if not preset:
+            return
+        # Disable every widget
+        for wid in self._widget_settings:
+            self._widget_settings[wid]["enabled"] = False
+        # Apply preset overrides
+        for wid, settings in preset.items():
+            if wid in self._widget_settings:
+                self._widget_settings[wid].update(settings)
+        self.widgetSettingsChanged.emit()
+        self.settingsSaveRequested.emit()
+
+    @safe_slot()
+    @Slot(result="QVariant")
+    def getPresetList(self) -> list:  # noqa: N802
+        """Return the list of available layout presets for QML."""
+        return list(PRESET_LIST)
+
+    @safe_slot()
+    @Slot(str, result=int)
+    def getWidgetX(self, widget_id: str) -> int:  # noqa: N802
+        return get_widget_int(self._widget_settings, widget_id, "x", 100)
+
+    @safe_slot()
+    @Slot(str, result=int)
+    def getWidgetY(self, widget_id: str) -> int:  # noqa: N802
+        return get_widget_int(self._widget_settings, widget_id, "y", 80)
+
+    def export_settings(self) -> dict[str, dict]:
+        """Return a serialisable copy of all widget settings for persistence."""
+        return {wid: dict(s) for wid, s in self._widget_settings.items()}
+
+    @safe_slot()
+    @Slot(str, int, int, result="QVariant")
+    def clampToScreen(self, widget_id: str, x: int, y: int) -> dict:  # noqa: N802
+        """Clamp x/y so overlay is visible on at least one monitor."""
+        try:
+            from PySide6.QtCore import QPoint
+            from PySide6.QtWidgets import QApplication
+            screens = QApplication.screens()
+            if not screens:
+                return {"x": x, "y": y}
+            point = QPoint(x + 50, y + 20)
+            for screen in screens:
+                if screen.geometry().contains(point):
+                    return {"x": x, "y": y}
+            primary = QApplication.primaryScreen()
+            geo = primary.geometry()
+            w = self._widget_settings.get(widget_id, {}).get("width", 300)
+            h = self._widget_settings.get(widget_id, {}).get("height", 200)
+            return {"x": geo.x() + (geo.width() - w) // 2, "y": geo.y() + (geo.height() - h) // 2}
+        except Exception:
+            return {"x": x, "y": y}
+
+    @safe_slot()
+    @Slot(result="QVariant")
+    def getScreenInfo(self) -> list:  # noqa: N802
+        """Return info about all connected monitors."""
+        try:
+            from PySide6.QtWidgets import QApplication
+            return [{"name": s.name(), "width": s.geometry().width(), "height": s.geometry().height()}
+                    for s in QApplication.screens()]
+        except Exception:
+            return []
+
+    @safe_slot()
+    @Slot(result=str)
+    @Slot()
+    def copyLayoutToClipboard(self) -> None:  # noqa: N802
+        """Export layout to system clipboard as JSON."""
+        import json
+        from PySide6.QtWidgets import QApplication
+        text = json.dumps(self.export_settings(), indent=2)
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(text)
+
+    @safe_slot()
+    @Slot(result=bool)
+    def pasteLayoutFromClipboard(self) -> bool:  # noqa: N802
+        """Import layout from system clipboard JSON."""
+        from PySide6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        if not clipboard:
+            return False
+        text = clipboard.text()
+        return self.importLayoutJson(text) if text else False
+
+    def exportLayoutJson(self) -> str:  # noqa: N802
+        """Export current overlay layout as JSON string for sharing."""
+        import json
+        return json.dumps(self.export_settings(), indent=2)
+
+    @safe_slot()
+    @Slot(str, result=bool)
+    def importLayoutJson(self, json_str: str) -> bool:  # noqa: N802
+        """Import overlay layout from JSON string."""
+        import json
+        try:
+            data = json.loads(json_str)
+            if not isinstance(data, dict):
+                return False
+            for wid, settings in data.items():
+                if wid in self._widget_settings and isinstance(settings, dict):
+                    self._widget_settings[wid].update(settings)
+            self.widgetSettingsChanged.emit()
+            self.settingsSaveRequested.emit()
+            return True
+        except Exception:
+            return False
+
+    # -- public API ------------------------------------------------------------
+
+    @safe_slot()
+    def update_from_snapshot(self, snap: dict) -> None:
+        """Read a coordinator snapshot and update all overlay properties."""
+        if not isinstance(snap, dict):
+            return
+        live = snap.get("live") or {}
+
+        # Telemetry inputs
+        try:
+            inputs = extract_telemetry_inputs(live)
+        except (KeyError, TypeError, ValueError):
+            return
+        self._speed_kph = inputs.get("speed_kph", 0.0)
+        self._throttle_pct = inputs.get("throttle_pct", 0.0)
+        self._brake_pct = inputs.get("brake_pct", 0.0)
+        self._steering_deg = inputs.get("steering_deg", 0.0)
+        self._lat_accel_g = inputs.get("lat_accel_g", 0.0)
+        self._long_accel_g = inputs.get("long_accel_g", 0.0)
+        self._clutch_pct = inputs.get("clutch_pct", 0.0)
+        self._lap_dist_pct = inputs.get("lap_dist_pct", 0.0)
+        self._lap_progress = self._lap_dist_pct * 100.0
+        self._lap_number = inputs.get("lap_number", 0)
+        self._gear = inputs.get("gear", 0)
+        self._rpm = inputs.get("rpm", 0)
+        self._position = inputs.get("position", 0)
+        self._num_cars = inputs.get("num_cars", 0)
+
+        self._tyre_temp_avg = calc_tyre_temp_avg(live)
+        self._brake_temp_max = calc_brake_temp_max(live)
+
+        self.inputsChanged.emit()
+
+        # Live telemetry processor -- delta, timing, sectors, detections
+        result = self._processor.process(live, snap)
+        self._lockup_active = bool(result.get("lockup_active", False))
+        self._wheelspin_active = bool(result.get("wheelspin_active", False))
+        self._input_smoothness = float(result.get("input_smoothness", 0.75))
+        self._live_delta = float(result.get("live_delta_s", 0.0))
+        self._current_lap_time = result.get("current_lap_time_fmt", "")
+
+        # Coaching cards — show highest-severity card
+        cards = result.get("coaching_cards", [])
+        if cards:
+            self._coaching_cards = cards
+            cinfo = extract_coaching_top_card(cards)
+            self._coaching_visible = cinfo["visible"]
+            self._coaching_headline = cinfo["headline"]
+            self._coaching_sub = cinfo["sub"]
+            self._coaching_category = cinfo["category"]
+            self._coaching_severity = cinfo["severity"]
+            self._coaching_confidence = cinfo["confidence"]
+            self._coaching_sector = cinfo["sector"]
+            self.coachingChanged.emit()
+        elif self._coaching_visible:
+            self._coaching_visible = False
+            self.coachingChanged.emit()
+
+        # Use processor output for best/last when available, keep
+        # existing values as fallback so the overlay never blanks out.
+        best_fmt = result.get("best_lap_time_fmt", "")
+        if best_fmt:
+            self._best_time = best_fmt
+        last_fmt = result.get("last_lap_time_fmt", "")
+        if last_fmt:
+            self._last_time = last_fmt
+        # Corner analysis rows
+        self._corner_rows = result.get("corner_rows", [])
+        self.deltaChanged.emit()
+
+        # Tire state from processor
+        ts = result.get("tire_state", {})
+        if ts:
+            self._tire_grip_pct = float(ts.get("grip_pct", 100))
+            self._tire_lap_count = int(ts.get("lap_count", 0))
+            self._tire_laps_remaining = int(ts.get("laps_remaining", 99))
+            self._tire_condition = str(ts.get("condition", "good"))
+            self._tire_temp_lf = float(ts.get("avg_temp_lf", 0))
+            self._tire_temp_rf = float(ts.get("avg_temp_rf", 0))
+            self._tire_temp_lr = float(ts.get("avg_temp_lr", 0))
+            self._tire_temp_rr = float(ts.get("avg_temp_rr", 0))
+            self.tireChanged.emit()
+
+        # Sector states
+        raw_sectors = result.get("sector_rows", [])
+        new_sectors = build_sector_states(raw_sectors, self._lap_dist_pct)
+        if new_sectors != self._sector_states:
+            self._sector_states = new_sectors
+            self.timesChanged.emit()
+
+        # Context
+        ctx = extract_context(live, snap)
+        self._track = ctx["track"]
+        self._car = ctx["car"]
+        self._is_recording = ctx["is_recording"]
+        if self._is_recording:
+            self._has_been_recording = True
+        self._session_type = ctx["session_type"]
+        self._track_length_m = ctx["track_length_m"]
+        self._track_temp = ctx["track_temp"]
+        self._air_temp = ctx["air_temp"]
+        self._current_flag = ctx["current_flag"]
+
+        # Auto-hide: only hide overlays if we WERE recording and then stopped.
+        # If no session has started yet, always show overlays.
+        if self._auto_hide_enabled and not self._is_recording and self._has_been_recording:
+            self._should_show_overlays = False
+        else:
+            self._should_show_overlays = True
+
+        self.contextChanged.emit()
+
+        # Fuel calculation
+        fuel = float(live.get("fuel_level", 0.0))
+        if fuel > 0:
+            fs = calc_fuel_state(
+                fuel, self._prev_fuel_level, self._lap_fuel_samples,
+                self._lap_number, int(snap.get("total_laps", 0)),
+            )
+            self._fuel_level = fs["fuel_level"]
+            self._fuel_per_lap = fs["fuel_per_lap"]
+            self._fuel_laps_left = fs["fuel_laps_left"]
+            self._fuel_state = fs["fuel_state"]
+            self._prev_fuel_level = fs["prev_fuel_level"]
+            self._lap_fuel_samples = fs["lap_fuel_samples"]
+            self.fuelChanged.emit()
+
+        # Live strategy recalculation on lap transitions
+        if (
+            self._strategy is not None
+            and self._is_recording
+            and self._lap_number != self._strategy_prev_lap
+            and self._lap_number > 0
+        ):
+            self._strategy_prev_lap = self._lap_number
+            self.recalculateLiveStrategy()
+
+    @safe_slot()
+    @Slot()
+    def dismissCoaching(self) -> None:
+        """Dismiss the current coaching card."""
+        if self._coaching_cards:
+            self._coaching_cards.pop(0)
+        cinfo = extract_coaching_top_card(self._coaching_cards)
+        self._coaching_visible = cinfo["visible"]
+        self._coaching_headline = cinfo["headline"]
+        self._coaching_sub = cinfo["sub"]
+        self._coaching_category = cinfo["category"]
+        self._coaching_severity = cinfo["severity"]
+        self._coaching_confidence = cinfo["confidence"]
+        self._coaching_sector = cinfo["sector"]
+        self.coachingChanged.emit()

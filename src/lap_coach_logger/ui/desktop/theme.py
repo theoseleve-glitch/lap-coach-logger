@@ -1,0 +1,11 @@
+"""Color constants for the desktop overlay and workspace UI."""
+
+ASPHALT = "#06080B"
+CHALK = "#F2F4F7"
+STEEL = "#9AA5B4"
+CONCRETE = "#5E6673"
+PIT_ORANGE = "#C6A24C"
+SAFETY_RED = "#CE2D2D"
+MARSHAL_YELLOW = "#E0AF47"
+ACID_GREEN = "#35C978"
+RACING_PURPLE = "#7A6BBF"

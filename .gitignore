@@ -15,3 +15,18 @@ venv/
 .pytest_cache/
 config.json
 .worktrees/
+
+# Installer output
+*.exe
+
+# Graphify analysis output
+graphify-out/
+
+# Automation/workflow state (added 2026-04-23 during cycle 1 remediation)
+.superpowers/
+.claude/
+*.pid
+*.lock
+
+# Stray artifacts from misrun commands
+=1.26

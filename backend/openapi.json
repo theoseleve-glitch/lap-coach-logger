@@ -1,0 +1,1798 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Lap Coach Logger API",
+    "description": "Connected v1 ingestion + read API.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/v1/sessions-start": {
+      "post": {
+        "tags": [
+          "ingest"
+        ],
+        "summary": "Sessions Start",
+        "operationId": "sessions_start_v1_sessions_start_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions-end": {
+      "post": {
+        "tags": [
+          "ingest"
+        ],
+        "summary": "Sessions End",
+        "operationId": "sessions_end_v1_sessions_end_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionEndIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/laps-batch": {
+      "post": {
+        "tags": [
+          "ingest"
+        ],
+        "summary": "Laps Batch",
+        "operationId": "laps_batch_v1_laps_batch_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LapsBatchIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/coaching-batch": {
+      "post": {
+        "tags": [
+          "ingest"
+        ],
+        "summary": "Coaching Batch",
+        "operationId": "coaching_batch_v1_coaching_batch_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachingBatchIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/events-batch": {
+      "post": {
+        "tags": [
+          "ingest"
+        ],
+        "summary": "Events Batch",
+        "operationId": "events_batch_v1_events_batch_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventsBatchIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/v1/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Me",
+        "operationId": "me_v1_auth_me_get",
+        "parameters": [
+          {
+            "name": "lc_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lc Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions": {
+      "get": {
+        "tags": [
+          "read"
+        ],
+        "summary": "List Sessions",
+        "operationId": "list_sessions_v1_sessions_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "lc_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lc Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionSummary"
+                  },
+                  "title": "Response List Sessions V1 Sessions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "read"
+        ],
+        "summary": "Session Detail",
+        "operationId": "session_detail_v1_sessions__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "lc_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lc Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/registry/snapshot": {
+      "get": {
+        "tags": [
+          "registry"
+        ],
+        "summary": "Registry Snapshot",
+        "operationId": "registry_snapshot_v1_registry_snapshot_get",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "LUT version from the desktop's last fetch",
+              "default": "",
+              "title": "Since"
+            },
+            "description": "LUT version from the desktop's last fetch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/bundles": {
+      "post": {
+        "tags": [
+          "bundles"
+        ],
+        "summary": "Upload Bundle",
+        "description": "Accept a full session bundle as multipart/form-data.",
+        "operationId": "upload_bundle_v1_bundles_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/files/{filename}": {
+      "get": {
+        "tags": [
+          "bundles"
+        ],
+        "summary": "Download File",
+        "description": "Redirect to a MinIO pre-signed URL for the requested file.",
+        "operationId": "download_file_v1_sessions__session_id__files__filename__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          },
+          {
+            "name": "lc_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lc Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/drifts": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Drifts",
+        "description": "List canonical drifts — where desktop and backend disagree.",
+        "operationId": "list_drifts_v1_admin_drifts_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Drifts V1 Admin Drifts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/unresolved": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Unresolved",
+        "description": "List unresolved canonical mappings, sorted by most frequent first.",
+        "operationId": "list_unresolved_v1_admin_unresolved_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Unresolved V1 Admin Unresolved Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AcceptResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true,
+            "title": "Ok",
+            "default": true
+          },
+          "envelope_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Envelope Id"
+          },
+          "already_seen": {
+            "type": "boolean",
+            "title": "Already Seen",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "envelope_id"
+        ],
+        "title": "AcceptResponse"
+      },
+      "CoachingBatchIn": {
+        "properties": {
+          "coaching": {
+            "items": {
+              "$ref": "#/components/schemas/CoachingIn"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Coaching"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coaching"
+        ],
+        "title": "CoachingBatchIn"
+      },
+      "CoachingIn": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Session Id"
+          },
+          "consistency_score": {
+            "type": "number",
+            "title": "Consistency Score"
+          },
+          "trend": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Trend"
+          },
+          "focus_area": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Focus Area"
+          },
+          "recommendation": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Recommendation"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "consistency_score",
+          "trend",
+          "focus_area",
+          "recommendation",
+          "confidence",
+          "timestamp"
+        ],
+        "title": "CoachingIn"
+      },
+      "CoachingOut": {
+        "properties": {
+          "consistency_score": {
+            "type": "number",
+            "title": "Consistency Score"
+          },
+          "trend": {
+            "type": "string",
+            "title": "Trend"
+          },
+          "focus_area": {
+            "type": "string",
+            "title": "Focus Area"
+          },
+          "recommendation": {
+            "type": "string",
+            "title": "Recommendation"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "emitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Emitted At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consistency_score",
+          "trend",
+          "focus_area",
+          "recommendation",
+          "confidence",
+          "emitted_at"
+        ],
+        "title": "CoachingOut"
+      },
+      "EventIn": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Session Id"
+          },
+          "event_type": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Event Type"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "event_type",
+          "timestamp"
+        ],
+        "title": "EventIn"
+      },
+      "EventOut": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "occurred_at",
+          "payload"
+        ],
+        "title": "EventOut"
+      },
+      "EventsBatchIn": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventIn"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "title": "EventsBatchIn"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LapIn": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Session Id"
+          },
+          "lap_number": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Lap Number"
+          },
+          "lap_time_s": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Lap Time S"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid",
+            "default": true
+          },
+          "fuel_used_l": {
+            "type": "number",
+            "title": "Fuel Used L",
+            "default": 0.0
+          },
+          "sector_times_s": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Sector Times S"
+          },
+          "consistency_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consistency Pct"
+          },
+          "std_dev_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Std Dev S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "lap_number",
+          "lap_time_s"
+        ],
+        "title": "LapIn"
+      },
+      "LapOut": {
+        "properties": {
+          "lap_number": {
+            "type": "integer",
+            "title": "Lap Number"
+          },
+          "lap_time_s": {
+            "type": "number",
+            "title": "Lap Time S"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "fuel_used_l": {
+            "type": "number",
+            "title": "Fuel Used L"
+          },
+          "sector_times_s": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Sector Times S"
+          },
+          "consistency_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consistency Pct"
+          },
+          "std_dev_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Std Dev S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lap_number",
+          "lap_time_s",
+          "valid",
+          "fuel_used_l",
+          "sector_times_s",
+          "consistency_pct",
+          "std_dev_s"
+        ],
+        "title": "LapOut"
+      },
+      "LapsBatchIn": {
+        "properties": {
+          "laps": {
+            "items": {
+              "$ref": "#/components/schemas/LapIn"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Laps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "laps"
+        ],
+        "title": "LapsBatchIn"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "SessionDetail": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "sim": {
+            "type": "string",
+            "title": "Sim"
+          },
+          "track": {
+            "type": "string",
+            "title": "Track"
+          },
+          "car": {
+            "type": "string",
+            "title": "Car"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "sprint",
+              "endurance",
+              "coaching",
+              "data"
+            ],
+            "title": "Mode"
+          },
+          "driver_name": {
+            "type": "string",
+            "title": "Driver Name"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time"
+          },
+          "sample_count": {
+            "type": "integer",
+            "title": "Sample Count"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version"
+          },
+          "device_token": {
+            "type": "string",
+            "title": "Device Token"
+          },
+          "envelope_count": {
+            "type": "integer",
+            "title": "Envelope Count"
+          },
+          "canonical_car_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Car Id"
+          },
+          "canonical_car_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Car Name"
+          },
+          "car_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Car Class"
+          },
+          "canonical_track_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Track Id"
+          },
+          "canonical_track_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Track Name"
+          },
+          "track_layout": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Track Layout"
+          },
+          "bundle_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundle Hash"
+          },
+          "analysis_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Json"
+          },
+          "laps": {
+            "items": {
+              "$ref": "#/components/schemas/LapOut"
+            },
+            "type": "array",
+            "title": "Laps"
+          },
+          "coaching": {
+            "items": {
+              "$ref": "#/components/schemas/CoachingOut"
+            },
+            "type": "array",
+            "title": "Coaching"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventOut"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "sim",
+          "track",
+          "car",
+          "mode",
+          "driver_name",
+          "start_time",
+          "end_time",
+          "sample_count",
+          "source",
+          "schema_version",
+          "device_token",
+          "envelope_count",
+          "laps",
+          "coaching",
+          "events"
+        ],
+        "title": "SessionDetail"
+      },
+      "SessionEndIn": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Session Id"
+          },
+          "sim": {
+            "type": "string",
+            "title": "Sim"
+          },
+          "track": {
+            "type": "string",
+            "title": "Track"
+          },
+          "car": {
+            "type": "string",
+            "title": "Car"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "sprint",
+              "endurance",
+              "coaching",
+              "data"
+            ],
+            "title": "Mode"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "sample_count": {
+            "type": "integer",
+            "title": "Sample Count",
+            "default": 0
+          },
+          "driver_name": {
+            "type": "string",
+            "title": "Driver Name",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "sim",
+          "track",
+          "car",
+          "mode",
+          "start_time",
+          "end_time"
+        ],
+        "title": "SessionEndIn"
+      },
+      "SessionIn": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "title": "Session Id"
+          },
+          "sim": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Sim"
+          },
+          "track": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Track"
+          },
+          "car": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Car"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "sprint",
+              "endurance",
+              "coaching",
+              "data"
+            ],
+            "title": "Mode"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "title": "End Time",
+            "default": ""
+          },
+          "sample_count": {
+            "type": "integer",
+            "title": "Sample Count",
+            "default": 0
+          },
+          "driver_name": {
+            "type": "string",
+            "title": "Driver Name",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "sim",
+          "track",
+          "car",
+          "mode",
+          "start_time"
+        ],
+        "title": "SessionIn"
+      },
+      "SessionSummary": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "sim": {
+            "type": "string",
+            "title": "Sim"
+          },
+          "track": {
+            "type": "string",
+            "title": "Track"
+          },
+          "car": {
+            "type": "string",
+            "title": "Car"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "sprint",
+              "endurance",
+              "coaching",
+              "data"
+            ],
+            "title": "Mode"
+          },
+          "driver_name": {
+            "type": "string",
+            "title": "Driver Name"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time"
+          },
+          "sample_count": {
+            "type": "integer",
+            "title": "Sample Count"
+          },
+          "lap_count": {
+            "type": "integer",
+            "title": "Lap Count",
+            "default": 0
+          },
+          "canonical_car_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Car Id"
+          },
+          "canonical_car_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Car Name"
+          },
+          "car_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Car Class"
+          },
+          "canonical_track_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Track Id"
+          },
+          "canonical_track_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Track Name"
+          },
+          "track_layout": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Track Layout"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "sim",
+          "track",
+          "car",
+          "mode",
+          "driver_name",
+          "start_time",
+          "end_time",
+          "sample_count"
+        ],
+        "title": "SessionSummary"
+      },
+      "UserOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "display_name"
+        ],
+        "title": "UserOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

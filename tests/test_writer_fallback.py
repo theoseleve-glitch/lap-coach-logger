@@ -1,4 +1,4 @@
-"""Tests for writer fallback: CSV failure → Parquet, metadata, folder naming."""
+"""Tests for writer fallback: Parquet primary, CSV fallback, metadata, folder naming."""
 
 import json
 from pathlib import Path
@@ -22,7 +22,8 @@ def _make_samples(n: int = 5) -> list[TelemetrySample]:
     ]
 
 
-def test_csv_write_succeeds(tmp_path: Path) -> None:
+def test_parquet_write_succeeds(tmp_path: Path) -> None:
+    """Default finalization writes parquet as the primary telemetry format."""
     finalizer = SessionFinalizer(tmp_path)
     now = datetime.now(timezone.utc)
     result = finalizer.finalize(
@@ -34,30 +35,29 @@ def test_csv_write_succeeds(tmp_path: Path) -> None:
         session_uid="test123",
     )
     assert result is not None
-    assert (result / "telemetry.csv").exists()
-    assert (result / "metadata.json").exists()
+    assert (result / "telemetry.parquet").exists()
+    assert not (result / "telemetry.csv").exists()
+    assert (result / "session.json").exists()
 
-    meta = json.loads((result / "metadata.json").read_text())
-    assert meta["save_format"] == "csv"
-    assert meta["sample_count"] == 5
-    assert meta["app_version"] is not None
-    assert meta["logger_version"] is not None
-    assert meta["duration_s"] >= 0
-    assert "started_at_utc" in meta
-    assert "ended_at_utc" in meta
-    assert meta["sim"] == "iRacing"
-    assert meta["track_name"] == "Spa"
-    # data_quality_score: all samples have speed_kph and gear set
-    assert 0.0 < meta["data_quality_score"] <= 1.0
+    manifest = json.loads((result / "session.json").read_text())
+    # v2 format checks
+    assert manifest["schema_version"] == 2
+    assert manifest["logger_version"] is not None
+    assert manifest["session"]["duration_s"] >= 0
+    assert manifest["session"]["start_time"] is not None
+    assert manifest["session"]["end_time"] is not None
+    assert manifest["raw_source"]["sim_id"] == "iracing"
+    assert manifest["raw_source"]["raw_track"] == "Spa"
 
 
-def test_parquet_fallback_on_csv_failure(tmp_path: Path) -> None:
+def test_csv_fallback_on_parquet_failure(tmp_path: Path) -> None:
+    """When parquet write fails, CSV is produced as fallback."""
     finalizer = SessionFinalizer(tmp_path)
     now = datetime.now(timezone.utc)
 
     with patch(
-        "lap_coach_logger.writers.finalizer.CsvWriter.write_samples",
-        side_effect=RuntimeError("Simulated csv failure"),
+        "lap_coach_logger.writers.finalizer.ParquetWriter",
+        side_effect=RuntimeError("Simulated parquet failure"),
     ):
         result = finalizer.finalize(
             _make_samples(),
@@ -68,15 +68,16 @@ def test_parquet_fallback_on_csv_failure(tmp_path: Path) -> None:
         )
 
     assert result is not None
-    assert (result / "telemetry.parquet").exists()
-    assert not (result / "telemetry.csv").exists()
+    assert (result / "telemetry.csv").exists()
+    assert not (result / "telemetry.parquet").exists()
 
-    meta = json.loads((result / "metadata.json").read_text())
-    assert meta["save_format"] == "parquet"
+    manifest = json.loads((result / "session.json").read_text())
+    # v2 format: CSV fallback still produces session.json
+    assert manifest["schema_version"] == 2
 
 
 def test_debug_csv_export(tmp_path: Path) -> None:
-    """When debug_csv_export is True, a CSV is written alongside parquet."""
+    """When debug_csv_export is True, a debug CSV is written alongside parquet."""
     finalizer = SessionFinalizer(tmp_path, debug_csv_export=True)
     now = datetime.now(timezone.utc)
     result = finalizer.finalize(
@@ -87,8 +88,8 @@ def test_debug_csv_export(tmp_path: Path) -> None:
         session_type="race",
     )
     assert result is not None
-    assert (result / "telemetry.csv").exists()
-    assert not (result / "telemetry_debug.csv").exists()
+    assert (result / "telemetry.parquet").exists()
+    assert (result / "telemetry_debug.csv").exists()
 
 
 def test_stale_temp_cleanup(tmp_path: Path) -> None:
@@ -137,7 +138,7 @@ def test_validate_samples_empty() -> None:
 
 # -- metadata enriched fields --
 
-def test_metadata_has_enriched_fields(tmp_path: Path) -> None:
+def test_session_has_enriched_fields(tmp_path: Path) -> None:
     finalizer = SessionFinalizer(tmp_path)
     now = datetime.now(timezone.utc)
     result = finalizer.finalize(
@@ -149,8 +150,7 @@ def test_metadata_has_enriched_fields(tmp_path: Path) -> None:
         extra_metadata={"car": "Porsche 911", "sample_rate_hz": 10.0, "dropped_samples": 2},
     )
     assert result is not None
-    meta = json.loads((result / "metadata.json").read_text())
-    assert meta["car_name"] == "Porsche 911"
-    assert meta["sample_rate_hz"] == 10.0
-    assert meta["dropped_sample_count"] == 2
-    assert "output_path" in meta
+    manifest = json.loads((result / "session.json").read_text())
+    # v2: car is in raw_source
+    assert manifest["raw_source"]["raw_car"] == "Porsche 911"
+    assert manifest["session"]["sample_count"] == 5

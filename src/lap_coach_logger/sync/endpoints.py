@@ -18,32 +18,34 @@ class EndpointSpec:
 
 
 _SPECS: dict[str, EndpointSpec] = {
+    # All backend routes live under /v1. base_url in config should be the
+    # root domain (e.g. https://api.example.com), not include /v1.
     "session": EndpointSpec(
-        path="/sessions/start",
+        path="/v1/sessions-start",
         batch_key=None,
         max_batch_size=1,
         idempotency_header="Idempotency-Key",
     ),
     "session_end": EndpointSpec(
-        path="/sessions/end",
+        path="/v1/sessions-end",
         batch_key=None,
         max_batch_size=1,
         idempotency_header="Idempotency-Key",
     ),
     "lap": EndpointSpec(
-        path="/laps/batch",
+        path="/v1/laps-batch",
         batch_key="laps",
         max_batch_size=50,
         idempotency_header="Idempotency-Key",
     ),
     "coaching": EndpointSpec(
-        path="/coaching/batch",
+        path="/v1/coaching-batch",
         batch_key="coaching",
         max_batch_size=50,
         idempotency_header="Idempotency-Key",
     ),
     "event": EndpointSpec(
-        path="/events/batch",
+        path="/v1/events-batch",
         batch_key="events",
         max_batch_size=50,
         idempotency_header="Idempotency-Key",

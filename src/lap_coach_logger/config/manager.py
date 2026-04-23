@@ -52,7 +52,10 @@ class ConfigManager:
             with open(tmp_fd, "w", encoding="utf-8") as f:
                 json.dump(cfg.to_dict(), f, indent=2)
             Path(tmp_path).replace(self.path)
-            log.info("Config saved to %s", self.path)
+            # DEBUG (not INFO) because SaveScheduler coalesces routine
+            # writes and we do not want burst-logging in production.
+            # First-run creation still emits INFO via load().
+            log.debug("Config saved to %s", self.path)
         except Exception:
             log.exception("Failed to save config")
             Path(tmp_path).unlink(missing_ok=True)

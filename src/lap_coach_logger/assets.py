@@ -56,6 +56,22 @@ def monogram_path() -> Path | None:
     return resolve_asset(*MONOGRAM_CANDIDATES)
 
 
+def overlay_workspace_hero_path() -> Path | None:
+    """Return the hero/banner image for the overlay workspace panel."""
+    return resolve_asset(
+        "assets/overlay_workspace/hero.png",
+        "assets/overlay_workspace/hero.svg",
+    )
+
+
+def overlay_workspace_icon_path(name: str) -> Path | None:
+    """Return the icon for a named workspace section."""
+    return resolve_asset(
+        f"assets/overlay_workspace/icons/{name}.svg",
+        f"assets/overlay_workspace/icons/{name}.png",
+    )
+
+
 def qml_dir() -> Path:
     """Return the root QML directory (for QQmlApplicationEngine import paths)."""
     candidate = bundle_resource_path("src/lap_coach_logger/qml")

@@ -10,7 +10,18 @@ import logging
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
+from lap_coach_logger.coaching.policy_config import RACE_OVERLAY_POLICY
+from lap_coach_logger.coaching.presentation import CoachingMessage
+from lap_coach_logger.coaching.surface_policy import (
+    SurfaceState,
+    compute_surface_state,
+)
 from lap_coach_logger.core.live_telemetry_processor import LiveTelemetryProcessor
+from lap_coach_logger.core.pit_call_state import (
+    PitCallState,
+    STATE_ON_PLAN,
+    advance_pit_call_state,
+)
 from lap_coach_logger.core.race_strategy import RaceStrategy, calculate_strategy, recalculate_live
 from lap_coach_logger.utils.overlay_hwnd import apply_overlay_flags, apply_overlay_flags_to_all_overlays, remove_overlay_flags
 from lap_coach_logger.utils.qt_safe_slot import safe_slot
@@ -32,9 +43,9 @@ from lap_coach_logger.viewmodels.overlay_helpers import (
     make_default_widget_settings,
 )
 
-log = logging.getLogger(__name__)
-
 from lap_coach_logger.core.mode_descriptor import get_mode
+
+log = logging.getLogger(__name__)
 
 
 class OverlayViewModel(QObject):
@@ -99,6 +110,7 @@ class OverlayViewModel(QObject):
         self._lap_number: int = 0
         self._track: str = ""
         self._car: str = ""
+        self._car_class: str = ""        # e.g. "GT3" — drives fuel calibration
         self._is_recording: bool = False
         self._elapsed: str = ""
         self._gear: int = 0
@@ -162,6 +174,23 @@ class OverlayViewModel(QObject):
         self._strategy_fuel_at_finish: float = 0.0
         self._strategy_prev_lap: int = -1
         self._strategy_weather_alert: str = ""
+
+        # Corner-level technique coaching — tracks the last insights lap
+        # we forwarded to the strategy VM so we push exactly once per lap
+        # finalisation.
+        self._technique_last_pushed_lap: int | None = None
+
+        # Coaching surface state — updated per snapshot via the policy
+        # engine. Kept as a single dataclass so tests can introspect it
+        # and QML bindings refresh exactly once per change.
+        self._coaching_surface: SurfaceState = SurfaceState()
+
+        # Pit-call state machine — the deterministic source for the
+        # pit_countdown + strategy_status widgets. Advanced once per
+        # snapshot from (lapsToPit, is_in_pits, was_in_pits); all widget
+        # properties derive from it so they can't contradict each other.
+        self._pit_call_state: PitCallState = PitCallState()
+        self._was_in_pits_prev: bool = False
 
         # Tire state
         self._tire_grip_pct: float = 100.0
@@ -376,6 +405,69 @@ class OverlayViewModel(QObject):
     def coachingSector(self) -> str:  # noqa: N802
         return self._coaching_sector
 
+    # -- Technique coaching (corner-level self-comparison) --------------------
+    # These properties proxy the strategy VM's coaching plan so the overlay
+    # can render a compact technique card without duplicating state.
+
+    def _strategy_attr(self, name: str, default: str = "") -> str:
+        vm = self._strategy_vm
+        return str(getattr(vm, name, default)) if vm is not None else default
+
+    # -- Coaching surface state (policy-governed) ----------------------------
+    # Thin QML accessors over self._coaching_surface; all upstream gating
+    # (visibility, cooldown, hysteresis, formatting) lives in surface_policy.
+
+    @Property(bool, notify=coachingChanged)
+    def coachingSurfaceVisible(self) -> bool:  # noqa: N802
+        return self._coaching_surface.visible
+
+    @Property(str, notify=coachingChanged)
+    def coachingSurfaceHeadline(self) -> str:  # noqa: N802
+        return self._coaching_surface.message.headline
+
+    @Property(str, notify=coachingChanged)
+    def coachingSurfaceSub(self) -> str:  # noqa: N802
+        return self._coaching_surface.message.subline
+
+    @Property(str, notify=coachingChanged)
+    def coachingSurfaceSeverity(self) -> str:  # noqa: N802
+        return self._coaching_surface.message.severity
+
+    @Property(str, notify=coachingChanged)
+    def coachingSurfaceCategory(self) -> str:  # noqa: N802
+        return self._coaching_surface.message.category
+
+    @Property(str, notify=coachingChanged)
+    def coachingSurfaceFocus(self) -> str:  # noqa: N802
+        return self._coaching_surface.message.focus_id
+
+    @Property(str, notify=coachingChanged)
+    def coachingSurfaceFreshness(self) -> str:  # noqa: N802
+        """Freshness state: 'live' / 'carryover' / 'stale' (replaces
+        the legacy time_loss sentinel so QML can distinguish an active
+        coaching tip from a carryover display)."""
+        return self._coaching_surface.freshness
+
+    @Property(str, notify=coachingChanged)
+    def techniqueCornerFocus(self) -> str:  # noqa: N802
+        """Corner the coaching plan is targeting (empty for sector focus)."""
+        return self._strategy_attr("cornerFocus")
+
+    @Property(str, notify=coachingChanged)
+    def techniqueInsight(self) -> str:  # noqa: N802
+        """Concise data-driven coaching statement from the latest plan."""
+        return self._strategy_attr("techniqueInsight")
+
+    @Property(str, notify=coachingChanged)
+    def techniqueAction(self) -> str:  # noqa: N802
+        """One-line action hint from the corner insight."""
+        return self._strategy_attr("techniqueAction")
+
+    @Property(str, notify=coachingChanged)
+    def techniqueConfidence(self) -> str:  # noqa: N802
+        """Confidence tier of the technique insight: high/medium/low."""
+        return self._strategy_attr("techniqueConfidence", "low")
+
     @Property("QVariant", notify=deltaChanged)
     def cornerRows(self) -> list:  # noqa: N802
         return self._corner_rows
@@ -443,19 +535,247 @@ class OverlayViewModel(QObject):
         """One-line weather alert text from the strategy plan."""
         return self._strategy_weather_alert
 
+    # -- Redesign v2: derived widget state -------------------------------------
+
+    @Property(int, notify=strategyChanged)
+    def lapsToPit(self) -> int:  # noqa: N802
+        """Laps to next planned pit. -1 if unknown."""
+        vm = self._strategy_vm
+        return int(vm.lapsToPit) if vm is not None else -1
+
+    @Property(bool, notify=strategyChanged)
+    def pitNow(self) -> bool:  # noqa: N802
+        """True when driver should pit THIS lap."""
+        vm = self._strategy_vm
+        return bool(vm.pitNow) if vm is not None else False
+
+    @Property(float, notify=strategyChanged)
+    def pitFuelLoad(self) -> float:  # noqa: N802
+        """Fuel to add at next stop (L)."""
+        vm = self._strategy_vm
+        return float(vm.pitFuelLoad) if vm is not None else 0.0
+
+    @Property(float, notify=strategyChanged)
+    def fuelMargin(self) -> float:  # noqa: N802
+        """Fuel margin in liters (current - needed).
+
+        Honors ``_mock_fuel_margin_l`` when set by the smoke harness
+        (``injectSmokeState``). Production always reads from strategy VM.
+        """
+        mock = getattr(self, "_mock_fuel_margin_l", None)
+        if mock is not None:
+            return float(mock)
+        vm = self._strategy_vm
+        return float(vm.fuelMargin) if vm is not None else 0.0
+
+    def _current_fuel_state(self) -> str:
+        """Class-calibrated fuel state shared by the pit + status helpers."""
+        from lap_coach_logger.viewmodels.overlay_derived import compute_fuel_state
+        return compute_fuel_state(self.fuelMargin, self._car_class)
+
+    def _pit_countdown_display(self):
+        """Pit countdown display derived from the pit-call state machine."""
+        from lap_coach_logger.viewmodels.overlay_derived import build_pit_countdown_from_state
+        return build_pit_countdown_from_state(
+            state=self._pit_call_state,
+            pit_fuel_load=self.pitFuelLoad,
+            fuel_state=self._current_fuel_state(),
+        )
+
+    @Property(str, notify=strategyChanged)
+    def pitCountdownHeadline(self) -> str:  # noqa: N802
+        """Compact headline for pit_countdown widget ("PIT IN 3" / "BOX BOX BOX" / "")."""
+        return self._pit_countdown_display().headline
+
+    @Property(str, notify=strategyChanged)
+    def pitCountdownSub(self) -> str:  # noqa: N802
+        """Sub-text for pit_countdown widget ("38L fuel" / "")."""
+        return self._pit_countdown_display().sub
+
+    @Property(str, notify=strategyChanged)
+    def pitCountdownSeverity(self) -> str:  # noqa: N802
+        """Severity for pit_countdown widget ("ok" / "advisory" / "critical")."""
+        return self._pit_countdown_display().severity
+
+    @Property(bool, notify=strategyChanged)
+    def pitCountdownVisible(self) -> bool:  # noqa: N802
+        """Whether pit_countdown should render (``on_plan`` is the only hidden state)."""
+        return self._pit_countdown_display().visible
+
+    @Property(str, notify=strategyChanged)
+    def pitCallState(self) -> str:  # noqa: N802
+        """Current pit-call state label (for diagnostics / QML styling)."""
+        return self._pit_call_state.state
+
+    def _strategy_status_obj(self):
+        """Strategy status derived from the same PitCallState that drives
+        the countdown widget, so the two can't disagree on severity."""
+        from lap_coach_logger.viewmodels.overlay_derived import build_strategy_status_from_state
+        return build_strategy_status_from_state(
+            position=self._position if self._position > 0 else None,
+            current_lap=self._lap_number,
+            total_laps=self._strategy_total_laps,
+            fuel_state=self._current_fuel_state(),
+            grip_pct=self._tire_grip_pct if self._tire_grip_pct > 0 else None,
+            pit_state=self._pit_call_state,
+        )
+
+    @Property(str, notify=strategyChanged)
+    def strategyStatusLine(self) -> str:  # noqa: N802
+        """Compact one-line strategy banner ("P5 · L9/20 · Fuel SAFE · Grip 82%")."""
+        return self._strategy_status_obj().line
+
+    @Property(str, notify=strategyChanged)
+    def strategyStatusSeverity(self) -> str:  # noqa: N802
+        """Severity for strategy_status widget."""
+        return self._strategy_status_obj().severity
+
+    def _push_manage_state_obj(self):
+        """Shared compute for state/reason/confidence/hint properties.
+
+        Prefers live strategy stint data from the strategy VM; falls
+        back to legacy tire counters only when the plan isn't active.
+        """
+        from lap_coach_logger.viewmodels.overlay_derived import (
+            compute_fuel_state,
+            compute_push_manage,
+        )
+
+        # Live stint data (preferred): from strategy VM's live recalc
+        live_stint_lap: int | None = None
+        live_stint_total: int | None = None
+        has_live = False
+        vm = self._strategy_vm
+        if vm is not None:
+            try:
+                lap = int(vm.currentStintLap)
+                total = int(vm.currentStintTotalLaps)
+                if lap > 0 and total > 0:
+                    live_stint_lap = lap
+                    live_stint_total = total
+                    has_live = True
+            except (AttributeError, TypeError, ValueError):
+                pass
+
+        # Fallback: legacy tire counter (only if no live data)
+        if not has_live:
+            if self._tire_lap_count > 0:
+                live_stint_lap = self._tire_lap_count
+            if self._strategy_tire_life > 0:
+                live_stint_total = self._strategy_tire_life
+
+        return compute_push_manage(
+            fuel_margin_l=self.fuelMargin,
+            fuel_state=compute_fuel_state(self.fuelMargin, self._car_class),
+            grip_pct=self._tire_grip_pct if self._tire_grip_pct > 0 else None,
+            stint_lap=live_stint_lap,
+            stint_total_laps=live_stint_total,
+            has_live_stint_data=has_live,
+        )
+
+    @Property(str, notify=strategyChanged)
+    def pushManageState(self) -> str:  # noqa: N802
+        """PUSH / MANAGE / SAVE / HOLD (endurance decision)."""
+        return self._push_manage_state_obj().state
+
+    @Property(str, notify=strategyChanged)
+    def pushManageReason(self) -> str:  # noqa: N802
+        """Short reason explaining the push/manage decision."""
+        return self._push_manage_state_obj().reason
+
+    @Property(str, notify=strategyChanged)
+    def pushManageConfidence(self) -> str:  # noqa: N802
+        """Confidence in the decision: high / medium / low."""
+        return self._push_manage_state_obj().confidence
+
+    @Property(str, notify=strategyChanged)
+    def pushManageHint(self) -> str:  # noqa: N802
+        """One-line driver instruction (widget sub-text)."""
+        return self._push_manage_state_obj().hint
+
+    @Property("QVariant", notify=timesChanged)
+    def sectorDeltas(self) -> list:  # noqa: N802
+        """Per-sector delta list [s1, s2, s3] in seconds vs best lap.
+
+        Each entry may be None (unavailable) — QML widget renders "—"
+        for None cells. Always length-3 when populated; empty when no
+        processor output has been seen yet.
+        """
+        deltas = getattr(self, "_sector_deltas", None)
+        if not deltas:
+            return []
+        # QVariant → JS: None passes through as undefined, which QML's
+        # isFinite() check rejects correctly.
+        return list(deltas)
+
+    # -- Gap timing (iRacing primary source; others degraded) ------------------
+
+    @Property(float, notify=contextChanged)
+    def gapAhead(self) -> float:  # noqa: N802
+        """Time gap to car ahead in seconds. NaN when adapter doesn't provide it."""
+        return float(getattr(self, "_gap_ahead_s", float("nan")))
+
+    @Property(float, notify=contextChanged)
+    def gapBehind(self) -> float:  # noqa: N802
+        """Time gap to car behind in seconds. NaN when adapter doesn't provide it."""
+        return float(getattr(self, "_gap_behind_s", float("nan")))
+
+    @Property(int, notify=contextChanged)
+    def positionAhead(self) -> int:  # noqa: N802
+        """Position number of the car ahead. 0 when unavailable."""
+        return int(getattr(self, "_position_ahead", 0))
+
+    @Property(int, notify=contextChanged)
+    def positionBehind(self) -> int:  # noqa: N802
+        """Position number of the car behind. 0 when unavailable."""
+        return int(getattr(self, "_position_behind", 0))
+
     # -- Strategy VM wiring ----------------------------------------------------
 
     def set_strategy_vm(self, vm: object) -> None:
         """Store a reference to the StrategyViewModel and connect its signals."""
         self._strategy_vm = vm
+        # Reset the pit-state machine so stale state from a previous
+        # session (was_in_pits=True at session exit, or a latched
+        # stint_high_water) doesn't produce spurious STOP_COMPLETED
+        # latches or suppress a legitimate early pit call in the new
+        # session.
+        self.reset_pit_state()
         vm.planChanged.connect(self._sync_strategy_from_vm)
         vm.alertsChanged.connect(self._sync_strategy_from_vm)
+        # Route the strategy VM's profile/plan updates into our coaching
+        # signal so the technique properties refresh on lap boundaries.
+        try:
+            vm.profilesChanged.connect(self.coachingChanged.emit)
+        except Exception:
+            # profilesChanged may not exist in very old mocks; ignore.
+            pass
+
+    def reset_pit_state(self) -> None:
+        """Clear the pit-call state machine back to on_plan.
+
+        Called when the strategy VM is (re-)wired, and from the
+        ``clear`` smoke scenario. Emits ``strategyChanged`` so the
+        countdown + status widgets refresh immediately.
+        """
+        if self._pit_call_state.state != STATE_ON_PLAN or self._was_in_pits_prev:
+            self._pit_call_state = PitCallState()
+            self._was_in_pits_prev = False
+            self.strategyChanged.emit()
 
     def _sync_strategy_from_vm(self) -> None:
         """Read strategy VM state and update overlay properties."""
         vm = self._strategy_vm
         if vm is None:
             return
+
+        # Pull car_class for fuel calibration (resolved by desktop LUT)
+        try:
+            cls = getattr(vm, "carClass", "") or ""
+            if cls and cls != self._car_class:
+                self._car_class = str(cls)
+        except Exception:
+            pass
 
         plan = vm.racePlan
         if plan:
@@ -1167,6 +1487,22 @@ class OverlayViewModel(QObject):
             self._sector_states = new_sectors
             self.timesChanged.emit()
 
+        # Sector delta scalars for the sector_delta widget (Part 2 plumbing).
+        # Extract [delta_s1, delta_s2, delta_s3] — None entries stay None
+        # so the widget can render "—" per cell instead of a misleading 0.
+        new_deltas: list[float | None] = []
+        for row in raw_sectors[:3]:
+            d = row.get("delta_s") if isinstance(row, dict) else None
+            new_deltas.append(float(d) if isinstance(d, (int, float)) else None)
+        # Pad to 3 entries so QML always has a stable shape
+        while len(new_deltas) < 3:
+            new_deltas.append(None)
+        if new_deltas != getattr(self, "_sector_deltas", None):
+            self._sector_deltas = new_deltas
+            # timesChanged already emitted above if sector_states changed;
+            # emit here too in case sectors are identical but deltas changed
+            self.timesChanged.emit()
+
         # Context
         ctx = extract_context(live, snap)
         self._track = ctx["track"]
@@ -1213,6 +1549,273 @@ class OverlayViewModel(QObject):
         ):
             self._strategy_prev_lap = self._lap_number
             self.recalculateLiveStrategy()
+
+        # -- Corner-level technique coaching ----------------------------------
+        # Forward per-corner insights into the strategy VM once per lap
+        # finalisation so the coaching plan can focus on the dominant corner.
+        insights_lap = result.get("corner_insights_lap")
+        if (
+            insights_lap is not None
+            and insights_lap != self._technique_last_pushed_lap
+            and self._strategy_vm is not None
+        ):
+            try:
+                self._strategy_vm.push_corner_insights(result.get("corner_insights") or [])
+            except Exception:
+                log.debug("push_corner_insights failed", exc_info=True)
+            self._technique_last_pushed_lap = insights_lap
+
+        # Advance the pit-call state machine — deterministic source for
+        # pit_countdown + strategy_status. Runs before the coaching
+        # surface refresh so any state-driven severity changes are
+        # reflected in the coaching suppression decision.
+        is_in_pits_now = bool(live.get("is_in_pits") or snap.get("is_in_pits") or False)
+        new_pit_state = advance_pit_call_state(
+            self._pit_call_state,
+            laps_to_pit=self.lapsToPit,
+            is_in_pits=is_in_pits_now,
+            was_in_pits=self._was_in_pits_prev,
+        )
+        if new_pit_state != self._pit_call_state:
+            self._pit_call_state = new_pit_state
+            self.strategyChanged.emit()
+        self._was_in_pits_prev = is_in_pits_now
+
+        # Refresh the coaching surface state via the policy engine so
+        # visibility / cooldown / anti-oscillation kick in.
+        raw_now = snap.get("session_time_s") or live.get("session_time_s")
+        try:
+            now_s = float(raw_now) if raw_now is not None else 0.0
+        except (TypeError, ValueError):
+            now_s = 0.0
+        self._refresh_coaching_surface(now_s=now_s)
+
+        # -- Relative / gap timing (Part 1 plumbing) --------------------------
+        self._apply_relative(snap.get("relative"))
+
+        # -- Sector delta extraction (Part 2 plumbing) ------------------------
+        # Called only when processor result is available in this method's scope
+        # (see _apply_sector_deltas for the extraction logic).
+
+    def _refresh_coaching_surface(self, *, now_s: float) -> None:
+        """Re-compute the policy-governed coaching surface state.
+
+        Pulls the unified ``coachingMessage`` dict from the strategy VM
+        (same contract all surfaces consume) and feeds it through the
+        policy engine. Emits ``coachingChanged`` only when the state
+        actually changes so QML bindings don't re-render every tick.
+        """
+        message = self._build_coaching_message()
+        critical = bool(self.pitNow) or self.strategyStatusSeverity == "critical"
+        next_state = compute_surface_state(
+            previous=self._coaching_surface,
+            message=message,
+            critical_alert=critical,
+            now_s=now_s,
+            config=RACE_OVERLAY_POLICY,
+        )
+        if next_state != self._coaching_surface:
+            self._coaching_surface = next_state
+            self.coachingChanged.emit()
+
+    def _build_coaching_message(self) -> CoachingMessage:
+        """Build the unified CoachingMessage for the overlay surface.
+
+        Calls the strategy VM's ``build_coaching_message`` helper
+        directly with ``RACE_OVERLAY_POLICY`` — no dict round-trip, no
+        type-coercion loss. Falls back to reconstructing from the
+        ``coachingMessage`` dict only for test mocks that predate the
+        helper method.
+        """
+        vm = self._strategy_vm
+        if vm is None:
+            return CoachingMessage()
+        builder = getattr(vm, "build_coaching_message", None)
+        if callable(builder):
+            try:
+                return builder(config=RACE_OVERLAY_POLICY)
+            except Exception:
+                log.debug("build_coaching_message failed", exc_info=True)
+                return CoachingMessage()
+        # Mock-only fallback: reconstruct from the dict @Property.
+        raw = getattr(vm, "coachingMessage", None)
+        if not isinstance(raw, dict):
+            return CoachingMessage()
+        return CoachingMessage(
+            focus_id=str(raw.get("focus_id") or ""),
+            category=str(raw.get("category") or ""),
+            headline=str(raw.get("headline") or ""),
+            subline=str(raw.get("subline") or ""),
+            confidence=str(raw.get("confidence") or "low"),
+            severity=str(raw.get("severity") or "ok"),
+            time_loss_s=raw.get("time_loss_s"),
+            supporting=dict(raw.get("supporting") or {}),
+        )
+
+    def _apply_relative(self, relative: dict | None) -> None:
+        """Populate gap_ahead_s / gap_behind_s / position_{ahead,behind}.
+
+        Only emits contextChanged when values actually change, so repeat
+        snapshots with identical relative data don't trigger spurious
+        UI repaints. NaN signals "unknown" to QML.
+        """
+        if not relative or not isinstance(relative, dict):
+            new_ahead = float("nan")
+            new_behind = float("nan")
+            new_pos_ahead = 0
+            new_pos_behind = 0
+        else:
+            def _f(key: str) -> float:
+                v = relative.get(key)
+                return float(v) if isinstance(v, (int, float)) else float("nan")
+
+            def _i(key: str) -> int:
+                v = relative.get(key)
+                return int(v) if isinstance(v, (int, float)) and v > 0 else 0
+
+            new_ahead = _f("gap_ahead_s")
+            new_behind = _f("gap_behind_s")
+            new_pos_ahead = _i("position_ahead")
+            new_pos_behind = _i("position_behind")
+
+        # Compare (NaN-aware — NaN != NaN, so use repr for change detection)
+        def _same(a: float, b: float) -> bool:
+            # Both NaN counts as "same" for change-detection purposes
+            import math
+            if math.isnan(a) and math.isnan(b):
+                return True
+            return a == b
+
+        prev_ahead = getattr(self, "_gap_ahead_s", float("nan"))
+        prev_behind = getattr(self, "_gap_behind_s", float("nan"))
+        changed = (
+            not _same(prev_ahead, new_ahead)
+            or not _same(prev_behind, new_behind)
+            or getattr(self, "_position_ahead", 0) != new_pos_ahead
+            or getattr(self, "_position_behind", 0) != new_pos_behind
+        )
+
+        self._gap_ahead_s = new_ahead
+        self._gap_behind_s = new_behind
+        self._position_ahead = new_pos_ahead
+        self._position_behind = new_pos_behind
+
+        if changed:
+            self.contextChanged.emit()
+
+    @safe_slot()
+    @Slot(str)
+    def injectSmokeState(self, scenario: str) -> None:  # noqa: N802
+        """Debug: inject representative widget state for smoke validation.
+
+        Not for production. Called from the overlay manager's
+        "Smoke test" button. Scenarios:
+
+          - "pit_advisory"  → laps_to_pit=3, fuel SAFE
+          - "pit_now"       → laps_to_pit=1, fuel SAFE
+          - "box_box_box"   → laps_to_pit=0, fuel SAFE
+          - "fuel_deficit"  → fuel DEFICIT, strategy_status turns red
+          - "sector_delta"  → sectorDeltas=[-0.2, +0.3, null]
+          - "gap_available" → gap_ahead=1.2s P4, gap_behind=0.8s P6
+          - "gap_missing"   → gaps NaN, widget renders degraded
+          - "push_manage_save" → state=SAVE
+          - "clear"         → reset all injected state
+        """
+        if scenario == "pit_advisory":
+            self._mock_pit_state(laps_to_pit=3, pit_fuel=40.0)
+        elif scenario == "pit_now":
+            self._mock_pit_state(laps_to_pit=1, pit_fuel=40.0)
+        elif scenario == "box_box_box":
+            self._mock_pit_state(laps_to_pit=0, pit_fuel=40.0)
+        elif scenario == "fuel_deficit":
+            self._mock_fuel_state(margin=-1.5)
+        elif scenario == "sector_delta":
+            self._sector_deltas = [-0.2, 0.3, None]
+            self.timesChanged.emit()
+        elif scenario == "gap_available":
+            self._gap_ahead_s = 1.2
+            self._gap_behind_s = 0.8
+            self._position_ahead = 4
+            self._position_behind = 6
+            self.contextChanged.emit()
+        elif scenario == "gap_missing":
+            self._gap_ahead_s = float("nan")
+            self._gap_behind_s = float("nan")
+            self._position_ahead = 0
+            self._position_behind = 0
+            self.contextChanged.emit()
+        elif scenario == "push_manage_save":
+            self._mock_fuel_state(margin=0.2)
+        elif scenario == "coaching_live":
+            # Live high-confidence coaching surface (race_reminder widget)
+            self._coaching_surface = SurfaceState(
+                message=CoachingMessage(
+                    focus_id="T5",
+                    category="corner",
+                    headline="T5: Braking begins later than your best",
+                    subline="Brake 10m earlier, smoother release",
+                    confidence="high",
+                    severity="positive",
+                    time_loss_s=0.35,
+                ),
+                visible=True,
+                freshness="live",
+                last_update_s=0.0,
+            )
+            self.coachingChanged.emit()
+        elif scenario == "coaching_carryover":
+            self._coaching_surface = SurfaceState(
+                message=CoachingMessage(
+                    focus_id="T7",
+                    category="corner",
+                    headline="T7: Throttle pickup is delayed",
+                    subline="Get on throttle earlier",
+                    confidence="high",
+                    severity="positive",
+                    time_loss_s=0.25,
+                ),
+                visible=True,
+                freshness="carryover",
+                last_update_s=30.0,
+            )
+            self.coachingChanged.emit()
+        elif scenario == "coaching_suppressed":
+            # Empty surface — simulates critical-alert suppression
+            self._coaching_surface = SurfaceState(visible=False, freshness="stale")
+            self.coachingChanged.emit()
+        elif scenario == "clear":
+            self._sector_deltas = []
+            self._gap_ahead_s = float("nan")
+            self._gap_behind_s = float("nan")
+            self._position_ahead = 0
+            self._position_behind = 0
+            self._coaching_surface = SurfaceState()
+            self._pit_call_state = PitCallState()
+            self._was_in_pits_prev = False
+            self.timesChanged.emit()
+            self.contextChanged.emit()
+            self.strategyChanged.emit()
+            self.coachingChanged.emit()
+
+    def _mock_pit_state(self, laps_to_pit: int, pit_fuel: float) -> None:
+        """Smoke helper: fake a strategy VM that reports a pit lap soon."""
+        # Emit strategyChanged so derived properties recompute; the
+        # strategy VM stays unchanged — QML bindings re-read via property.
+        self._strategy_next_pit_lap = self._lap_number + laps_to_pit
+        self._strategy_fuel_to_add = pit_fuel
+        self.strategyChanged.emit()
+
+    def _mock_fuel_state(self, margin: float) -> None:
+        """Smoke helper: set internal fuel state to trigger a specific band."""
+        # Synthesize a burn that produces the desired margin given lap 1/20
+        if self._strategy_total_laps <= 0:
+            self._strategy_total_laps = 20
+        remaining_laps = max(1, self._strategy_total_laps - self._lap_number)
+        # For the VM's fuelMargin calculation: margin = current_fuel - remaining_laps * burn
+        # We override the strategy-VM-backed fuelMargin by setting a mock attr
+        # that takes precedence in the property getter below.
+        self._mock_fuel_margin_l = margin
+        self.strategyChanged.emit()
 
     @safe_slot()
     @Slot()

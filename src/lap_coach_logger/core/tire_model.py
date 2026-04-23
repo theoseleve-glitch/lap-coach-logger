@@ -47,7 +47,9 @@ class TireDegradationTracker:
     def __init__(self) -> None:
         self._state = TireState()
         self._lap_temps: list[tuple[float, float, float, float]] = []
+        self._lap_wear: list[float] = []
         self._last_lap: int = 0
+        self._current_temps: list[tuple[float, float, float, float]] = []
 
     @property
     def state(self) -> TireState:
@@ -59,14 +61,12 @@ class TireDegradationTracker:
             if self._last_lap > 0:
                 self._finalize_lap()
             self._last_lap = lap_number
-            self._current_temps: list[tuple[float, float, float, float]] = []
-
-        if not hasattr(self, "_current_temps"):
             self._current_temps = []
+
         self._current_temps.append(temps)
 
     def _finalize_lap(self) -> None:
-        if not hasattr(self, "_current_temps") or not self._current_temps:
+        if not self._current_temps:
             return
 
         n = len(self._current_temps)
@@ -78,7 +78,7 @@ class TireDegradationTracker:
         self._state.avg_temp_lr = avg[2]
         self._state.avg_temp_rr = avg[3]
 
-        # Estimate grip from temperature and lap count
+        # Compute this lap's wear from its own temperature
         avg_all = sum(avg) / 4
         temp_penalty = 0.0
         if avg_all < self.OPTIMAL_TEMP_RANGE[0]:
@@ -87,10 +87,14 @@ class TireDegradationTracker:
             temp_penalty = (avg_all - self.OPTIMAL_TEMP_RANGE[1]) * 0.5
 
         # Base degradation: ~2% per lap + temperature penalty
-        base_wear = 2.0 + temp_penalty * 0.1
-        self._state.wear_rate = base_wear
-        self._state.grip_pct = max(0.0, 100.0 - self._state.lap_count * base_wear)
-        self._state.laps_remaining = max(0, int((self._state.grip_pct - self.GRIP_THRESHOLD) / max(0.1, base_wear)))
+        lap_wear = 2.0 + temp_penalty * 0.1
+        self._lap_wear.append(lap_wear)
+        self._state.wear_rate = lap_wear
+
+        # Grip = 100 minus accumulated wear from each lap
+        total_wear = sum(self._lap_wear)
+        self._state.grip_pct = max(0.0, 100.0 - total_wear)
+        self._state.laps_remaining = max(0, int((self._state.grip_pct - self.GRIP_THRESHOLD) / max(0.1, lap_wear)))
 
         if self._state.grip_pct > 70:
             self._state.condition = "good"
@@ -102,6 +106,6 @@ class TireDegradationTracker:
     def reset(self) -> None:
         self._state = TireState()
         self._lap_temps.clear()
+        self._lap_wear.clear()
         self._last_lap = 0
-        if hasattr(self, "_current_temps"):
-            self._current_temps.clear()
+        self._current_temps.clear()

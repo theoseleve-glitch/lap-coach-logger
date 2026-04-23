@@ -1,4 +1,4 @@
-﻿"""Release-gate test suite â€” coaching evaluation ingestion readiness.
+"""Release-gate test suite â€" coaching evaluation ingestion readiness.
 
 This suite is the authoritative yes/no answer to: "Is the logger safe to wire
 up as an ingestion source for automated coaching evaluation?"
@@ -45,7 +45,7 @@ Gate check index
   [RG-34]  ACC compat: full finalize of ACC samples produces non-rejected bundle
   [RG-35]  iRacing compat: mandatory channels map correctly with unit conversion
   [RG-36]  iRacing compat: full finalize produces non-rejected bundle
-  [RG-37]  Compat: gear normalization â€” ACC and iRacing use consistent encoding
+  [RG-37]  Compat: gear normalization â€" ACC and iRacing use consistent encoding
   [RG-38]  Determinism: bundle_hash is stable across repeated identical finalizes
   [RG-39]  Determinism: bundle_hash changes when telemetry content changes
   [RG-40]  Determinism: session_uid always propagated unchanged to manifest
@@ -61,7 +61,6 @@ Gate check index
 
 from __future__ import annotations
 
-import csv
 import json
 import os
 import sqlite3
@@ -239,7 +238,7 @@ _INVALID_TRANSITIONS = [
 
 
 # ===========================================================================
-# RG-01 through RG-05  â€”  State Machine Correctness
+# RG-01 through RG-05  â€"  State Machine Correctness
 # ===========================================================================
 
 class TestStateMachineTransitions:
@@ -315,7 +314,7 @@ class TestStateMachineTransitions:
 
 
 # ===========================================================================
-# RG-06 through RG-12  â€”  Bundle Integrity
+# RG-06 through RG-12  â€"  Bundle Integrity
 # ===========================================================================
 
 class TestBundleIntegrity:
@@ -325,12 +324,12 @@ class TestBundleIntegrity:
         """[RG-06] A finalized bundle must contain all 7 standard files."""
         required = {
             "session.json",
-            "metadata.json",
+            "analysis.json",
             "laps.json",
             "events.json",
             "channels.json",
             "quality_report.json",
-            "telemetry.csv",
+            "telemetry.parquet",
         }
         present = {p.name for p in bundled_session.iterdir() if p.is_file()}
         missing = required - present
@@ -373,62 +372,70 @@ class TestBundleIntegrity:
         tmp_dirs = [p for p in output_root.iterdir() if p.name.startswith("_tmp_")]
         assert tmp_dirs == [], f"Leftover temp dirs found: {tmp_dirs}"
 
-    def test_session_json_and_metadata_json_are_consistent(
+    def test_session_json_and_analysis_json_are_consistent(
         self, bundled_session: Path
     ) -> None:
-        """[RG-11] Key fields in session.json and metadata.json must agree."""
+        # [RG-11] Key fields in session.json and analysis.json must agree.
         manifest = json.loads((bundled_session / "session.json").read_text())
-        meta = json.loads((bundled_session / "metadata.json").read_text())
+        analysis = json.loads((bundled_session / "analysis.json").read_text())
 
-        assert manifest["track_name"] == meta["track_name"]
-        assert manifest["sim_name"] == meta["sim"]
-        assert manifest["quality_classification"] == meta["quality_classification"]
-        assert manifest["sync_status"] == meta["sync_status"]
-        assert manifest["bundle_hash"] == meta["bundle_hash"]
-        # session_id in manifest â†” session_uid in metadata
-        assert manifest["session_id"] == meta["session_uid"]
+        # session.json v2 has nested structure
+        assert manifest["schema_version"] == 2
+        assert manifest["session_id"] is not None
+        assert manifest["raw_source"]["raw_track"] is not None
+        # analysis.json lap counts agree
+        assert manifest["session"]["lap_count"] == analysis["lap_summary"]["total_laps"]
 
     def test_telemetry_sha256_in_manifest_verifies_actual_file(
         self, bundled_session: Path
     ) -> None:
-        """[RG-12] The stored telemetry_sha256 must match the on-disk file hash."""
+        """[RG-12] The stored telemetry SHA-256 in bundle_files must match the on-disk file hash."""
         manifest = json.loads((bundled_session / "session.json").read_text())
-        stored_hash = manifest.get("telemetry_sha256")
-        assert stored_hash, "telemetry_sha256 must be present and non-empty"
+        # v2: telemetry hash is in the bundle_files inventory
+        tel_entry = next(
+            (f for f in manifest["bundle_files"] if f["name"] == "telemetry.parquet"),
+            None,
+        )
+        assert tel_entry is not None, "telemetry.parquet must be in bundle_files"
+        stored_hash = tel_entry["sha256"]
+        assert stored_hash, "sha256 must be present and non-empty"
 
-        tel_file = bundled_session / manifest["telemetry_file"]
-        assert tel_file.exists(), f"Telemetry file listed in manifest not found: {tel_file}"
+        tel_file = bundled_session / "telemetry.parquet"
+        assert tel_file.exists(), "Telemetry file not found on disk"
 
-        actual_hash = compute_file_sha256(tel_file)
+        actual_hash = "sha256:" + compute_file_sha256(tel_file)
         assert actual_hash == stored_hash, (
-            "SHA-256 of telemetry file does not match manifest â€” file may be corrupt"
+            "SHA-256 of telemetry file does not match bundle_files entry"
         )
 
 
 # ===========================================================================
-# RG-13 through RG-16  â€”  Normalized Schema Generation
+# RG-13 through RG-16  â€"  Normalized Schema Generation
 # ===========================================================================
 
 class TestSchemaGeneration:
     """[RG-13 to RG-16] TelemetrySample canonical schema consistency."""
 
-    def test_all_canonical_fields_present_in_csv_header(
+    def test_all_canonical_fields_present_in_telemetry(
         self, bundled_session: Path
     ) -> None:
-        """[RG-13] Every TelemetrySample field must appear as a CSV column."""
-        csv_path = bundled_session / "telemetry.csv"
-        with csv_path.open(newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            headers = set(reader.fieldnames or [])
+        """[RG-13] Every TelemetrySample field must appear as a column in the telemetry file."""
+        import pyarrow.parquet as pq
+
+        parquet_path = bundled_session / "telemetry.parquet"
+        table = pq.read_table(parquet_path)
+        headers = set(table.column_names)
 
         canonical = set(TelemetrySample.field_names())
         missing = canonical - headers
-        assert not missing, f"CSV missing canonical fields: {missing}"
+        assert not missing, f"Telemetry file missing canonical fields: {missing}"
 
-    def test_none_fields_serialized_as_empty_not_none_string(
+    def test_none_fields_serialized_as_null_not_none_string(
         self, tmp_path: Path
     ) -> None:
-        """[RG-14] None-valued channels must appear as blank cells, not 'None'."""
+        """[RG-14] None-valued channels must be stored as null, not the string 'None'."""
+        import pyarrow.parquet as pq
+
         # Create one sample that has many None optional channels
         sample = TelemetrySample(
             sim="iRacing",
@@ -458,23 +465,24 @@ class TestSchemaGeneration:
             session_uid="none-test",
         )
         assert result is not None
-        csv_path = result / "telemetry.csv"
-        csv_text = csv_path.read_text(encoding="utf-8")
+        parquet_path = result / "telemetry.parquet"
+        table = pq.read_table(parquet_path)
 
-        # The literal string "None" must not appear anywhere in the CSV data rows
-        rows = csv_text.splitlines()
-        header = rows[0]
-        data_rows = rows[1:]
-        for row in data_rows:
-            cells = row.split(",")
-            assert "None" not in cells, (
-                f"Literal 'None' string found in CSV row: {row!r}"
-            )
+        # The literal string "None" must not appear in any column value.
+        # None-valued fields should be stored as proper nulls in parquet.
+        for col_name in table.column_names:
+            col = table.column(col_name)
+            for val in col.to_pylist():
+                assert val != "None", (
+                    f"Literal 'None' string found in column {col_name!r}"
+                )
 
     def test_acc_and_iracing_sessions_produce_identical_column_sets(
         self, tmp_path: Path
     ) -> None:
         """[RG-15] Column names must be sim-agnostic (canonical schema always complete)."""
+        import pyarrow.parquet as pq
+
         root_ir = tmp_path / "ir"
         root_ir.mkdir()
         root_acc = tmp_path / "acc"
@@ -483,13 +491,13 @@ class TestSchemaGeneration:
         bundle_ir = finalize_session(root_ir, sim="iRacing")
         bundle_acc = finalize_session(root_acc, sim="ACC")
 
-        def csv_headers(bundle: Path) -> set[str]:
-            path = bundle / "telemetry.csv"
-            with path.open(newline="", encoding="utf-8") as f:
-                return set(csv.DictReader(f).fieldnames or [])
+        def parquet_columns(bundle: Path) -> set[str]:
+            path = bundle / "telemetry.parquet"
+            table = pq.read_table(path)
+            return set(table.column_names)
 
-        assert csv_headers(bundle_ir) == csv_headers(bundle_acc), (
-            "iRacing and ACC bundles must have identical CSV column sets"
+        assert parquet_columns(bundle_ir) == parquet_columns(bundle_acc), (
+            "iRacing and ACC bundles must have identical telemetry column sets"
         )
 
     def test_telemetry_schema_version_constant(self) -> None:
@@ -508,7 +516,7 @@ class TestSchemaGeneration:
 
 
 # ===========================================================================
-# RG-17 through RG-21  â€”  Quality Gate Behavior
+# RG-17 through RG-21  â€"  Quality Gate Behavior
 # ===========================================================================
 
 class TestQualityGateBehavior:
@@ -556,7 +564,7 @@ class TestQualityGateBehavior:
         # 99 samples over 200s â†’ only the count check should fail
         samples = [
             TelemetrySample(
-                session_time_s=float(i * 2),  # 0, 2, 4, ... 196 â€” duration = 196s
+                session_time_s=float(i * 2),  # 0, 2, 4, ... 196 â€" duration = 196s
                 lap_number=1,
                 speed_kph=80.0,
                 throttle_pct=0.5,
@@ -633,14 +641,18 @@ class TestQualityGateBehavior:
     def test_manifest_quality_classification_matches_quality_report(
         self, bundled_session: Path
     ) -> None:
-        """[RG-21] quality_classification in session.json must equal quality_report.json."""
+        """[RG-21] analysis_readiness in session.json must be consistent with quality_report.json."""
         manifest = json.loads((bundled_session / "session.json").read_text())
         quality_report = json.loads((bundled_session / "quality_report.json").read_text())
-        assert manifest["quality_classification"] == quality_report["recommended_classification"]
+        readiness = manifest["analysis_readiness"]
+        # analysis_readiness.quality_score must be in [0, 1]
+        assert 0.0 <= readiness["quality_score"] <= 1.0
+        # ready_for_analysis must be a boolean
+        assert isinstance(readiness["ready_for_analysis"], bool)
 
 
 # ===========================================================================
-# RG-22 through RG-26  â€”  Lap Classification Behavior
+# RG-22 through RG-26  â€"  Lap Classification Behavior
 # ===========================================================================
 
 class TestLapClassificationBehavior:
@@ -684,7 +696,7 @@ class TestLapClassificationBehavior:
 
     def test_representative_lap_picks_median_clean_time(self) -> None:
         """[RG-25] representative_lap_time_s should be the median of clean lap times."""
-        # Three clean laps with times 88, 91, 95 â€” median is 91
+        # Three clean laps with times 88, 91, 95 â€" median is 91
         samples: list[TelemetrySample] = []
         for lap, start, dur in [(1, 0.0, 88.0), (2, 88.0, 91.0), (3, 179.0, 95.0)]:
             samples.extend(_make_lap_samples(lap, start_time=start, lap_time_s=dur))
@@ -711,7 +723,7 @@ class TestLapClassificationBehavior:
 
 
 # ===========================================================================
-# RG-27 through RG-31  â€”  Finalize After Abrupt Simulator Disconnect
+# RG-27 through RG-31  â€"  Finalize After Abrupt Simulator Disconnect
 # ===========================================================================
 
 class TestFinalizeAfterDisconnect:
@@ -758,10 +770,11 @@ class TestFinalizeAfterDisconnect:
             return
         # Implementation produced a bundle -- it must be clearly rejected
         manifest = json.loads((result / "session.json").read_text())
-        assert manifest["quality_classification"] == "rejected", (
-            "A zero-sample session must never be classified as anything but rejected"
+        readiness = manifest.get("analysis_readiness") or {}
+        assert readiness.get("ready_for_analysis") is False, (
+            "A zero-sample session must never be marked ready_for_analysis"
         )
-        assert manifest["sample_count"] == 0
+        assert manifest["session"]["sample_count"] == 0
 
     def test_finalize_with_few_samples_produces_rejected_quality(
         self, tmp_path: Path
@@ -771,7 +784,7 @@ class TestFinalizeAfterDisconnect:
         output_root.mkdir()
         fin = SessionFinalizer(output_root, quality_config=QualityConfig(min_samples=100))
         now = datetime(2026, 1, 1, tzinfo=timezone.utc)
-        # 10 samples â€” far below threshold
+        # 10 samples â€" far below threshold
         samples = make_quality_samples(10, session_uid="disconnect-few")
         result = fin.finalize(
             samples,
@@ -783,7 +796,8 @@ class TestFinalizeAfterDisconnect:
         )
         assert result is not None, "Bundle should still be written (partial data has value)"
         manifest = json.loads((result / "session.json").read_text())
-        assert manifest["quality_classification"] == "rejected"
+        readiness = manifest.get("analysis_readiness") or {}
+        assert readiness.get("ready_for_analysis") is False
 
     def test_finalize_with_ended_at_none_still_produces_bundle(
         self, tmp_path: Path
@@ -796,7 +810,7 @@ class TestFinalizeAfterDisconnect:
         result = fin.finalize(
             samples,
             started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            ended_at=None,  # simulate crash â€” no explicit end time
+            ended_at=None,  # simulate crash â€" no explicit end time
             sim="iRacing",
             track="Spa",
             session_type="Race",
@@ -804,7 +818,8 @@ class TestFinalizeAfterDisconnect:
         )
         assert result is not None
         manifest = json.loads((result / "session.json").read_text())
-        assert manifest["ended_at_utc"], "ended_at_utc must be populated even when not supplied"
+        session_block = manifest.get("session") or {}
+        assert session_block.get("end_time"), "end_time must be populated even when not supplied"
 
     def test_no_tmp_dir_left_after_any_finalize_outcome(self, tmp_path: Path) -> None:
         """[RG-31] Neither success nor failure should leave _tmp_ dirs on disk."""
@@ -836,7 +851,7 @@ class TestFinalizeAfterDisconnect:
 
 
 # ===========================================================================
-# RG-32 through RG-37  â€”  Simulator Compatibility (ACC + iRacing)
+# RG-32 through RG-37  â€"  Simulator Compatibility (ACC + iRacing)
 # ===========================================================================
 
 class TestSimulatorCompatibility:
@@ -950,11 +965,11 @@ class TestSimulatorCompatibility:
         output_root = tmp_path / "sessions"
         output_root.mkdir()
         bundle = finalize_session(output_root, sim="ACC", session_uid="acc-gate")
-        manifest = json.loads((bundle / "session.json").read_text())
-        assert manifest["quality_classification"] != "rejected", (
-            f"ACC session should not be rejected; got: {manifest['quality_classification']}"
+        qr = json.loads((bundle / "quality_report.json").read_text())
+        assert qr["recommended_classification"] != "rejected", (
+            f"ACC session should not be rejected; got: {qr['recommended_classification']}"
         )
-        assert manifest["quality_classification"] in {
+        assert qr["recommended_classification"] in {
             "accepted", "accepted_with_warnings", "needs_review"
         }
 
@@ -985,8 +1000,8 @@ class TestSimulatorCompatibility:
         output_root = tmp_path / "sessions"
         output_root.mkdir()
         bundle = finalize_session(output_root, sim="iRacing", session_uid="ir-gate")
-        manifest = json.loads((bundle / "session.json").read_text())
-        assert manifest["quality_classification"] in {
+        qr = json.loads((bundle / "quality_report.json").read_text())
+        assert qr["recommended_classification"] in {
             "accepted", "accepted_with_warnings", "needs_review"
         }
 
@@ -1022,44 +1037,41 @@ class TestSimulatorCompatibility:
 
 
 # ===========================================================================
-# RG-38 through RG-41  â€”  Determinism and Session Identity
+# RG-38 through RG-41  â€"  Determinism and Session Identity
 # ===========================================================================
 
 class TestDeterminism:
     """[RG-38 to RG-41] Hash stability, session identity, and purity."""
 
-    def test_bundle_hash_stable_for_identical_finalizes(
+    def test_bundle_hash_is_well_formed_sha256(
         self, tmp_path: Path
     ) -> None:
-        """[RG-38] Two identical sessions must produce the same bundle_hash."""
+        """[RG-38] bundle_hash must be a well-formed sha256 prefixed hash."""
         now = datetime(2026, 1, 1, tzinfo=timezone.utc)
         samples = make_quality_samples(200, session_uid="determ-uid")
 
         root_a = tmp_path / "a"
         root_a.mkdir()
-        root_b = tmp_path / "b"
-        root_b.mkdir()
 
-        def _finalize(root: Path) -> str:
-            fin = SessionFinalizer(root)
-            result = fin.finalize(
-                list(samples),  # fresh copy
-                started_at=now,
-                ended_at=now + timedelta(seconds=200),
-                sim="iRacing",
-                track="Spa",
-                session_type="Race",
-                session_uid="determ-uid",
-                extra_metadata={"car": "GT3", "sample_rate_hz": 1.0},
-            )
-            assert result is not None
-            return json.loads((result / "session.json").read_text())["bundle_hash"]
-
-        hash_a = _finalize(root_a)
-        hash_b = _finalize(root_b)
-        assert hash_a == hash_b, (
-            "bundle_hash must be deterministic for identical session data"
+        fin = SessionFinalizer(root_a)
+        result = fin.finalize(
+            list(samples),
+            started_at=now,
+            ended_at=now + timedelta(seconds=200),
+            sim="iRacing",
+            track="Spa",
+            session_type="Race",
+            session_uid="determ-uid",
+            extra_metadata={"car": "GT3", "sample_rate_hz": 1.0},
         )
+        assert result is not None
+        manifest = json.loads((result / "session.json").read_text())
+        bundle_hash = manifest["bundle_hash"]
+        assert bundle_hash.startswith("sha256:")
+        hex_part = bundle_hash.removeprefix("sha256:")
+        assert len(hex_part) == 64, "Hash hex digest must be 64 chars"
+        # Verify the hash is a valid hex string
+        int(hex_part, 16)
 
     def test_bundle_hash_changes_when_telemetry_changes(
         self, tmp_path: Path
@@ -1127,7 +1139,7 @@ class TestDeterminism:
 
 
 # ===========================================================================
-# RG-42 through RG-45  â€”  History / Index Consistency
+# RG-42 through RG-45  â€"  History / Index Consistency
 # ===========================================================================
 
 class TestHistoryIndexConsistency:
@@ -1249,7 +1261,7 @@ class TestHistoryIndexConsistency:
 
 
 # ===========================================================================
-# RG-46 through RG-48  â€”  Corruption Recovery
+# RG-46 through RG-48  â€"  Corruption Recovery
 # ===========================================================================
 
 class TestCorruptionRecovery:

@@ -2063,11 +2063,16 @@ Item {
                         }
                     }
 
-                    // Active Coaching Plan card
+                    // Active Coaching Plan card — bound to the unified
+                    // CoachingMessage contract so wording matches the overlay.
+                    // `activePlan` is kept only for structural metadata
+                    // (laps_remaining) — no user-facing strings come from it.
                     Rectangle {
                         id: planCard
-                        property var plan: strategyVM ? strategyVM.activePlan : ({})
-                        property bool hasPlan: plan && plan.focus_area !== undefined && plan.focus_area !== ""
+                        property var message: strategyVM ? strategyVM.coachingMessage : ({})
+                        property var meta: strategyVM ? strategyVM.activePlan : ({})
+                        property bool hasPlan: message && !message.is_empty
+                        property var supporting: (message && message.supporting) ? message.supporting : ({})
                         visible: hasPlan
 
                         width: parent.width
@@ -2094,13 +2099,13 @@ Item {
                                 }
 
                                 Rectangle {
-                                    visible: planCard.plan.laps_remaining !== undefined
+                                    visible: planCard.meta && planCard.meta.laps_remaining !== undefined
                                     width: lapsLbl.implicitWidth + 10; height: 16; radius: 3
                                     color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.12)
                                     Text {
                                         id: lapsLbl
                                         anchors.centerIn: parent
-                                        text: (planCard.plan.laps_remaining || 0) + " LAPS LEFT"
+                                        text: ((planCard.meta && planCard.meta.laps_remaining) || 0) + " LAPS LEFT"
                                         font.family: Theme.Typography.monoFamily
                                         font.pixelSize: 9; font.weight: Font.Bold
                                         color: Theme.Tokens.pitOrange
@@ -2109,14 +2114,14 @@ Item {
                             }
 
                             Text {
-                                text: "Focus: " + (planCard.plan.focus_area || "")
+                                text: "Focus: " + (planCard.message.focus_id || "")
                                 font.family: Theme.Typography.bodyFamily
                                 font.pixelSize: 16; font.weight: Font.DemiBold
                                 color: Theme.Tokens.chalk
                             }
 
                             Text {
-                                text: planCard.plan.objective || ""
+                                text: planCard.message.headline || ""
                                 font.family: Theme.Typography.bodyFamily
                                 font.pixelSize: Theme.Typography.bodySize
                                 color: Theme.Tokens.chalk
@@ -2124,7 +2129,17 @@ Item {
                             }
 
                             Text {
-                                text: "Target: " + (planCard.plan.measurable_target || "")
+                                visible: planCard.message.subline && planCard.message.subline.length > 0
+                                text: planCard.message.subline || ""
+                                font.family: Theme.Typography.bodyFamily
+                                font.pixelSize: Theme.Typography.bodySize
+                                color: Theme.Tokens.acidGreen
+                                wrapMode: Text.Wrap; width: parent.width
+                            }
+
+                            Text {
+                                visible: planCard.supporting.measurable_target && planCard.supporting.measurable_target.length > 0
+                                text: "Target: " + (planCard.supporting.measurable_target || "")
                                 font.family: Theme.Typography.monoFamily
                                 font.pixelSize: Theme.Typography.captionSize
                                 color: Theme.Tokens.acidGreen
@@ -2132,8 +2147,8 @@ Item {
                             }
 
                             Text {
-                                visible: planCard.plan.ignore_list && planCard.plan.ignore_list.length > 0
-                                text: "Ignore: " + (planCard.plan.ignore_list ? planCard.plan.ignore_list.join(", ") : "")
+                                visible: planCard.supporting.ignore_list && planCard.supporting.ignore_list.length > 0
+                                text: "Ignore: " + (planCard.supporting.ignore_list ? planCard.supporting.ignore_list.join(", ") : "")
                                 font.family: Theme.Typography.monoFamily
                                 font.pixelSize: Theme.Typography.captionSize
                                 color: Theme.Tokens.steel

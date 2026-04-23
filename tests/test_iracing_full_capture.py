@@ -424,12 +424,13 @@ class TestFinalizerWithRawData:
         assert (result / "session_info_iracing.json").exists()
         assert (result / "iracing_catalogs.json").exists()
 
-        # Check session.json references the new files
+        # Check session.json has v2 structure with iRacing raw files in bundle_files
         with open(result / "session.json", encoding="utf-8") as f:
             manifest = json.load(f)
-        source_meta = manifest.get("source_metadata", {})
-        assert "iracing_raw_files" in source_meta
-        assert "telemetry_iracing_raw" in source_meta["iracing_raw_files"]
+        assert manifest["schema_version"] == 2
+        # iRacing raw files should be present in the bundle_files inventory
+        file_names = {f["name"] for f in manifest.get("bundle_files", [])}
+        assert "telemetry_iracing_raw.csv" in file_names
 
         # Existing files still present
         assert (result / "telemetry.csv").exists() or (result / "telemetry.parquet").exists()

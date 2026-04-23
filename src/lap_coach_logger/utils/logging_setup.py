@@ -55,10 +55,38 @@ def setup_logging(*, debug: bool = False) -> None:
     for name in ("PIL", "pyarrow", "pystray", "PySide6", "PySide6.QtDBus"):
         logging.getLogger(name).setLevel(logging.WARNING)
 
-    # Install dedupe filter on root logger so all handlers benefit
-    root.addFilter(DedupFilter(window_s=30.0))
+    # Install dedupe filter on each handler so propagated records from
+    # child loggers (e.g. "unhandled") also flow through the filter.
+    # Filters on the root logger itself only apply to records emitted
+    # directly on the root logger, not propagated ones.
+    dedupe = DedupFilter(window_s=30.0)
+    fh.addFilter(dedupe)
+    sh.addFilter(dedupe)
 
     _install_global_exception_logging()
+
+
+def _is_qt_dispatch_exception(exc_traceback: object) -> bool:
+    """Heuristic: is this exception coming from inside Qt's signal dispatch?
+
+    Signal-dispatch exceptions are caught by Qt internally, but Python's
+    excepthook still sees them on the currently-executing thread. They
+    typically route through qml_bootstrap.py lambdas that connect signals
+    to slots. These add noise without actionable information.
+    """
+    import traceback as _tb
+    try:
+        frames = _tb.extract_tb(exc_traceback)
+    except Exception:
+        return False
+    if not frames:
+        return False
+    # The top frame (lambda in qml_bootstrap) is a strong signal
+    for frame in frames:
+        filename = frame.filename or ""
+        if filename.endswith("qml_bootstrap.py") and frame.name == "<lambda>":
+            return True
+    return False
 
 
 def _install_global_exception_logging() -> None:
@@ -66,6 +94,16 @@ def _install_global_exception_logging() -> None:
 
     def _sys_hook(exc_type, exc_value, exc_traceback) -> None:  # noqa: ANN001
         if issubclass(exc_type, KeyboardInterrupt):
+            return
+        # Downgrade exceptions that originate inside Qt's signal dispatch
+        # to debug level. These are caught by Qt internally — logging them
+        # at CRITICAL drowns out real errors. Detection heuristic: the
+        # bottom-most frame is in a Qt/PySide slot dispatcher.
+        if _is_qt_dispatch_exception(exc_traceback):
+            logging.getLogger("unhandled").debug(
+                "Qt dispatch exception",
+                exc_info=(exc_type, exc_value, exc_traceback),
+            )
             return
         logging.getLogger("unhandled").critical(
             "Unhandled exception",

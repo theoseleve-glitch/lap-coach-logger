@@ -78,17 +78,25 @@ class TestAuthFailure:
         assert result.outcome == TransportOutcome.AUTH_FAILURE
 
 
-class TestIdempotentDuplicate:
+class TestConflict:
+    """409 = precondition failure (e.g. missing_session) — NOT a duplicate.
+
+    Connected v1 backend signals dedup with HTTP 200 + {already_seen: true}.
+    409 is reserved for out-of-order / precondition failures that the
+    desktop must surface in sync_failures rather than silently drop.
+    """
 
     @patch("lap_coach_logger.sync.http_transport.urlopen")
-    def test_409_is_treated_as_success(self, mock_urlopen):
+    def test_409_is_permanent_failure(self, mock_urlopen):
         mock_urlopen.side_effect = HTTPError(
-            "https://x", 409, "Conflict", {}, MagicMock(read=lambda: b'{"duplicate": true}')
+            "https://x", 409, "Conflict", {},
+            MagicMock(read=lambda: b'{"ok":false,"code":"missing_session"}')
         )
         transport = HttpTransport(_make_config())
         result = transport.post("/x", {}, "k")
-        assert result.outcome == TransportOutcome.SUCCESS
+        assert result.outcome == TransportOutcome.PERMANENT_FAILURE
         assert result.http_status == 409
+        assert result.attempt_count == 1  # no retry on 4xx
 
 
 class TestClientError:

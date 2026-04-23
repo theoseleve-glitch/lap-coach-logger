@@ -17,11 +17,6 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-# Default paths for the recovered inventory catalogs
-_DEFAULT_CATALOG_BASE = Path(
-    r"C:\Users\Admin\Documents\Telemetry\Analysis\V2_claude_ai\artifacts"
-)
-
 _CATALOG_FILES = {
     "live_var_schema": "iracing_live_var_schema.json",
     "session_leaf_paths": "iracing_session_leaf_paths.json",
@@ -134,8 +129,13 @@ class IRacingRawCapture:
 
 
 def _load_catalog(explicit_path: str, default_filename: str) -> dict[str, Any]:
-    """Load a JSON catalog file, returning metadata dict."""
-    path = Path(explicit_path) if explicit_path else _DEFAULT_CATALOG_BASE / default_filename
+    """Load a JSON catalog file, returning metadata dict.
+
+    If no explicit path is configured, the catalog is skipped (returns empty).
+    """
+    if not explicit_path:
+        return {"source_path": None, "data": None, "count": 0}
+    path = Path(explicit_path)
     result: dict[str, Any] = {"source_path": str(path), "data": None, "count": 0}
 
     if not path.exists():

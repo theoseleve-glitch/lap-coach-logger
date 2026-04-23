@@ -14,6 +14,7 @@ def _make_plan(**overrides) -> CoachingPlan:
         focus_area="Sector 2",
         objective="Stabilize braking point",
         measurable_target="Reduce Sector 2 std dev from \u00b10.450s to \u00b10.315s",
+        technique_insight="Sector 2: You lose 0.4s here vs your best. Focus on consistency.",
         ignore_list=["Don't chase Sector 1", "Don't chase Sector 3"],
         evaluation_window=5,
         confidence=Confidence.MEDIUM,

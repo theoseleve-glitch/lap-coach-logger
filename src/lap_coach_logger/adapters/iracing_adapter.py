@@ -207,6 +207,82 @@ class IRacingAdapter(SimAdapter):
     def connected(self) -> bool:
         return self._connected
 
+    # -- relative/gap data (iRacing first-class) ---------------------------
+
+    def read_relative(self) -> dict[str, Any] | None:
+        """Extract gap to car ahead/behind from iRacing SDK.
+
+        Data sources:
+          - PlayerCarIdx: the driver's car index in CarIdx* arrays
+          - CarIdxClassPosition: 1-based class position per car
+          - CarIdxF2Time: delta-to-leader per car (seconds); subtract to
+            get pairwise gap
+          - CarIdxLapDistPct / CarIdxOnPitRoad: used to filter
+            neighbours that are on pit road (gap would be meaningless)
+
+        Returns None only when SDK is disconnected; returns partial dict
+        (missing keys) when some neighbours can't be identified.
+        """
+        if not self._connected or self._ir is None:
+            return None
+        ir = self._ir
+        try:
+            player_idx = ir["PlayerCarIdx"]  # type: ignore[index]
+            class_positions = ir["CarIdxClassPosition"]  # type: ignore[index]
+            f2_times = ir["CarIdxF2Time"]  # type: ignore[index]
+            on_pit = ir["CarIdxOnPitRoad"]  # type: ignore[index]
+        except Exception:
+            return None
+
+        if player_idx is None or class_positions is None or f2_times is None:
+            return None
+        if not (0 <= int(player_idx) < len(class_positions)):
+            return None
+
+        player_class_pos = int(class_positions[player_idx])
+        player_f2 = float(f2_times[player_idx]) if f2_times[player_idx] is not None else None
+        if player_class_pos <= 0 or player_f2 is None:
+            return None
+
+        # Find neighbours by class position — closest car ahead and behind
+        ahead_idx: int | None = None
+        behind_idx: int | None = None
+        ahead_gap_class_pos = 10_000
+        behind_gap_class_pos = 10_000
+
+        for idx, pos in enumerate(class_positions):
+            try:
+                p = int(pos)
+            except (TypeError, ValueError):
+                continue
+            if idx == int(player_idx) or p <= 0:
+                continue
+            if on_pit is not None and idx < len(on_pit) and bool(on_pit[idx]):
+                continue  # skip cars in pit lane — gap isn't meaningful
+            delta_pos = player_class_pos - p
+            if delta_pos > 0 and delta_pos < ahead_gap_class_pos:
+                ahead_gap_class_pos = delta_pos
+                ahead_idx = idx
+            elif delta_pos < 0 and -delta_pos < behind_gap_class_pos:
+                behind_gap_class_pos = -delta_pos
+                behind_idx = idx
+
+        result: dict[str, Any] = {}
+
+        if ahead_idx is not None and f2_times[ahead_idx] is not None:
+            gap = player_f2 - float(f2_times[ahead_idx])
+            if gap > 0 and gap < 300:  # sanity: skip lapped / ghost cars
+                result["gap_ahead_s"] = round(gap, 3)
+                result["position_ahead"] = int(class_positions[ahead_idx])
+
+        if behind_idx is not None and f2_times[behind_idx] is not None:
+            gap = float(f2_times[behind_idx]) - player_f2
+            if gap > 0 and gap < 300:
+                result["gap_behind_s"] = round(gap, 3)
+                result["position_behind"] = int(class_positions[behind_idx])
+
+        return result or None
+
     # -- extended capture interface -----------------------------------------
 
     def supports_raw_capture(self) -> bool:

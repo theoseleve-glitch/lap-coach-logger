@@ -29,6 +29,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from lap_coach_logger.core.telemetry_utils import to_float as _float
+
+from lap_coach_logger.coaching.corner_insights import (
+    CornerInsight,
+    analyze_corner_comparisons,
+)
 from lap_coach_logger.core.live_coach import LiveCoachTracker
 from lap_coach_logger.core.live_dashboard import LiveCornerTracker
 from lap_coach_logger.core.live_input_diagnostics import LiveInputDiagnosticsTracker
@@ -92,6 +98,10 @@ class LiveTelemetryProcessor:
         self._input_tracker = LiveInputDiagnosticsTracker()
         self._corner_tracker = LiveCornerTracker()
         self._tire_tracker = TireDegradationTracker()
+        # Cache last published insights so we can detect lap-boundary
+        # transitions without re-running the analyser every snapshot.
+        self._last_insights_lap: int | None = None
+        self._last_insights: list[CornerInsight] = []
 
     def process(self, live_dict: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
         """Process a raw snapshot, return aggregated overlay state.
@@ -126,6 +136,13 @@ class LiveTelemetryProcessor:
         # last_lap_time_s comes from the tracker's last finalized profile.
         last_profile = self._lap_tracker._last_profile
         last_lap_time_s = last_profile.lap_time_s if last_profile else None
+
+        # -- Corner insights — self-comparison last lap vs session best.
+        # Re-analyse only when a new lap has finalised (cheap check).
+        best_profile = self._lap_tracker._best_profile
+        if last_profile is not None and last_profile.lap_number != self._last_insights_lap:
+            self._last_insights = analyze_corner_comparisons(last_profile, best_profile)
+            self._last_insights_lap = last_profile.lap_number
 
         # -- Lockup / wheelspin heuristic detection --------------------------
         lockup_active = self._detect_lockup(sample)
@@ -182,6 +199,8 @@ class LiveTelemetryProcessor:
             "input_smoothness": input_smoothness,
             "corner_rows": corner_rows,
             "tire_state": tire_state,
+            "corner_insights": list(self._last_insights),
+            "corner_insights_lap": self._last_insights_lap,
         }
 
     # -- heuristic helpers -----------------------------------------------------
@@ -260,14 +279,9 @@ class LiveTelemetryProcessor:
         self._input_tracker.reset()
         self._corner_tracker.reset()
         self._tire_tracker.reset()
+        self._last_insights_lap = None
+        self._last_insights = []
 
-
-# -- tiny helpers (avoid importing from other modules) -------------------------
-
-def _float(value: object) -> float | None:
-    if not isinstance(value, (int, float)):
-        return None
-    return float(value)
 
 
 def _int(value: object) -> int | None:

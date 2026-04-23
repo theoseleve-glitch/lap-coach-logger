@@ -20,7 +20,7 @@
 - Run `build.bat`.
 - Confirm `dist\LapCoachLogger\LapCoachLogger.exe` exists.
 - Launch the packaged executable once directly from `dist`.
-- Confirm the About dialog shows version `1.1.0` and valid config/log paths.
+- Confirm the About dialog shows version `2.0.0` and valid config/log paths.
 
 ## Installer
 

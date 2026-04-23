@@ -90,7 +90,10 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # UPX disabled for reproducibility — some UPX versions produce
+    # non-deterministic output and occasionally confuse AV heuristics.
+    # Binary size trade-off is acceptable for a ~150MB PySide6 bundle.
+    upx=False,
     console=False,          # windowed — no terminal window
     disable_windowed_traceback=False,
 )
@@ -100,7 +103,7 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name="LapCoachLogger",
 )

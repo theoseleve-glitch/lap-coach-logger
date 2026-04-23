@@ -7,6 +7,12 @@ from typing import Any
 
 from lap_coach_logger.core.live_dashboard import CornerDefinition, LiveSamplePoint, detect_corners
 from lap_coach_logger.core.schema import TelemetrySample
+from lap_coach_logger.core.telemetry_utils import (
+    to_float as _float,
+    to_nonnegative_float as _nonnegative_float,
+    to_percentage as _percentage,
+    to_positive_float as _positive_float,
+)
 
 
 @dataclass(slots=True)
@@ -16,6 +22,8 @@ class ComparePoint:
     session_time_s: float
     speed_kph: float | None = None
     lat_accel_g: float | None = None
+    brake_pct: float | None = None       # 0-1 fraction (raw sample range)
+    throttle_pct: float | None = None    # 0-1 fraction (raw sample range)
 
 
 @dataclass(slots=True)
@@ -57,6 +65,8 @@ def build_point_from_sample(sample: TelemetrySample) -> ComparePoint | None:
         session_time_s=session_time_s,
         speed_kph=_nonnegative_float(sample.speed_kph),
         lat_accel_g=_float(sample.lat_accel_g),
+        brake_pct=_float(sample.brake_pct),
+        throttle_pct=_float(sample.throttle_pct),
     )
 
 
@@ -673,30 +683,3 @@ def _speed_compare_text(current: float | None, reference: float | None) -> str:
     return f"{current:.0f} / {reference:.0f}"
 
 
-def _float(value: object) -> float | None:
-    if not isinstance(value, (int, float)):
-        return None
-    return float(value)
-
-
-def _nonnegative_float(value: object) -> float | None:
-    if not isinstance(value, (int, float)):
-        return None
-    number = float(value)
-    if number < 0:
-        return None
-    return number
-
-
-def _positive_float(value: object) -> float | None:
-    number = _nonnegative_float(value)
-    if number is None or number <= 0:
-        return None
-    return number
-
-
-def _percentage(value: object) -> float | None:
-    number = _nonnegative_float(value)
-    if number is None or number > 1.0:
-        return None
-    return number

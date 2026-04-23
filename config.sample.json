@@ -1,15 +1,33 @@
 {
-  "output_dir": "C:\\Users\\Admin\\Documents\\LapCoachLogger_sessions",
+  "output_dir": "C:\\Users\\YourName\\Documents\\LapCoachLogger_sessions",
   "poll_interval_s": 1.0,
   "sample_interval_s": 0.1,
   "session_end_grace_s": 5.0,
   "debug": false,
+  "low_resource_mode": false,
   "start_with_windows": false,
+  "driver_name": "",
   "iracing": {
-    "enabled": true
+    "enabled": true,
+    "raw_capture_enabled": true,
+    "sample_mode": "auto_sdk",
+    "catalog_live_var_schema": "",
+    "catalog_session_leaf_paths": "",
+    "catalog_localserver_track_fields": "",
+    "catalog_localserver_arq_messages": "",
+    "catalog_sim_param_names": ""
   },
   "acc": {
-    "enabled": true
+    "enabled": true,
+    "raw_capture_enabled": true
+  },
+  "assetto_corsa": {
+    "enabled": true,
+    "raw_capture_enabled": true
+  },
+  "lmu": {
+    "enabled": true,
+    "raw_capture_enabled": true
   },
   "writer": {
     "parquet_row_group_size": 10000,
@@ -24,10 +42,32 @@
     "cooldown_after_finalize_s": 3.0,
     "data_freeze_timeout_s": 5.0
   },
+  "quality": {
+    "min_samples": 100,
+    "min_duration_s": 20.0,
+    "max_time_gap_s": 1.5,
+    "essential_missing_ratio_warn": 0.05,
+    "essential_missing_ratio_fail": 0.2,
+    "min_meaningful_speed_kph": 25.0,
+    "flatline_speed_std_kph": 1.0,
+    "flatline_control_std": 0.01,
+    "min_gear": -1,
+    "max_gear": 10,
+    "interval_tolerance_ratio": 0.35,
+    "interval_outlier_ratio_warn": 0.1,
+    "interval_outlier_ratio_fail": 0.25
+  },
   "sync": {
     "enabled": false,
     "api_url": "https://api.lap-coach.racing",
     "device_token": "",
     "device_name": ""
+  },
+  "overlay": {
+    "enabled": true,
+    "refresh_rate_hz": 60,
+    "opacity": 0.92,
+    "pin_mode": "always_on_top",
+    "widget_settings": {}
   }
 }

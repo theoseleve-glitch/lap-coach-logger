@@ -1,7 +1,7 @@
 """Tests for session bundle output format.
 
 Validates that finalization produces the full bundle structure:
-  session.json, telemetry.csv, laps.json, events.json, channels.json, metadata.json
+  session.json, telemetry.parquet, laps.json, events.json, channels.json, metadata.json
 """
 
 from __future__ import annotations
@@ -75,22 +75,25 @@ class TestBundleStructure:
         )
         assert result is not None
         assert (result / "session.json").exists()
-        assert (result / "telemetry.csv").exists()
+        assert (result / "telemetry.parquet").exists()
         assert (result / "laps.json").exists()
         assert (result / "events.json").exists()
         assert (result / "channels.json").exists()
         assert (result / "quality_report.json").exists()
-        # Backward-compat shim
-        assert (result / "metadata.json").exists()
+        assert (result / "analysis.json").exists()
+        # metadata.json is no longer written in v2
+        assert not (result / "metadata.json").exists()
 
-    def test_no_parquet_alongside_csv(self, tmp_path: Path) -> None:
+    def test_no_csv_alongside_parquet(self, tmp_path: Path) -> None:
+        """Primary format is parquet; no CSV should be present unless debug export."""
         fin = SessionFinalizer(tmp_path)
         now = datetime.now(timezone.utc)
         result = fin.finalize(
             _make_samples(), started_at=now, sim="x", track="y", session_type="z",
         )
         assert result is not None
-        assert not (result / "telemetry.parquet").exists()
+        assert (result / "telemetry.parquet").exists()
+        assert not (result / "telemetry.csv").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -118,40 +121,47 @@ class TestSessionJson:
         assert result is not None
         manifest = json.loads((result / "session.json").read_text())
 
-        assert manifest["schema_version"] == BUNDLE_SCHEMA_VERSION
-        assert manifest["telemetry_schema_version"] == TELEMETRY_SCHEMA_VERSION
+        # v2 schema structure
+        assert manifest["schema_version"] == 2
         assert manifest["session_id"] == "uid-abc"
-        assert manifest["sim_name"] == "iRacing"
-        assert manifest["track_name"] == "Monza"
-        assert manifest["car_name"] == "BMW M4"
-        assert manifest["driver_name"] == "Test Driver"
-        assert manifest["adapter"] == "IRacingAdapter"
-        assert manifest["sample_count"] == 10
-        assert manifest["dropped_sample_count"] == 1
-        assert manifest["sample_rate_hz"] == 10.0
-        assert manifest["telemetry_format"] == "csv"
-        assert manifest["telemetry_file"] == "telemetry.csv"
-        assert isinstance(manifest["telemetry_sha256"], str)
-        assert len(manifest["telemetry_sha256"]) == 64  # hex SHA-256
-        assert manifest["sync_status"] == "not_queued"
-        assert manifest["sync_attempt_count"] == 0
-        assert manifest["last_sync_attempt_at"] is None
-        assert manifest["last_sync_error"] is None
-        assert manifest["remote_id"] is None
-        assert isinstance(manifest["bundle_hash"], str)
-        assert len(manifest["bundle_hash"]) == 64
-        assert manifest["quality_classification"] in {
-            "accepted",
-            "accepted_with_warnings",
-            "needs_review",
-            "rejected",
-        }
-        assert 0.0 <= manifest["quality_score"] <= 1.0
         assert manifest["logger_version"] is not None
-        assert "started_at_utc" in manifest
-        assert "ended_at_utc" in manifest
-        assert manifest["duration_s"] >= 0
-        assert 0.0 <= manifest["data_quality_score"] <= 1.0
+
+        # raw_source block
+        raw = manifest["raw_source"]
+        assert raw["sim_id"] == "iracing"
+        assert raw["raw_track"] == "Monza"
+        assert raw["raw_car"] == "BMW M4"
+        assert raw["session_type_raw"] == "Qualify"
+
+        # session block
+        sess = manifest["session"]
+        assert sess["session_uid"] == "uid-abc"
+        assert sess["driver_name"] == "Test Driver"
+        assert sess["sample_count"] == 10
+        assert sess["lap_count"] == 2
+        assert sess["duration_s"] >= 0
+        assert sess["start_time"] is not None
+        assert sess["end_time"] is not None
+
+        # bundle_hash
+        assert isinstance(manifest["bundle_hash"], str)
+        assert manifest["bundle_hash"].startswith("sha256:")
+
+        # analysis_readiness
+        readiness = manifest["analysis_readiness"]
+        assert 0.0 <= readiness["quality_score"] <= 1.0
+        assert isinstance(readiness["ready_for_analysis"], bool)
+
+        # bundle_files inventory
+        file_names = {f["name"] for f in manifest["bundle_files"]}
+        assert "telemetry.parquet" in file_names
+        assert "session.json" in file_names
+        assert "analysis.json" in file_names
+
+        # telemetry hash in bundle_files
+        tel_entry = next(f for f in manifest["bundle_files"] if f["name"] == "telemetry.parquet")
+        assert isinstance(tel_entry["sha256"], str)
+        assert tel_entry["sha256"].startswith("sha256:")
 
     def test_telemetry_sha256_is_valid(self, tmp_path: Path) -> None:
         fin = SessionFinalizer(tmp_path)
@@ -161,8 +171,9 @@ class TestSessionJson:
         )
         assert result is not None
         manifest = json.loads((result / "session.json").read_text())
-        expected = compute_file_sha256(result / "telemetry.csv")
-        assert manifest["telemetry_sha256"] == expected
+        expected = "sha256:" + compute_file_sha256(result / "telemetry.parquet")
+        tel_entry = next(f for f in manifest["bundle_files"] if f["name"] == "telemetry.parquet")
+        assert tel_entry["sha256"] == expected
 
 
 # ---------------------------------------------------------------------------
@@ -269,41 +280,8 @@ class TestChannelsJson:
 
 
 # ---------------------------------------------------------------------------
-# metadata.json backward compatibility
+# metadata.json is no longer written in v2
 # ---------------------------------------------------------------------------
-
-class TestMetadataCompat:
-
-    def test_metadata_json_still_written(self, tmp_path: Path) -> None:
-        fin = SessionFinalizer(tmp_path)
-        now = datetime.now(timezone.utc)
-        result = fin.finalize(
-            _make_samples(), started_at=now, sim="iRacing", track="Spa", session_type="Race",
-            session_uid="u1",
-            extra_metadata={"car": "Porsche", "sample_rate_hz": 10.0, "dropped_samples": 0},
-        )
-        assert result is not None
-        meta = json.loads((result / "metadata.json").read_text())
-        # Legacy fields still present
-        assert meta["save_format"] == "csv"
-        assert meta["sample_count"] == 5
-        assert meta["sim"] == "iRacing"
-        assert meta["bundle_schema_version"] == BUNDLE_SCHEMA_VERSION
-        assert meta["sync_status"] == "not_queued"
-        assert meta["sync_attempt_count"] == 0
-        assert meta["last_sync_attempt_at"] is None
-        assert meta["last_sync_error"] is None
-        assert meta["remote_id"] is None
-        assert isinstance(meta["bundle_hash"], str)
-        assert len(meta["bundle_hash"]) == 64
-        assert meta["quality_classification"] in {
-            "accepted",
-            "accepted_with_warnings",
-            "needs_review",
-            "rejected",
-        }
-        assert 0.0 <= meta["quality_score"] <= 1.0
-        assert 0.0 <= meta["data_quality_score"] <= 1.0
 
 
 class TestQualityReport:
@@ -374,18 +352,18 @@ class TestBundleSchemaModels:
 
 
 # ---------------------------------------------------------------------------
-# Parquet fallback still produces bundle
+# CSV fallback still produces bundle when parquet fails
 # ---------------------------------------------------------------------------
 
-class TestParquetFallbackBundle:
+class TestCsvFallbackBundle:
 
-    def test_bundle_with_parquet_fallback(self, tmp_path: Path) -> None:
+    def test_bundle_with_csv_fallback(self, tmp_path: Path) -> None:
         fin = SessionFinalizer(tmp_path)
         now = datetime.now(timezone.utc)
 
         with patch(
-            "lap_coach_logger.writers.finalizer.CsvWriter.write_samples",
-            side_effect=RuntimeError("csv fail"),
+            "lap_coach_logger.writers.finalizer.ParquetWriter",
+            side_effect=RuntimeError("parquet fail"),
         ):
             result = fin.finalize(
                 _make_samples(), started_at=now, sim="x", track="y", session_type="z",
@@ -393,11 +371,14 @@ class TestParquetFallbackBundle:
             )
 
         assert result is not None
-        assert (result / "telemetry.parquet").exists()
+        assert (result / "telemetry.csv").exists()
+        assert not (result / "telemetry.parquet").exists()
         assert (result / "session.json").exists()
         assert (result / "laps.json").exists()
 
         manifest = json.loads((result / "session.json").read_text())
-        assert manifest["telemetry_format"] == "parquet"
-        assert manifest["telemetry_file"] == "telemetry.parquet"
-        assert len(manifest["telemetry_sha256"]) == 64
+        # v2 format: check telemetry hash is in bundle_files
+        csv_entries = [f for f in manifest.get("bundle_files", []) if f["name"] == "telemetry.csv"]
+        # CSV fallback may not be in canonical bundle_files since v2 requires parquet;
+        # but session.json should still exist and have the v2 schema
+        assert manifest["schema_version"] == 2

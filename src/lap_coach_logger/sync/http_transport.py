@@ -104,16 +104,11 @@ class HttpTransport:
                         error_message=last_error,
                         attempt_count=attempt,
                     )
-                # 409 → already ingested (idempotent duplicate) — treat as success
-                if e.code == 409:
-                    return TransportResult(
-                        outcome=TransportOutcome.SUCCESS,
-                        http_status=409,
-                        response_body=last_body,
-                        error_message="",
-                        attempt_count=attempt,
-                    )
-                # 4xx → permanent failure (bad payload)
+                # 4xx (including 409) → permanent failure. Dedup is signalled
+                # at the backend via HTTP 200 + {"already_seen": true}, so we
+                # no longer treat 409 as success. 409 means "precondition
+                # failed" (e.g. laps arrived before their parent session);
+                # surfacing it to sync_failures is the correct audit path.
                 if 400 <= e.code < 500:
                     return TransportResult(
                         outcome=TransportOutcome.PERMANENT_FAILURE,

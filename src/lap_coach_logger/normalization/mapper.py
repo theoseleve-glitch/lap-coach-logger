@@ -128,7 +128,40 @@ def _session_type_passthrough(raw: dict[str, Any]) -> str | None:
     return str(value) if value is not None else None
 
 
+def _lmu_gear(raw: dict[str, Any]) -> int | None:
+    return first_int(raw, "Gear")
+
+
 SIM_FIELD_MAPPINGS: dict[str, dict[str, MappingRule]] = {
+    "Le Mans Ultimate": {
+        "session_time_s": MappingRule(("Session Time",), lambda raw: first_float(raw, "Session Time")),
+        "lap_number": MappingRule(("Lap",), lambda raw: first_int(raw, "Lap")),
+        "lap_distance_m": MappingRule(("Lap Dist",), lambda raw: first_float(raw, "Lap Dist")),
+        "lap_dist_pct": MappingRule(("Lap Dist Pct",), lambda raw: first_float(raw, "Lap Dist Pct")),
+        "speed_kph": MappingRule(("Ground Speed",), lambda raw: mps_to_kph(first_float(raw, "Ground Speed"))),
+        "throttle_pct": MappingRule(("Throttle Pos",), lambda raw: first_float(raw, "Throttle Pos")),
+        "brake_pct": MappingRule(("Brake Pos",), lambda raw: first_float(raw, "Brake Pos")),
+        "clutch_pct": MappingRule(("Clutch Pos",), lambda raw: first_float(raw, "Clutch Pos")),
+        "steering_deg": MappingRule(("Steered Angle",), lambda raw: first_float(raw, "Steered Angle")),
+        "gear": MappingRule(("Gear",), _lmu_gear),
+        "rpm": MappingRule(("Engine RPM",), lambda raw: first_float(raw, "Engine RPM")),
+        "world_pos_x": MappingRule(("World Pos X",), lambda raw: first_float(raw, "World Pos X")),
+        "world_pos_y": MappingRule(("World Pos Y",), lambda raw: first_float(raw, "World Pos Y")),
+        "world_pos_z": MappingRule(("World Pos Z",), lambda raw: first_float(raw, "World Pos Z")),
+        "lat_accel_g": MappingRule(("Lateral Acceleration",), lambda raw: first_float(raw, "Lateral Acceleration")),
+        "long_accel_g": MappingRule(("Longitudinal Acceleration",), lambda raw: first_float(raw, "Longitudinal Acceleration")),
+        "track_temp_c": MappingRule(("Track Temperature",), lambda raw: first_float(raw, "Track Temperature")),
+        "air_temp_c": MappingRule(("Ambient Temperature",), lambda raw: first_float(raw, "Ambient Temperature")),
+        "tyre_temp_lf": MappingRule(("Tyre Temp LF",), lambda raw: first_float(raw, "Tyre Temp LF")),
+        "tyre_temp_rf": MappingRule(("Tyre Temp RF",), lambda raw: first_float(raw, "Tyre Temp RF")),
+        "tyre_temp_lr": MappingRule(("Tyre Temp LR",), lambda raw: first_float(raw, "Tyre Temp LR")),
+        "tyre_temp_rr": MappingRule(("Tyre Temp RR",), lambda raw: first_float(raw, "Tyre Temp RR")),
+        "fuel_level": MappingRule(("Fuel Level",), lambda raw: first_float(raw, "Fuel Level")),
+        "water_temp": MappingRule(("Engine Water Temp",), lambda raw: first_float(raw, "Engine Water Temp")),
+        "oil_temp": MappingRule(("Engine Oil Temp",), lambda raw: first_float(raw, "Engine Oil Temp")),
+        "is_in_pits": MappingRule(("In Pits",), lambda raw: first_bool(raw, "In Pits")),
+        "raw_source_timestamp": MappingRule(("Session Time",), lambda raw: first_float(raw, "Session Time")),
+    },
     "iRacing": {
         "session_time_s": MappingRule(("SessionTime",), lambda raw: first_float(raw, "SessionTime")),
         "lap_number": MappingRule(("Lap",), lambda raw: first_int(raw, "Lap")),

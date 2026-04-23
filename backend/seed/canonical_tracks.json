@@ -1,0 +1,632 @@
+[
+  {
+    "canonical_id": "a0000001-0001-7000-8000-000000000001",
+    "canonical_name": "Monza",
+    "country": "Italy",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Autodromo Nazionale Monza",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "monza",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "monza",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Monza",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0002-7000-8000-000000000002",
+    "canonical_name": "Spa-Francorchamps",
+    "country": "Belgium",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Circuit de Spa-Francorchamps",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "spa",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "spa",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Spa-Francorchamps",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0003-7000-8000-000000000003",
+    "canonical_name": "Silverstone",
+    "country": "United Kingdom",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Silverstone Circuit",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "silverstone",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "silverstone",
+        "raw_layout": "gp",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "silverstone",
+        "raw_layout": "national",
+        "canonical_layout": "National"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Silverstone",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0004-7000-8000-000000000004",
+    "canonical_name": "NÃ¼rburgring",
+    "country": "Germany",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "NÃ¼rburgring Grand-Prix-Strecke",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "nurburgring",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "nurburgring",
+        "raw_layout": "gp",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "nurburgring",
+        "raw_layout": "nordschleife",
+        "canonical_layout": "Nordschleife"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Nurburgring",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0005-7000-8000-000000000005",
+    "canonical_name": "Daytona",
+    "country": "United States",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Daytona International Speedway",
+        "raw_layout": "",
+        "canonical_layout": "Road Course"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Daytona",
+        "raw_layout": "",
+        "canonical_layout": "Road Course"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0006-7000-8000-000000000006",
+    "canonical_name": "Sebring",
+    "country": "United States",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Sebring International Raceway",
+        "raw_layout": "",
+        "canonical_layout": "Full"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Sebring",
+        "raw_layout": "",
+        "canonical_layout": "Full"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0007-7000-8000-000000000007",
+    "canonical_name": "Le Mans",
+    "country": "France",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Circuit des 24 Heures du Mans",
+        "raw_layout": "",
+        "canonical_layout": "Full"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Le Mans",
+        "raw_layout": "",
+        "canonical_layout": "Full"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0008-7000-8000-000000000008",
+    "canonical_name": "Imola",
+    "country": "Italy",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Autodromo Enzo e Dino Ferrari",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "imola",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "imola",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Imola",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0009-7000-8000-000000000009",
+    "canonical_name": "Barcelona-Catalunya",
+    "country": "Spain",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Circuit de Barcelona-Catalunya",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "barcelona",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0010-7000-8000-000000000010",
+    "canonical_name": "Watkins Glen",
+    "country": "United States",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Watkins Glen International",
+        "raw_layout": "",
+        "canonical_layout": "Full"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0011-7000-8000-000000000011",
+    "canonical_name": "Road America",
+    "country": "United States",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Road America",
+        "raw_layout": "",
+        "canonical_layout": "Full"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0012-7000-8000-000000000012",
+    "canonical_name": "Suzuka",
+    "country": "Japan",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Suzuka International Racing Course",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Suzuka",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0013-7000-8000-000000000013",
+    "canonical_name": "Mount Panorama",
+    "country": "Australia",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Mount Panorama Circuit",
+        "raw_layout": "",
+        "canonical_layout": "Full"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "mount_panorama",
+        "raw_layout": "",
+        "canonical_layout": "Full"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0014-7000-8000-000000000014",
+    "canonical_name": "Brands Hatch",
+    "country": "United Kingdom",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Brands Hatch Circuit",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "brands_hatch",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "brands_hatch",
+        "raw_layout": "gp",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "brands_hatch",
+        "raw_layout": "indy",
+        "canonical_layout": "Indy"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0015-7000-8000-000000000015",
+    "canonical_name": "Laguna Seca",
+    "country": "United States",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "WeatherTech Raceway at Laguna Seca",
+        "raw_layout": "",
+        "canonical_layout": "Full"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0016-7000-8000-000000000016",
+    "canonical_name": "Indianapolis",
+    "country": "United States",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Indianapolis Motor Speedway",
+        "raw_layout": "",
+        "canonical_layout": "Road Course"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0017-7000-8000-000000000017",
+    "canonical_name": "Red Bull Ring",
+    "country": "Austria",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Red Bull Ring",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "red_bull_ring",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Red Bull Ring",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000002-0018-7000-8000-000000000018",
+    "canonical_name": "Zandvoort",
+    "country": "Netherlands",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Circuit Zandvoort",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "zandvoort",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0019-7000-8000-000000000019",
+    "canonical_name": "Interlagos",
+    "country": "Brazil",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "AutÃ³dromo JosÃ© Carlos Pace",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Interlagos",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0020-7000-8000-000000000020",
+    "canonical_name": "Fuji",
+    "country": "Japan",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Fuji International Speedway",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Fuji Speedway",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0021-7000-8000-000000000021",
+    "canonical_name": "Road Atlanta",
+    "country": "United States",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Road Atlanta",
+        "raw_layout": "",
+        "canonical_layout": "Full"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "Road Atlanta",
+        "raw_layout": "",
+        "canonical_layout": "Full"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0022-7000-8000-000000000022",
+    "canonical_name": "COTA",
+    "country": "United States",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Circuit of the Americas",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "lmu",
+        "raw_id": "COTA",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0023-7000-8000-000000000023",
+    "canonical_name": "Hungaroring",
+    "country": "Hungary",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Hungaroring",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "hungaroring",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0024-7000-8000-000000000024",
+    "canonical_name": "Mugello",
+    "country": "Italy",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Autodromo Internazionale del Mugello",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "mugello",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "a0000001-0025-7000-8000-000000000025",
+    "canonical_name": "Misano",
+    "country": "Italy",
+    "aliases": [
+      {
+        "sim_id": "iracing",
+        "raw_id": "Misano World Circuit Marco Simoncelli",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "misano",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "5c96a3c6-5215-4c35-a4bc-f310acbbd273",
+    "canonical_name": "Bahrain",
+    "country": "Bahrain",
+    "aliases": [
+      {
+        "sim_id": "lmu",
+        "raw_id": "Bahrain International Circuit",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "3bc2c80e-7711-4c20-a32b-c38f8d69303b",
+    "canonical_name": "Portimão",
+    "country": "Portugal",
+    "aliases": [
+      {
+        "sim_id": "lmu",
+        "raw_id": "Portimao",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "acc",
+        "raw_id": "portimao",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "5758ce08-44fe-4d03-bb3e-a4ccacf3952a",
+    "canonical_name": "Kyalami",
+    "country": "South Africa",
+    "aliases": [
+      {
+        "sim_id": "acc",
+        "raw_id": "kyalami",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "17e4ac12-d863-4ed2-b46a-478fa44f8bd0",
+    "canonical_name": "Paul Ricard",
+    "country": "France",
+    "aliases": [
+      {
+        "sim_id": "acc",
+        "raw_id": "paul_ricard",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "iracing",
+        "raw_id": "Circuit Paul Ricard",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      }
+    ]
+  },
+  {
+    "canonical_id": "3ed0cbc0-d6d7-4de8-b3d1-fde5b7d05b6f",
+    "canonical_name": "Donington Park",
+    "country": "United Kingdom",
+    "aliases": [
+      {
+        "sim_id": "acc",
+        "raw_id": "donington",
+        "raw_layout": "",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "donington",
+        "raw_layout": "gp",
+        "canonical_layout": "GP"
+      },
+      {
+        "sim_id": "assetto_corsa",
+        "raw_id": "donington",
+        "raw_layout": "national",
+        "canonical_layout": "National"
+      }
+    ]
+  }
+]

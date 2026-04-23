@@ -8,8 +8,28 @@ from typing import Any
 
 from PySide6.QtCore import QObject, Property, Signal, Slot
 
+from lap_coach_logger.coaching.corner_insights import CornerInsight
 from lap_coach_logger.coaching.plan_engine import CoachingPlan, generate_plan
 from lap_coach_logger.coaching.plan_evaluator import PlanResult, evaluate_plan
+from lap_coach_logger.coaching.post_session_summary import (
+    build_post_session_summary,
+    summary_to_dict,
+)
+from lap_coach_logger.coaching.policy_config import (
+    COACHING_TAB_POLICY,
+    DEFAULT_POLICY,
+    PolicyConfig,
+)
+from lap_coach_logger.coaching.presentation import (
+    CoachingMessage,
+    message_from_plan,
+    message_from_summary,
+    message_to_dict,
+)
+from lap_coach_logger.coaching.strategy_review import (
+    build_strategy_review,
+    review_to_dict,
+)
 from lap_coach_logger.coaching.readiness import assess_readiness
 from lap_coach_logger.core.consistency_analyzer import ConsistencyReport, analyze_consistency
 from lap_coach_logger.core.metric_state import MetricState, classify_metric
@@ -33,6 +53,7 @@ from lap_coach_logger.core.race_strategy import (
 from lap_coach_logger.core.stint_recorder import StintRecorder
 from lap_coach_logger.core.stint_store import CompoundProfile, StintStore
 from lap_coach_logger.core.strategy_models import PitProfile  # noqa: F401
+from lap_coach_logger.normalization.resolver import CanonicalResolver
 from lap_coach_logger.sync.queue import SyncQueue
 from lap_coach_logger.sync.schema import (
     CoachingPayload,
@@ -65,6 +86,9 @@ class StrategyViewModel(QObject):
         self._store = store
         self._track = ""
         self._car = ""
+        self._car_class = ""                # resolved via LUT, drives per-class calibration
+        self._sim_id = ""                   # last-seen sim_id from telemetry
+        self._resolver: CanonicalResolver | None = None
         self._total_laps = 0
         self._fuel_capacity = 0.0
         self._pit_time = 25.0
@@ -83,6 +107,20 @@ class StrategyViewModel(QObject):
         self._last_plan_result: PlanResult | None = None
         self._laps_since_plan: int = 0
         self._pre_plan_lap_times: list[float] = []
+        # Corner-level technique coaching (sprint):
+        # - latest: insights from the lap that just finalized
+        # - history: per-lap list; used for post-session summary + blocker
+        #   classification.
+        self._corner_insights_latest: list[CornerInsight] = []
+        self._corner_insights_history: list[list[CornerInsight]] = []
+        # -- Live strategy recalculation (redesign v2) --------------------------
+        self._fuel_deltas: list[float] = []         # per-lap fuel consumption
+        self._prev_fuel_level: float | None = None   # last-known fuel for delta calc
+        self._current_fuel: float = 0.0              # latest fuel reading
+        self._race_active = False                     # True after green flag in race session
+        self._original_plan: RacePlan | None = None   # frozen pre-race plan for plan-vs-actual
+        self._actual_pit_laps: list[int] = []         # recorded pit entry laps
+        self._actual_fuel_added: list[float] = []     # fuel added at each actual stop
         # -- Sync wiring -------------------------------------------------------
         self._sync_queue: SyncQueue | None = None
         self._session_id: str = ""
@@ -109,6 +147,16 @@ class StrategyViewModel(QObject):
     @Property(str, notify=profilesChanged)
     def carName(self) -> str:  # noqa: N802
         return self._car
+
+    @Property(str, notify=profilesChanged)
+    def carClass(self) -> str:  # noqa: N802
+        """Canonical car class (e.g. "GT3", "LMP2").
+
+        Resolved via CanonicalResolver from (sim_id, raw_car) on first
+        snapshot and whenever the car changes. Empty string when the LUT
+        has no entry — overlay code treats empty as "use GT3 defaults".
+        """
+        return self._car_class
 
     @Property(int, notify=planChanged)
     def totalLaps(self) -> int:  # noqa: N802
@@ -201,6 +249,114 @@ class StrategyViewModel(QObject):
     def planNumStops(self) -> int:  # noqa: N802
         return self._plan.num_stops if self._plan else 0
 
+    # -- Live strategy properties (redesign v2) --------------------------------
+
+    @Property(int, notify=alertsChanged)
+    def lapsToPit(self) -> int:  # noqa: N802
+        """Laps remaining until next planned pit stop. -1 if no plan or no remaining stops."""
+        if not self._plan or not self._plan.next_pit_lap:
+            return -1
+        return max(0, self._plan.next_pit_lap - self._prev_consistency_lap)
+
+    @Property(bool, notify=alertsChanged)
+    def pitNow(self) -> bool:  # noqa: N802
+        """True when the driver should pit THIS lap."""
+        return self.lapsToPit == 1
+
+    @Property(float, notify=alertsChanged)
+    def pitFuelLoad(self) -> float:  # noqa: N802
+        """Fuel to add at the next planned stop (liters)."""
+        if not self._plan or not self._plan.stints:
+            return 0.0
+        # Find the next stint that hasn't started yet
+        current = self._prev_consistency_lap
+        for stint in self._plan.stints:
+            if stint.start_lap > current:
+                return stint.fuel_to_add
+        return 0.0
+
+    @Property(float, notify=alertsChanged)
+    def fuelBurnRate(self) -> float:  # noqa: N802
+        """Rolling 3-lap average fuel consumption (L/lap). 0 if insufficient data."""
+        if len(self._fuel_deltas) < 1:
+            return 0.0
+        recent = self._fuel_deltas[-3:] if len(self._fuel_deltas) >= 3 else self._fuel_deltas
+        return round(sum(recent) / len(recent), 3)
+
+    @Property(float, notify=alertsChanged)
+    def fuelMargin(self) -> float:  # noqa: N802
+        """Fuel remaining minus fuel needed to finish (liters). Negative = deficit."""
+        burn = self.fuelBurnRate
+        if burn <= 0 or self._total_laps <= 0:
+            return 0.0
+        remaining_laps = max(0, self._total_laps - self._prev_consistency_lap)
+        needed = remaining_laps * burn
+        return round(self._current_fuel - needed, 2)
+
+    @Property(bool, notify=alertsChanged)
+    def strategyOnTrack(self) -> bool:  # noqa: N802
+        """True when all divergence metrics are within acceptable bounds."""
+        if not self._plan:
+            return True
+        return not any(
+            a.category == "divergence" and a.severity in ("warning", "critical")
+            for a in self._plan.alerts
+        )
+
+    @Property(int, notify=alertsChanged)
+    def currentStintLap(self) -> int:  # noqa: N802
+        """Lap within the current stint (1-indexed). 0 when unknown.
+
+        Computed from the live plan — reflects stint shifts from the
+        live recalc, not legacy tire-lap counters.
+        """
+        if self._plan is None or not self._plan.stints:
+            return 0
+        current = self._prev_consistency_lap
+        if current <= 0:
+            return 0
+        for stint in self._plan.stints:
+            if stint.start_lap <= current <= stint.end_lap:
+                return current - stint.start_lap + 1
+        return 0
+
+    @Property(int, notify=alertsChanged)
+    def currentStintTotalLaps(self) -> int:  # noqa: N802
+        """Total planned laps for the current stint. 0 when unknown."""
+        if self._plan is None or not self._plan.stints:
+            return 0
+        current = self._prev_consistency_lap
+        if current <= 0:
+            return 0
+        for stint in self._plan.stints:
+            if stint.start_lap <= current <= stint.end_lap:
+                return stint.end_lap - stint.start_lap + 1
+        return 0
+
+    @Property("QVariant", notify=alertsChanged)
+    def planVsActual(self) -> dict:  # noqa: N802
+        """Raw planned-vs-actual structural data (stops, fuel, times).
+
+        User-facing verdict / wording lives on ``strategyReview`` — QML
+        must bind the review card to that property, not to raw fields
+        here. This property is retained for structural debug / export.
+        """
+        if not self._original_plan:
+            return {}
+        planned_pit_laps = []
+        for i, stint in enumerate(self._original_plan.stints[:-1]):
+            planned_pit_laps.append(stint.end_lap)
+        return {
+            "planned_pit_laps": planned_pit_laps,
+            "actual_pit_laps": self._actual_pit_laps,
+            "planned_fuel_at_finish": self._original_plan.fuel_at_finish,
+            "actual_fuel_at_finish": self._current_fuel,
+            "planned_total_time": self._original_plan.total_race_time_s,
+            "planned_num_stops": self._original_plan.num_stops,
+            "actual_num_stops": len(self._actual_pit_laps),
+            "fuel_deltas": self._fuel_deltas,
+        }
+
     @Property(str, notify=planChanged)
     def raceMode(self) -> str:  # noqa: N802
         return self._race_mode
@@ -285,10 +441,159 @@ class StrategyViewModel(QObject):
             "evaluation_window": self._active_plan.evaluation_window,
             "confidence": self._active_plan.confidence.value,
             "reason": self._active_plan.reason,
+            "technique_insight": self._active_plan.technique_insight,
+            "corner_focus": self._active_plan.corner_focus,
+            "technique_action": self._active_plan.technique_action,
+            "likely_cause": self._active_plan.likely_cause,
             "laps_remaining": max(
                 0, self._active_plan.evaluation_window - self._laps_since_plan
             ),
         }
+
+    # -- Unified coaching presentation (Coaching Surface Unification) --------
+
+    def build_coaching_message(
+        self,
+        config: PolicyConfig = DEFAULT_POLICY,
+    ) -> CoachingMessage:
+        """Build the unified CoachingMessage directly (no dict round-trip).
+
+        Overlay VM + Coaching tab both call this with their own
+        ``PolicyConfig`` — identical source fields, surface-specific
+        truncation. Prefers the plan's ``plan_time_loss_s`` snapshot
+        over the latest lap's (stable across the plan lifetime) and
+        falls back to the insights list only when the plan predates
+        that field.
+        """
+        plan = self._active_plan
+        if plan is None:
+            return CoachingMessage()
+        time_loss = plan.plan_time_loss_s
+        if time_loss is None and plan.corner_focus:
+            time_loss = next(
+                (
+                    i.time_loss_s for i in self._corner_insights_latest
+                    if i.corner_name == plan.corner_focus
+                ),
+                None,
+            )
+        return message_from_plan(plan, time_loss_s=time_loss, config=config)
+
+    @Property("QVariant", notify=profilesChanged)
+    def coachingMessage(self) -> dict:  # noqa: N802
+        """The unified coaching message dict for the Coaching tab.
+
+        Uses ``COACHING_TAB_POLICY`` so the tab can show richer text
+        than the overlay while the underlying content (focus, action,
+        confidence, category) is guaranteed to match — same contract,
+        same source fields, different truncation limits only.
+        """
+        return message_to_dict(self.build_coaching_message(config=COACHING_TAB_POLICY))
+
+    @Property("QVariant", notify=profilesChanged)
+    def postSessionMessage(self) -> dict:  # noqa: N802
+        """Post-session summary in the unified coaching message shape."""
+        summary = build_post_session_summary(self._corner_insights_history)
+        return message_to_dict(message_from_summary(summary))
+
+    @Property("QVariant", notify=profilesChanged)
+    def strategyReview(self) -> dict:  # noqa: N802
+        """Post-session strategy verdict — compact "did I follow the plan?".
+
+        Returns a dict with verdict, planned/actual stop counts, biggest
+        divergence classification, fuel variance, next-time suggestion,
+        and pre-formatted rows for the review card. Degraded when no
+        plan exists or data is insufficient.
+        """
+        review = build_strategy_review(
+            original_plan=self._original_plan,
+            actual_pit_laps=list(self._actual_pit_laps),
+            actual_fuel_added=list(self._actual_fuel_added),
+            final_fuel_l=self._current_fuel,
+        )
+        return review_to_dict(review)
+
+    # -- Corner-level technique coaching (sprint) -----------------------------
+
+    @Property(str, notify=profilesChanged)
+    def cornerFocus(self) -> str:  # noqa: N802
+        """Name of the corner the coaching plan is focused on. Empty
+        string when the plan is sector-level or not yet generated."""
+        return self._active_plan.corner_focus if self._active_plan else ""
+
+    @Property(str, notify=profilesChanged)
+    def techniqueInsight(self) -> str:  # noqa: N802
+        """Concrete, data-driven coaching statement for the focus area.
+
+        Routed through ``build_coaching_message`` so the Coaching tab
+        sees the same headline text the overlay surface does (just
+        governed by ``COACHING_TAB_POLICY`` — longer limits, same source).
+        """
+        return self.build_coaching_message(config=COACHING_TAB_POLICY).headline
+
+    @Property(str, notify=profilesChanged)
+    def techniqueAction(self) -> str:  # noqa: N802
+        """One-line action hint, governed by the shared contract."""
+        return self.build_coaching_message(config=COACHING_TAB_POLICY).subline
+
+    @Property(str, notify=profilesChanged)
+    def techniqueConfidence(self) -> str:  # noqa: N802
+        """Confidence for the technique insight: high/medium/low."""
+        return self.build_coaching_message(config=COACHING_TAB_POLICY).confidence
+
+    @Property(list, notify=profilesChanged)
+    def cornerInsights(self) -> list:  # noqa: N802
+        """Latest per-corner insight list for diagnostics/tests."""
+        return [
+            {
+                "corner_name": i.corner_name,
+                "time_loss_s": i.time_loss_s,
+                "entry_speed_delta_kph": i.entry_speed_delta_kph,
+                "min_speed_delta_kph": i.min_speed_delta_kph,
+                "exit_speed_delta_kph": i.exit_speed_delta_kph,
+                "brake_onset_delta_pct": i.brake_onset_delta_pct,
+                "brake_release_delta_pct": i.brake_release_delta_pct,
+                "throttle_pickup_delta_pct": i.throttle_pickup_delta_pct,
+                "confidence": i.confidence,
+                "loss_zone": i.loss_zone,
+            }
+            for i in self._corner_insights_latest
+        ]
+
+    # Rolling window for endurance sessions — 120 laps is ~3 hours at
+    # 90s pace, a safe ceiling that preserves all realistic summary
+    # signal while keeping memory bounded.
+    _CORNER_INSIGHT_HISTORY_CAP = 120
+
+    def push_corner_insights(self, insights: list[CornerInsight]) -> None:
+        """Accept a fresh per-corner insight list from the live processor.
+
+        Called by the overlay VM after each lap finalisation. Updates
+        the history for post-session summary + readiness blocker
+        classification, and triggers a UI refresh so the technique
+        properties re-read on the next binding tick.
+        """
+        self._corner_insights_latest = list(insights)
+        if insights:
+            self._corner_insights_history.append(list(insights))
+            if len(self._corner_insights_history) > self._CORNER_INSIGHT_HISTORY_CAP:
+                self._corner_insights_history = self._corner_insights_history[
+                    -self._CORNER_INSIGHT_HISTORY_CAP:
+                ]
+        self.profilesChanged.emit()
+
+    @Property("QVariant", notify=profilesChanged)
+    def postSessionSummary(self) -> dict:  # noqa: N802
+        """Compact end-of-session coaching summary.
+
+        Returns a dict with ``problem_zones`` (top 3 corners),
+        ``largest_loss_area`` (single biggest time-on-table area), and
+        ``primary_next_session_focus`` (one actionable sentence).
+        Empty fields when insufficient data — see post_session_summary
+        for the shape.
+        """
+        summary = build_post_session_summary(self._corner_insights_history)
+        return summary_to_dict(summary)
 
     @Property("QVariant", notify=profilesChanged)
     def planResult(self) -> dict:  # noqa: N802
@@ -400,8 +705,30 @@ class StrategyViewModel(QObject):
         self._track = track
         self._car = car
         self._profiles = self._store.get_profiles(track, car)
+        # Re-resolve car class for the new car if sim is known.
+        if self._sim_id and car:
+            self._resolve_car_class(self._sim_id, car)
         self.profilesChanged.emit()
         self.stintLogChanged.emit()
+
+    def _resolve_car_class(self, sim_id: str, raw_car: str) -> None:
+        """Look up canonical car class via the LUT resolver, cache it.
+
+        Emits profilesChanged when the resolved class actually changes
+        so bound QML / overlay VM picks up the new calibration.
+        """
+        try:
+            if self._resolver is None:
+                self._resolver = CanonicalResolver()
+            resolved = self._resolver.resolve_car(sim_id, raw_car)
+            new_class = resolved.car_class or "" if resolved else ""
+        except Exception:
+            log.debug("Car class resolution failed", exc_info=True)
+            new_class = ""
+        if new_class != self._car_class:
+            self._car_class = new_class
+            log.info("Car class resolved: sim=%s car=%s -> %r", sim_id, raw_car, new_class)
+            self.profilesChanged.emit()
 
     @safe_slot()
     @Slot(int)
@@ -456,8 +783,61 @@ class StrategyViewModel(QObject):
             race_mode=self._race_mode,
             race_duration_s=self._race_duration_hours * 3600.0,
         )
+        # Freeze original plan for post-race comparison
+        self._original_plan = RacePlan(
+            stints=list(self._plan.stints),
+            total_race_time_s=self._plan.total_race_time_s,
+            fuel_at_finish=self._plan.fuel_at_finish,
+            alerts=[],
+        )
+        self._race_active = True
+        self._fuel_deltas.clear()
+        self._actual_pit_laps.clear()
+        self._actual_fuel_added.clear()
         self.planChanged.emit()
         self.alertsChanged.emit()
+
+    def _recalculate_live_strategy(self) -> None:
+        """Recalculate strategy from current race position using actual data.
+
+        Called once per completed lap during race modes. Uses measured
+        fuel deltas and estimated tire wear to update the plan, generate
+        divergence alerts, and update pit countdown state.
+        """
+        if self._plan is None:
+            return
+        try:
+            pit_profile = self._store.get_pit_profile(self._track) if self._track else None
+            # Estimate actual wear from stint lap count (simple linear proxy
+            # from DegradationModel or fallback 2%/lap)
+            current_stint_lap = self._prev_consistency_lap
+            for stint in self._plan.stints:
+                if stint.start_lap <= current_stint_lap <= stint.end_lap:
+                    current_stint_lap = current_stint_lap - stint.start_lap + 1
+                    break
+            actual_wear = min(1.0, current_stint_lap * 0.02)  # fallback: 2%/lap
+
+            self._plan = recalculate_live_plan(
+                plan=self._plan,
+                current_lap=self._prev_consistency_lap,
+                current_fuel=self._current_fuel,
+                actual_fuel_deltas=self._fuel_deltas,
+                actual_wear=actual_wear,
+                profiles=self._profiles,
+                fuel_capacity=self._fuel_capacity,
+                pit_time_s=self._pit_time,
+                conditions=self._conditions or None,
+                pit_profile=pit_profile,
+            )
+            self.planChanged.emit()
+            self.alertsChanged.emit()
+            log.debug(
+                "Live strategy recalculated: lap=%d fuel=%.1fL margin=%.1fL pit_in=%d",
+                self._prev_consistency_lap, self._current_fuel,
+                self.fuelMargin, self.lapsToPit,
+            )
+        except Exception:
+            log.warning("Live strategy recalculation failed", exc_info=True)
 
     @safe_slot()
     @Slot(str)
@@ -696,6 +1076,8 @@ class StrategyViewModel(QObject):
         if report is None:
             return
 
+        insights = self._corner_insights_latest or None
+
         # If we have an active plan, check if evaluation window elapsed
         if (
             self._active_plan is not None
@@ -711,15 +1093,18 @@ class StrategyViewModel(QObject):
                 self._last_plan_result = result_output.value
                 plan_output = generate_plan(
                     report, len(self._lap_times_buffer), self._last_plan_result,
+                    corner_insights=insights,
                 )
             else:
                 plan_output = generate_plan(
                     report, len(self._lap_times_buffer), None,
+                    corner_insights=insights,
                 )
         else:
             # No active plan or still evaluating — generate/refresh
             plan_output = generate_plan(
                 report, len(self._lap_times_buffer), self._last_plan_result,
+                corner_insights=insights,
             )
 
         # Update active plan if we got a fresh one
@@ -828,11 +1213,34 @@ class StrategyViewModel(QObject):
             if track and car:
                 self.setTrackCar(str(track), str(car))
 
-        # Pit-entry detection for auto-capture
+        # Car class resolution from LUT. Cheap, runs at most once per
+        # (sim, car) pair. Desktop is the authoritative resolver; empty
+        # string falls back to GT3 calibration in the overlay.
+        sim_id = snap.get("sim")
+        if sim_id and self._car and self._sim_id != str(sim_id):
+            self._sim_id = str(sim_id)
+            self._resolve_car_class(self._sim_id, self._car)
+
+        # -- Fuel tracking for live strategy -----------------------------------
+        fuel_level = snap.get("fuel_level")
+        if fuel_level is not None:
+            self._current_fuel = float(fuel_level)
+            # Initialise on first reading so delta tracking works from lap 1
+            if self._prev_fuel_level is None:
+                self._prev_fuel_level = self._current_fuel
+
+        # Pit-entry detection for auto-capture + plan-vs-actual recording
         is_in_pits = bool(snap.get("is_in_pits", False))
         was_in_pits = self._was_in_pits
         if is_in_pits and not was_in_pits:
             self.on_pit_detected()
+            # Record actual pit event for plan-vs-actual review
+            if self._race_active and self._prev_consistency_lap > 0:
+                self._actual_pit_laps.append(self._prev_consistency_lap)
+        if not is_in_pits and was_in_pits and self._race_active:
+            # Pit exit — track fuel added (delta from entry to exit)
+            if self._prev_fuel_level is not None and self._current_fuel > self._prev_fuel_level:
+                self._actual_fuel_added.append(round(self._current_fuel - self._prev_fuel_level, 2))
         self._was_in_pits = is_in_pits
 
         # Track lap times for consistency analysis
@@ -867,6 +1275,24 @@ class StrategyViewModel(QObject):
                                 self._last_synced_lap = self._prev_consistency_lap
 
                         self._maybe_update_coaching_plan()
+
+                        # -- Live strategy recalculation (v2 redesign) --------
+                        # Track per-lap fuel consumption
+                        if self._prev_fuel_level is not None and self._current_fuel > 0:
+                            delta = self._prev_fuel_level - self._current_fuel
+                            if 0 < delta < 20:  # sanity: 0-20L per lap
+                                self._fuel_deltas.append(round(delta, 3))
+                        self._prev_fuel_level = self._current_fuel
+
+                        # Recalculate strategy if we have a plan and we're racing
+                        if (
+                            self._plan is not None
+                            and self._race_active
+                            and self._mode in ("sprint", "endurance")
+                            and len(self._fuel_deltas) >= 1
+                        ):
+                            self._recalculate_live_strategy()
+
                         self.profilesChanged.emit()
                 self._prev_consistency_time = float(session_time)
             elif not hasattr(self, "_prev_consistency_lap"):

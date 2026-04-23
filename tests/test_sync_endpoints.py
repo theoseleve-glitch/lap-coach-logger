@@ -16,12 +16,12 @@ def test_session_is_singleton():
     assert spec is not None
     assert spec.batch_key is None
     assert spec.max_batch_size == 1
-    assert spec.path == "/sessions/start"
+    assert spec.path == "/v1/sessions-start"
 
 
 def test_session_end_is_singleton():
     spec = get_endpoint("session_end")
-    assert spec.path == "/sessions/end"
+    assert spec.path == "/v1/sessions-end"
     assert spec.batch_key is None
 
 
@@ -33,13 +33,13 @@ def test_lap_is_batched():
 
 def test_coaching_is_batched():
     spec = get_endpoint("coaching")
-    assert spec.path == "/coaching/batch"
+    assert spec.path == "/v1/coaching-batch"
     assert spec.batch_key == "coaching"
 
 
 def test_event_is_batched():
     spec = get_endpoint("event")
-    assert spec.path == "/events/batch"
+    assert spec.path == "/v1/events-batch"
     assert spec.batch_key == "events"
 
 

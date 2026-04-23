@@ -48,6 +48,7 @@ if TYPE_CHECKING:
 
     from lap_coach_logger.config.manager import ConfigManager
     from lap_coach_logger.config.models import AppConfig
+    from lap_coach_logger.config.save_scheduler import SaveScheduler
     from lap_coach_logger.core.session_coordinator import SessionCoordinator
     from lap_coach_logger.detection.process_watcher import ProcessWatcher
 
@@ -93,9 +94,12 @@ def build_view_models(service: DesktopService) -> dict:
     settings_vm.load(service.settings_snapshot())
 
     # -- Persist overlay widget settings on change -------------------------
+    # Overlay VM fires settingsSaveRequested many times per user gesture
+    # (17 emit sites; bulk operations like auto-arrange touch every widget).
+    # Route through the debounced scheduler so N emits = 1 disk write.
     def _save_overlay_settings() -> None:
         service.config.overlay.widget_settings = overlay_vm.export_settings()
-        service.config_manager.save(service.config)
+        service.config_saver.request_save()
 
     overlay_vm.settingsSaveRequested.connect(_save_overlay_settings)
 
@@ -172,6 +176,7 @@ def run_qml_shell(
     *,
     config: AppConfig,
     config_manager: ConfigManager,
+    config_saver: SaveScheduler,
     coordinator: SessionCoordinator,
     watcher: ProcessWatcher,
     on_exit: Callable[[], None],
@@ -205,6 +210,7 @@ def run_qml_shell(
     service = DesktopService(
         config=config,
         config_manager=config_manager,
+        config_saver=config_saver,
         coordinator=coordinator,
         watcher=watcher,
     )

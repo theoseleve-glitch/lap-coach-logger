@@ -10,19 +10,8 @@ Non-iRacing sims do not provide this data and skip this module.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 
-
-@dataclass
-class ConditionWindow:
-    """A contiguous block of laps sharing the same track conditions."""
-
-    start_lap: int
-    end_lap: int
-    track_temp_c: float
-    precipitation: float  # 0.0 – 1.0
-    track_state: str  # "dry" | "damp" | "wet"
-    recommended_compound: str  # "soft" | "inter" | "wet"
+from lap_coach_logger.core.race_strategy import ConditionWindow
 
 
 # ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@ Responsible for:
 1. Creating a temp session folder.
 2. Writing a structured **session bundle**:
    - ``session.json``  — manifest + metadata
-   - ``telemetry.csv`` (primary) or ``telemetry.parquet`` (fallback)
+   - ``telemetry.parquet`` (primary) or ``telemetry.csv`` (fallback)
    - ``laps.json``     — per-lap timing records
    - ``events.json``   — lifecycle event log
    - ``channels.json`` — telemetry channel definitions
@@ -42,7 +42,11 @@ from lap_coach_logger.writers.bundle_schema import (
     SessionManifest,
     compute_file_sha256,
 )
-from lap_coach_logger.writers.channels import build_channels_payload, build_raw_iracing_channels_payload
+from lap_coach_logger.writers.channels import (
+    build_channels_payload,
+    build_raw_channels_payload,
+    build_raw_iracing_channels_payload,
+)
 from lap_coach_logger.writers.csv_writer import CsvWriter
 from lap_coach_logger.writers.parquet_writer import ParquetWriter
 
@@ -148,6 +152,10 @@ class SessionFinalizer:
         iracing_session_info: dict[str, Any] | None = None,
         iracing_catalogs: dict[str, Any] | None = None,
         iracing_var_schema: list[dict[str, Any]] | None = None,
+        raw_capture_sim: str | None = None,
+        raw_samples: list[dict[str, Any]] | None = None,
+        raw_columns: list[str] | None = None,
+        raw_session_info: dict[str, Any] | None = None,
     ) -> Path | None:
         """Write session bundle and return the final folder path (or None on total failure)."""
         ended_at = ended_at or datetime.now(timezone.utc)
@@ -215,6 +223,29 @@ class SessionFinalizer:
                 )
                 iracing_files["iracing_catalogs"] = "iracing_catalogs.json"
 
+            # ── generic raw capture outputs (ACC, LMU, Assetto Corsa, etc.) ──
+            if raw_samples and raw_capture_sim:
+                sim_tag = raw_capture_sim.lower().replace(" ", "_")
+                raw_cols = raw_columns or (sorted(raw_samples[0].keys()) if raw_samples else [])
+                raw_tel_file = f"telemetry_{sim_tag}_raw.csv"
+                self._write_raw_csv(tmp_dir / raw_tel_file, raw_samples, raw_cols)
+                extra["raw_capture"] = {"sim": raw_capture_sim}
+                extra[f"{sim_tag}_raw_files"] = {f"telemetry_{sim_tag}_raw": raw_tel_file}
+                extra[f"{sim_tag}_raw_sample_count"] = len(raw_samples)
+
+                # Raw channels metadata
+                channels_file = f"channels_{sim_tag}_raw.json"
+                channels_meta = build_raw_channels_payload(raw_cols, raw_samples, sim_tag)
+                (tmp_dir / channels_file).write_text(
+                    json.dumps(channels_meta, indent=2), encoding="utf-8",
+                )
+                if raw_session_info is not None:
+                    info_file = f"session_info_{sim_tag}.json"
+                    (tmp_dir / info_file).write_text(
+                        json.dumps(raw_session_info, indent=2, default=str),
+                        encoding="utf-8",
+                    )
+
             # ── laps.json ──
             self._write_laps(tmp_dir, laps or [])
 
@@ -233,103 +264,33 @@ class SessionFinalizer:
             )
             self._write_quality_report(tmp_dir, quality_report.to_dict())
 
-            # ── session.json (manifest) ──
-            data_quality = _compute_data_quality(samples)
-
-            # Inject iRacing file references into source_metadata
+            # ── session.json v2 + analysis.json (Phase 6: v2-only) ──
+            # Extracts car_name from extra before v2 writer consumes it.
+            car_name = extra.pop("car", None)
+            # Inject iRacing file references for v2 raw_source provenance
             if iracing_files:
                 extra["iracing_raw_files"] = iracing_files
                 if iracing_raw_samples:
                     extra["iracing_raw_sample_count"] = len(iracing_raw_samples)
 
-            manifest = SessionManifest(
+            from lap_coach_logger.writers.bundle_v2 import write_bundle_v2
+            write_bundle_v2(
+                tmp_dir,
                 session_id=session_uid or folder_name,
-                schema_version=BUNDLE_SCHEMA_VERSION,
-                logger_version=__version__,
-                telemetry_schema_version=TELEMETRY_SCHEMA_VERSION,
-                adapter=adapter_name or extra.pop("adapter", None),
-                sim_name=sim,
-                started_at_utc=started_at.isoformat(),
-                ended_at_utc=ended_at.isoformat(),
-                session_type=session_type,
-                track_name=track,
-                car_name=extra.pop("car", None),
-                driver_name=driver_name,
+                sim_name=sim or "",
+                raw_car=car_name or "",
+                raw_track=track or "",
+                raw_track_layout=extra.get("track_layout"),
+                session_type_raw=session_type or "",
+                mode=extra.get("mode", "sprint"),
+                driver_name=driver_name or "",
+                start_time=started_at.isoformat(),
+                end_time=ended_at.isoformat(),
                 sample_count=len(samples),
-                dropped_sample_count=extra.pop("dropped_samples", 0),
-                sample_rate_hz=extra.pop("sample_rate_hz", None),
-                duration_s=round(duration_s, 2),
-                data_quality_score=data_quality,
-                track_temp_c=extra.pop("track_temp_c", None),
-                air_temp_c=extra.pop("air_temp_c", None),
-                total_laps=extra.pop("total_laps", 0),
-                valid_laps=extra.pop("valid_laps", 0),
-                clean_laps=extra.pop("clean_laps", 0),
-                best_lap_time_s=extra.pop("best_lap_time_s", None),
-                best_clean_lap_time_s=extra.pop("best_clean_lap_time_s", None),
-                representative_lap_number=extra.pop("representative_lap_number", None),
-                representative_lap_time_s=extra.pop("representative_lap_time_s", None),
-                review_status=extra.pop("review_status", "ready"),
-                review_updated_at_utc=ended_at.isoformat(),
-                sync_status="not_queued",
-                sync_attempt_count=0,
-                last_sync_attempt_at=None,
-                last_sync_error=None,
-                bundle_hash=sync_bundle_hash,
-                remote_id=None,
-                quality_classification=quality_report.recommended_classification,
-                quality_score=quality_report.overall_quality_score,
-                telemetry_file=tel_filename or "",
-                telemetry_format=write_format,
-                telemetry_sha256=tel_sha256,
-                source_metadata=extra,
-            )
-            session_path = tmp_dir / "session.json"
-            session_path.write_text(
-                json.dumps(manifest.to_dict(), indent=2), encoding="utf-8"
-            )
-
-            # ── backward-compat metadata.json shim ──
-            compat_meta: dict[str, Any] = {
-                "app_version": __version__,
-                "logger_version": __version__,
-                "sim": sim,
-                "session_uid": session_uid,
-                "track_name": track,
-                "car_name": manifest.car_name,
-                "session_type": session_type,
-                "started_at_utc": started_at.isoformat(),
-                "ended_at_utc": ended_at.isoformat(),
-                "duration_s": round(duration_s, 2),
-                "sample_count": len(samples),
-                "dropped_sample_count": manifest.dropped_sample_count,
-                "sample_rate_hz": manifest.sample_rate_hz,
-                "save_format": write_format,
-                "data_quality_score": data_quality,
-                "output_path": str(final_dir),
-                "schema_warnings": schema_warnings or None,
-                "bundle_schema_version": BUNDLE_SCHEMA_VERSION,
-                "quality_classification": quality_report.recommended_classification,
-                "quality_score": quality_report.overall_quality_score,
-                "total_laps": manifest.total_laps,
-                "valid_laps": manifest.valid_laps,
-                "clean_laps": manifest.clean_laps,
-                "best_lap_time_s": manifest.best_lap_time_s,
-                "best_clean_lap_time_s": manifest.best_clean_lap_time_s,
-                "representative_lap_number": manifest.representative_lap_number,
-                "representative_lap_time_s": manifest.representative_lap_time_s,
-                "review_status": manifest.review_status,
-                "review_updated_at_utc": manifest.review_updated_at_utc,
-                "sync_status": manifest.sync_status,
-                "sync_attempt_count": manifest.sync_attempt_count,
-                "last_sync_attempt_at": manifest.last_sync_attempt_at,
-                "last_sync_error": manifest.last_sync_error,
-                "bundle_hash": manifest.bundle_hash,
-                "remote_id": manifest.remote_id,
-                **manifest.source_metadata,
-            }
-            (tmp_dir / "metadata.json").write_text(
-                json.dumps(compat_meta, indent=2), encoding="utf-8"
+                duration_s=duration_s,
+                laps=[l.to_dict() for l in (laps or [])],
+                events=[e.to_dict() for e in (events or [])],
+                quality_report=quality_report.to_dict() if quality_report else None,
             )
 
             # ── atomic rename (shutil.move for Windows safety) ──
@@ -346,37 +307,36 @@ class SessionFinalizer:
 
     # ------------------------------------------------------------------
     def _write_telemetry(self, folder: Path, samples: list[TelemetrySample]) -> str:
-        """Try CSV first; fall back to Parquet on any error."""
+        """Try Parquet first; fall back to CSV on any error."""
         fields = TelemetrySample.field_names()
 
-        # Primary: CSV
-        csv_path = folder / "telemetry.csv"
+        # Primary: Parquet (compact, typed, fast reads)
+        parquet_path = folder / "telemetry.parquet"
+        try:
+            writer = ParquetWriter(compression=self._compression)
+            writer.open(parquet_path, fields)
+            writer.write_samples(samples)
+            writer.close()
+            return "parquet"
+        except Exception:
+            log.warning("Parquet write failed – falling back to CSV", exc_info=True)
+            parquet_path.unlink(missing_ok=True)
+
+        # Fallback: CSV
         csv_w: CsvWriter | None = None
         try:
             csv_w = CsvWriter()
-            csv_w.open(csv_path, fields)
+            csv_w.open(folder / "telemetry.csv", fields)
             csv_w.write_samples(samples)
             csv_w.close()
             return "csv"
         except Exception:
-            log.warning("CSV write failed – falling back to Parquet", exc_info=True)
-            # Ensure handle is released before fallback / rename
+            log.exception("CSV fallback also failed")
             if csv_w is not None:
                 try:
                     csv_w.close()
                 except Exception:
                     pass
-            csv_path.unlink(missing_ok=True)
-
-        # Fallback: Parquet
-        try:
-            writer = ParquetWriter(compression=self._compression)
-            writer.open(folder / "telemetry.parquet", fields)
-            writer.write_samples(samples)
-            writer.close()
-            return "parquet"
-        except Exception:
-            log.exception("Parquet fallback also failed")
             return "none"
 
     # ------------------------------------------------------------------
@@ -484,6 +444,20 @@ class SessionFinalizer:
         (folder / "channels_iracing_raw.json").write_text(
             json.dumps(payload, indent=2), encoding="utf-8"
         )
+
+    @staticmethod
+    def _write_raw_csv(
+        path: Path,
+        raw_samples: list[dict[str, Any]],
+        column_names: list[str],
+    ) -> None:
+        """Write a generic raw capture CSV file."""
+        import csv as csv_mod
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv_mod.DictWriter(f, fieldnames=column_names, extrasaction="ignore")
+            writer.writeheader()
+            for row in raw_samples:
+                writer.writerow({c: row.get(c) for c in column_names})
 
     # ------------------------------------------------------------------
     @staticmethod

@@ -45,3 +45,8 @@ GarageCoverWidget 1.0 GarageCoverWidget.qml
 MicVisualizerWidget 1.0 MicVisualizerWidget.qml
 PromoCodeAlertWidget 1.0 PromoCodeAlertWidget.qml
 TireLifeWidget 1.0 TireLifeWidget.qml
+PitCountdownWidget 1.0 PitCountdownWidget.qml
+StrategyStatusWidget 1.0 StrategyStatusWidget.qml
+SectorDeltaWidget 1.0 SectorDeltaWidget.qml
+PushManageWidget 1.0 PushManageWidget.qml
+GapTimingWidget 1.0 GapTimingWidget.qml

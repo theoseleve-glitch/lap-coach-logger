@@ -274,13 +274,12 @@ class TestLapTiming:
         sessions = [p for p in tmp_path.iterdir() if not p.name.startswith("_tmp_")]
         assert len(sessions) == 1
 
-        meta = json.loads((sessions[0] / "metadata.json").read_text())
-        assert meta["total_laps"] == 3
-        # JSON serialises int keys as strings
-        assert meta["lap_times"]["1"] == 29.0
-        assert meta["lap_times"]["2"] == 24.0
-        assert "3" not in meta["lap_times"]
-        assert meta["best_lap_time_s"] == 24.0
+        manifest = json.loads((sessions[0] / "session.json").read_text())
+        # v2: lap count is in the session block
+        assert manifest["session"]["lap_count"] == 3
+        # Lap timing details are in laps.json
+        laps = json.loads((sessions[0] / "laps.json").read_text())
+        assert len(laps) == 3
 
 
 # ---------------------------------------------------------------------------

@@ -39,71 +39,120 @@ _BOOL_FIELDS = {"is_on_track", "is_in_pits"}
 _FLOAT_FIELDS = set(TelemetrySample.field_names()) - _STRING_FIELDS - _INT_FIELDS - _BOOL_FIELDS
 
 
+def _v2_get(manifest: dict[str, Any], *paths: str, default: Any = None) -> Any:
+    """Read from v2 nested paths or v1 flat fields, returning first non-None."""
+    for p in paths:
+        parts = p.split(".")
+        val = manifest
+        for part in parts:
+            if isinstance(val, dict):
+                val = val.get(part)
+            else:
+                val = None
+                break
+        if val is not None:
+            return val
+    return default
+
+
 def load_session_review(folder: str | Path) -> dict[str, Any]:
     path = Path(folder)
     manifest = _read_json(path / "session.json")
-    metadata = _read_json(path / "metadata.json")
     quality = _read_json(path / "quality_report.json")
+    analysis = _read_json(path / "analysis.json")
 
-    review_status = (
-        manifest.get("review_status")
-        or metadata.get("review_status")
-        or REVIEW_STATUS_READY
-    )
+    # v2 nested accessors with v1 flat-field fallbacks
+    raw_source = manifest.get("raw_source") or {}
+    session_block = manifest.get("session") or {}
+    readiness = manifest.get("analysis_readiness") or {}
 
-    warnings = _coerce_str_list(metadata.get("schema_warnings"))
-    warnings.extend(_coerce_str_list(quality.get("warnings")))
+    review_status = manifest.get("review_status") or REVIEW_STATUS_READY
+
+    warnings = _coerce_str_list(quality.get("warnings"))
     errors = _coerce_str_list(quality.get("rejection_reasons"))
+
+    quality_class = (
+        quality.get("recommended_classification")
+        or manifest.get("quality_classification")
+        or "-"
+    )
+    if quality_class == "-" and readiness:
+        verdict = (analysis.get("recommendation") or {}).get("verdict")
+        if verdict == "recommended":
+            quality_class = "accepted"
+        elif verdict == "conditional":
+            quality_class = "accepted_with_warnings"
+        elif verdict == "not_recommended":
+            quality_class = "rejected"
 
     return {
         "name": path.name,
         "folder": str(path),
-        "session_id": manifest.get("session_id") or metadata.get("session_uid") or path.name,
-        "created_at": manifest.get("started_at_utc") or metadata.get("started_at_utc"),
-        "schema_version": manifest.get("schema_version") or metadata.get("bundle_schema_version") or "",
+        "session_id": manifest.get("session_id") or session_block.get("session_uid") or path.name,
+        "created_at": (
+            session_block.get("start_time")
+            or manifest.get("started_at_utc")
+        ),
+        "schema_version": manifest.get("schema_version") or "",
         "session_status": _display_review_status(review_status),
         "review_status": review_status,
-        "review_updated_at_utc": manifest.get("review_updated_at_utc") or metadata.get("review_updated_at_utc"),
-        "quality_classification": (
-            quality.get("recommended_classification")
-            or manifest.get("quality_classification")
-            or metadata.get("quality_classification")
+        "review_updated_at_utc": manifest.get("review_updated_at_utc"),
+        "quality_classification": quality_class,
+        "quality_score": (
+            readiness.get("quality_score")
+            or manifest.get("quality_score")
+        ),
+        "simulator": (
+            raw_source.get("sim_display_name")
+            or raw_source.get("sim_id")
+            or manifest.get("sim_name")
             or "-"
         ),
-        "quality_score": manifest.get("quality_score") or metadata.get("quality_score"),
-        "simulator": manifest.get("sim_name") or metadata.get("sim") or "-",
-        "track": manifest.get("track_name") or metadata.get("track_name") or "-",
-        "car": manifest.get("car_name") or metadata.get("car_name") or "-",
-        "session_type": manifest.get("session_type") or metadata.get("session_type") or "-",
-        "duration_s": manifest.get("duration_s") or metadata.get("duration_s") or 0,
-        "sample_count": manifest.get("sample_count") or metadata.get("sample_count") or 0,
-        "total_laps": manifest.get("total_laps") or metadata.get("total_laps") or 0,
-        "valid_laps": manifest.get("valid_laps") or metadata.get("valid_laps") or 0,
-        "clean_laps": manifest.get("clean_laps") or metadata.get("clean_laps") or 0,
-        "best_lap_time_s": manifest.get("best_lap_time_s") or metadata.get("best_lap_time_s"),
-        "best_clean_lap_time_s": (
-            manifest.get("best_clean_lap_time_s") or metadata.get("best_clean_lap_time_s")
+        "track": (
+            raw_source.get("raw_track")
+            or manifest.get("track_name")
+            or "-"
         ),
+        "car": (
+            raw_source.get("raw_car")
+            or manifest.get("car_name")
+            or "-"
+        ),
+        "session_type": (
+            raw_source.get("session_type_raw")
+            or manifest.get("session_type")
+            or "-"
+        ),
+        "duration_s": session_block.get("duration_s") or manifest.get("duration_s") or 0,
+        "sample_count": session_block.get("sample_count") or manifest.get("sample_count") or 0,
+        "total_laps": (
+            session_block.get("lap_count")
+            or manifest.get("total_laps")
+            or 0
+        ),
+        "valid_laps": manifest.get("valid_laps") or 0,
+        "clean_laps": manifest.get("clean_laps") or 0,
+        "best_lap_time_s": manifest.get("best_lap_time_s"),
+        "best_clean_lap_time_s": manifest.get("best_clean_lap_time_s"),
         "warnings": warnings,
         "errors": errors,
         "warning_count": len(warnings),
         "error_count": len(errors),
-        "sync_status": manifest.get("sync_status") or metadata.get("sync_status") or SYNC_STATUS_NOT_QUEUED,
-        "sync_attempt_count": int(manifest.get("sync_attempt_count") or metadata.get("sync_attempt_count") or 0),
-        "last_sync_attempt_at": manifest.get("last_sync_attempt_at") or metadata.get("last_sync_attempt_at"),
-        "last_sync_error": manifest.get("last_sync_error") or metadata.get("last_sync_error"),
-        "bundle_hash": manifest.get("bundle_hash") or metadata.get("bundle_hash"),
-        "remote_id": manifest.get("remote_id") or metadata.get("remote_id"),
+        "sync_status": manifest.get("sync_status") or SYNC_STATUS_NOT_QUEUED,
+        "sync_attempt_count": int(manifest.get("sync_attempt_count") or 0),
+        "last_sync_attempt_at": manifest.get("last_sync_attempt_at"),
+        "last_sync_error": manifest.get("last_sync_error"),
+        "bundle_hash": manifest.get("bundle_hash"),
+        "remote_id": manifest.get("remote_id"),
         "sync_ready": is_sync_ready(
             review_status=review_status,
-            quality_classification=(
-                quality.get("recommended_classification")
-                or manifest.get("quality_classification")
-                or metadata.get("quality_classification")
-            ),
+            quality_classification=quality_class,
         ),
         "local_folder_path": str(path),
-        "ended_at_utc": manifest.get("ended_at_utc") or metadata.get("ended_at_utc"),
+        "ended_at_utc": (
+            session_block.get("end_time")
+            or manifest.get("ended_at_utc")
+        ),
     }
 
 
@@ -185,55 +234,54 @@ def _format_duration_archive(duration_s: float) -> str:
 def set_session_review_status(folder: str | Path, review_status: str) -> dict[str, Any]:
     path = Path(folder)
     manifest_path = path / "session.json"
-    metadata_path = path / "metadata.json"
     manifest = _read_json(manifest_path)
-    metadata = _read_json(metadata_path)
     updated_at = datetime.now(timezone.utc).isoformat()
 
     manifest["review_status"] = review_status
     manifest["review_updated_at_utc"] = updated_at
-    metadata["review_status"] = review_status
-    metadata["review_updated_at_utc"] = updated_at
 
+    readiness = manifest.get("analysis_readiness") or {}
+    quality_class = manifest.get("quality_classification") or (
+        "accepted" if readiness.get("ready_for_analysis") else "rejected"
+    )
     sync_status = derive_sync_status(
-        current_status=manifest.get("sync_status") or metadata.get("sync_status"),
+        current_status=manifest.get("sync_status"),
         review_status=review_status,
-        quality_classification=(
-            manifest.get("quality_classification")
-            or metadata.get("quality_classification")
-        ),
-        remote_id=manifest.get("remote_id") or metadata.get("remote_id"),
+        quality_classification=quality_class,
+        remote_id=manifest.get("remote_id"),
     )
     manifest["sync_status"] = sync_status
-    metadata["sync_status"] = sync_status
 
     _write_json(manifest_path, manifest)
-    _write_json(metadata_path, metadata)
     return load_session_review(path)
 
 
 def reprocess_session_bundle(folder: str | Path, *, config: AppConfig) -> dict[str, Any]:
     path = Path(folder)
     manifest_path = path / "session.json"
-    metadata_path = path / "metadata.json"
     quality_path = path / "quality_report.json"
     laps_path = path / "laps.json"
 
     manifest = _read_json(manifest_path)
-    metadata = _read_json(metadata_path)
+    raw_source = manifest.get("raw_source") or {}
+    session_block = manifest.get("session") or {}
     samples, telemetry_file = _load_saved_samples(path, manifest)
 
-    session_id = str(manifest.get("session_id") or metadata.get("session_uid") or path.name)
-    existing_remote_id = manifest.get("remote_id") or metadata.get("remote_id")
+    session_id = str(manifest.get("session_id") or session_block.get("session_uid") or path.name)
+    existing_remote_id = manifest.get("remote_id")
+
+    track_name = raw_source.get("raw_track") or manifest.get("track_name")
+    car_name = raw_source.get("raw_car") or manifest.get("car_name")
+    session_type = raw_source.get("session_type_raw") or manifest.get("session_type")
 
     lap_records, lap_summary = classify_laps(samples, config=config.lap_analysis)
     quality_report = validate_session_quality(
         samples=samples,
         laps=lap_records,
-        track_name=manifest.get("track_name") or metadata.get("track_name"),
-        car_name=manifest.get("car_name") or metadata.get("car_name"),
-        session_type=manifest.get("session_type") or metadata.get("session_type"),
-        sample_rate_hz=manifest.get("sample_rate_hz") or metadata.get("sample_rate_hz"),
+        track_name=track_name,
+        car_name=car_name,
+        session_type=session_type,
+        sample_rate_hz=manifest.get("sample_rate_hz"),
         config=config.quality,
     )
 
@@ -243,14 +291,14 @@ def reprocess_session_bundle(folder: str | Path, *, config: AppConfig) -> dict[s
     )
     quality_path.write_text(json.dumps(quality_report.to_dict(), indent=2), encoding="utf-8")
 
-    review_status = manifest.get("review_status") or metadata.get("review_status") or REVIEW_STATUS_READY
+    review_status = manifest.get("review_status") or REVIEW_STATUS_READY
     review_updated_at = datetime.now(timezone.utc).isoformat()
     bundle_hash = SyncQueueManager.compute_bundle_hash(
         session_id=session_id,
         telemetry_sha256=compute_file_sha256(telemetry_file),
     )
     sync_status = derive_sync_status(
-        current_status=manifest.get("sync_status") or metadata.get("sync_status"),
+        current_status=manifest.get("sync_status"),
         review_status=review_status,
         quality_classification=quality_report.recommended_classification,
         remote_id=existing_remote_id,
@@ -258,9 +306,6 @@ def reprocess_session_bundle(folder: str | Path, *, config: AppConfig) -> dict[s
 
     manifest.update(
         {
-            "sample_count": len(samples),
-            "duration_s": round(_compute_duration(samples, manifest.get("duration_s") or 0.0), 2),
-            "data_quality_score": _compute_data_quality(samples),
             "total_laps": lap_summary.total_laps,
             "valid_laps": lap_summary.valid_laps,
             "clean_laps": lap_summary.clean_laps,
@@ -274,42 +319,15 @@ def reprocess_session_bundle(folder: str | Path, *, config: AppConfig) -> dict[s
             "review_status": review_status,
             "review_updated_at_utc": review_updated_at,
             "sync_status": sync_status,
-            "sync_attempt_count": int(manifest.get("sync_attempt_count") or metadata.get("sync_attempt_count") or 0),
-            "last_sync_attempt_at": manifest.get("last_sync_attempt_at") or metadata.get("last_sync_attempt_at"),
-            "last_sync_error": manifest.get("last_sync_error") or metadata.get("last_sync_error"),
+            "sync_attempt_count": int(manifest.get("sync_attempt_count") or 0),
+            "last_sync_attempt_at": manifest.get("last_sync_attempt_at"),
+            "last_sync_error": manifest.get("last_sync_error"),
             "bundle_hash": bundle_hash,
             "remote_id": existing_remote_id,
-            "telemetry_sha256": compute_file_sha256(telemetry_file),
-        }
-    )
-
-    metadata.update(
-        {
-            "sample_count": len(samples),
-            "duration_s": manifest["duration_s"],
-            "data_quality_score": manifest["data_quality_score"],
-            "total_laps": lap_summary.total_laps,
-            "valid_laps": lap_summary.valid_laps,
-            "clean_laps": lap_summary.clean_laps,
-            "best_lap_time_s": lap_summary.best_lap_time_s,
-            "best_clean_lap_time_s": lap_summary.best_clean_lap_time_s,
-            "representative_lap_number": lap_summary.representative_lap_number,
-            "representative_lap_time_s": lap_summary.representative_lap_time_s,
-            "quality_classification": quality_report.recommended_classification,
-            "quality_score": quality_report.overall_quality_score,
-            "sync_status": sync_status,
-            "sync_attempt_count": manifest["sync_attempt_count"],
-            "last_sync_attempt_at": manifest["last_sync_attempt_at"],
-            "last_sync_error": manifest["last_sync_error"],
-            "bundle_hash": bundle_hash,
-            "remote_id": existing_remote_id,
-            "review_status": review_status,
-            "review_updated_at_utc": review_updated_at,
         }
     )
 
     _write_json(manifest_path, manifest)
-    _write_json(metadata_path, metadata)
     return load_session_review(path)
 
 

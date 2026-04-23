@@ -44,4 +44,4 @@ def test_field_names_complete() -> None:
     assert "timestamp_utc" in names
     assert "speed_kph" in names
     assert "raw_source_timestamp" in names
-    assert len(names) == 40
+    assert len(names) == 47

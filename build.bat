@@ -1,4 +1,6 @@
 @echo off
+REM DEV BUILD — does NOT enforce clean tree, Python pinning, or produce
+REM build_info.json. For release artifacts use: scripts\build_rc1.bat
 setlocal
 pushd "%~dp0"
 

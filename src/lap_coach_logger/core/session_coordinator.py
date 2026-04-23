@@ -109,6 +109,20 @@ class SessionCoordinator:
     def session_started_at(self) -> datetime | None:
         return self._session_started_at
 
+    def latest_relative_snapshot(self) -> dict[str, object] | None:
+        """Return the active adapter's read_relative() output, or None.
+
+        Safe to call from UI thread — catches all exceptions so a flaky
+        SDK can never break the snapshot pipeline.
+        """
+        adapter = self._active_adapter
+        if adapter is None:
+            return None
+        try:
+            return adapter.read_relative()
+        except Exception:
+            return None
+
     def latest_sample_snapshot(self) -> dict[str, object]:
         """Return a shallow dict snapshot of the latest sample for UI display."""
         with self._lock:
@@ -515,11 +529,12 @@ class SessionCoordinator:
 
     def _load_iracing_var_schema(self, path: str) -> None:
         """Load the live var schema JSON for channel metadata."""
+        if not path:
+            return
         import json
         from pathlib import Path
 
-        default = Path(r"C:\Users\Admin\Documents\Telemetry\Analysis\V2_claude_ai\artifacts\iracing_live_var_schema.json")
-        p = Path(path) if path else default
+        p = Path(path)
         if p.exists():
             try:
                 with open(p, encoding="utf-8") as f:

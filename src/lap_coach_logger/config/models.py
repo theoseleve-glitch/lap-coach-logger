@@ -18,6 +18,14 @@ from lap_coach_logger.utils.paths import default_output_dir
 class SimConfig:
     """Per-sim toggle and connection hints."""
     enabled: bool = True
+    raw_capture_enabled: bool = True
+
+
+# Sim-specific aliases — all share the SimConfig base but have distinct names
+# so tests and profile_store can refer to them by sim.
+ACCConfig = SimConfig
+AssettoCorsaConfig = SimConfig
+LMUConfig = SimConfig
 
 
 @dataclass
@@ -96,6 +104,10 @@ class OverlayWidgetConfig:
 @dataclass
 class OverlayConfig:
     """Overlay HUD settings."""
+    enabled: bool = True
+    refresh_rate_hz: int = 60
+    opacity: float = 0.92
+    pin_mode: str = "always_on_top"
     widget_settings: dict[str, dict] = field(default_factory=dict)
 
 
@@ -106,6 +118,10 @@ class SyncConfig:
     api_url: str = "https://api.lap-coach.racing"
     device_token: str = ""
     device_name: str = ""
+    # Bundle upload (Connected v1 Phase 3)
+    bundle_upload_enabled: bool = True
+    bundle_upload_after_finalize: bool = True
+    bundle_max_size_mb: int = 200
 
 
 @dataclass
@@ -116,10 +132,13 @@ class AppConfig:
     sample_interval_s: float = 0.1
     session_end_grace_s: float = 5.0
     debug: bool = False
+    low_resource_mode: bool = False
     start_with_windows: bool = False
     driver_name: str = ""
     iracing: IRacingConfig = field(default_factory=IRacingConfig)
     acc: SimConfig = field(default_factory=SimConfig)
+    assetto_corsa: SimConfig = field(default_factory=SimConfig)
+    lmu: SimConfig = field(default_factory=SimConfig)
     writer: WriterConfig = field(default_factory=WriterConfig)
     session: SessionConfig = field(default_factory=SessionConfig)
     quality: QualityConfig = field(default_factory=QualityConfig)
@@ -145,6 +164,8 @@ class AppConfig:
         """Construct from a (possibly partial) dict, applying defaults."""
         iracing = IRacingConfig(**data.pop("iracing", {}))
         acc = SimConfig(**data.pop("acc", {}))
+        assetto_corsa = SimConfig(**data.pop("assetto_corsa", {}))
+        lmu = SimConfig(**data.pop("lmu", {}))
         writer = WriterConfig(**data.pop("writer", {}))
         session = SessionConfig(**data.pop("session", {}))
         quality = QualityConfig(**data.pop("quality", {}))
@@ -157,6 +178,8 @@ class AppConfig:
         return cls(
             iracing=iracing,
             acc=acc,
+            assetto_corsa=assetto_corsa,
+            lmu=lmu,
             writer=writer,
             session=session,
             quality=quality,

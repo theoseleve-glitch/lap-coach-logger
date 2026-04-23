@@ -133,3 +133,112 @@ class TestGeneratePlan:
         assert plan.focus_area == "T5"
         # Target should be easier (0.85 factor vs 0.7)
         assert "\u00b1" in plan.measurable_target
+
+
+# ---------------------------------------------------------------------------
+# Corner-level technique coaching integration (sprint)
+# ---------------------------------------------------------------------------
+
+class TestCornerFocusedPlan:
+    """Corner insights should upgrade the plan when they're significant."""
+
+    def test_high_confidence_corner_takes_over_sector_focus(self):
+        from lap_coach_logger.coaching.corner_insights import CornerInsight
+
+        report = _make_report(
+            overall_std_dev_s=0.15,  # low variance — normally no strong sector focus
+            per_sector_std_dev=[0.1, 0.15, 0.1],
+            worst_corners=[],
+            lap_count=10,
+        )
+        insights = [
+            CornerInsight(
+                corner_name="T7",
+                time_loss_s=0.45,     # big loss dominates the 0.15s std
+                exit_speed_delta_kph=-6.0,
+                throttle_pickup_delta_pct=0.01,
+                loss_zone="exit",
+                confidence="high",
+            ),
+            CornerInsight(
+                corner_name="T1",
+                time_loss_s=0.04,     # below noise floor
+                confidence="high",
+            ),
+        ]
+        output = generate_plan(report, laps_completed=10, corner_insights=insights)
+        plan: CoachingPlan = output.value
+
+        assert plan is not None
+        assert plan.focus_area == "T7"
+        assert plan.corner_focus == "T7"
+        assert plan.technique_action  # non-empty
+        assert plan.likely_cause
+        assert "T7" in plan.measurable_target
+        assert plan.confidence == Confidence.HIGH
+
+    def test_low_confidence_corner_falls_back_to_sector_focus(self):
+        from lap_coach_logger.coaching.corner_insights import CornerInsight
+
+        report = _make_report(
+            overall_std_dev_s=0.5,
+            per_sector_std_dev=[0.1, 0.45, 0.1],
+            worst_corners=[],
+        )
+        insights = [
+            CornerInsight(
+                corner_name="T7",
+                time_loss_s=0.45,
+                confidence="low",  # not trustworthy
+            ),
+        ]
+        output = generate_plan(report, laps_completed=10, corner_insights=insights)
+        plan: CoachingPlan = output.value
+
+        # Falls back to sector-level focus
+        assert plan is not None
+        assert plan.corner_focus == ""  # no corner takeover
+        assert plan.focus_area.startswith("Sector")
+
+    def test_small_corner_loss_does_not_override_sector(self):
+        from lap_coach_logger.coaching.corner_insights import CornerInsight
+
+        report = _make_report(
+            overall_std_dev_s=0.5,
+            per_sector_std_dev=[0.1, 0.45, 0.1],
+            worst_corners=[],
+        )
+        insights = [
+            CornerInsight(
+                corner_name="T7",
+                time_loss_s=0.10,  # below 0.15s floor
+                confidence="high",
+            ),
+        ]
+        output = generate_plan(report, laps_completed=10, corner_insights=insights)
+        plan: CoachingPlan = output.value
+
+        # Small corner loss doesn't dominate — stay sector-focused
+        assert plan.corner_focus == ""
+        assert plan.focus_area.startswith("Sector")
+
+    def test_corner_focus_requires_loss_to_dominate_variance(self):
+        from lap_coach_logger.coaching.corner_insights import CornerInsight
+
+        # Loss exists but overall variance is massive → inconsistency wins
+        report = _make_report(
+            overall_std_dev_s=1.5,
+            per_sector_std_dev=[0.5, 1.0, 0.5],
+            worst_corners=[],
+        )
+        insights = [
+            CornerInsight(
+                corner_name="T7",
+                time_loss_s=0.20,  # not >= 1.5 * 1.5s
+                confidence="high",
+            ),
+        ]
+        output = generate_plan(report, laps_completed=10, corner_insights=insights)
+        plan: CoachingPlan = output.value
+
+        assert plan.corner_focus == ""  # inconsistency too broad

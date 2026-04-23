@@ -234,12 +234,14 @@ class StintStore:
             log.warning("import_from_session: failed to parse session.json")
             return None
 
-        track_name: str = session_meta.get("track_name") or "unknown"
-        car_name: str = session_meta.get("car_name") or "unknown"
-        session_type: str = session_meta.get("session_type") or ""
-        started_at_utc: str = session_meta.get("started_at_utc") or ""
-        sample_count: int = session_meta.get("sample_count", 0)
-        session_id: str = session_meta.get("session_id") or started_at_utc
+        raw_source = session_meta.get("raw_source") or {}
+        session_block = session_meta.get("session") or {}
+        track_name: str = raw_source.get("raw_track") or session_meta.get("track_name") or "unknown"
+        car_name: str = raw_source.get("raw_car") or session_meta.get("car_name") or "unknown"
+        session_type: str = raw_source.get("session_type_raw") or session_meta.get("session_type") or ""
+        started_at_utc: str = session_block.get("start_time") or session_meta.get("started_at_utc") or ""
+        sample_count: int = session_block.get("sample_count") or session_meta.get("sample_count", 0)
+        session_id: str = session_meta.get("session_id") or session_block.get("session_uid") or started_at_utc
 
         # -- 2. Read laps.json ------------------------------------------
         laps_data: list[dict[str, Any]] = []

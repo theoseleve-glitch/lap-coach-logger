@@ -1,16 +1,8 @@
 """Tests for bootstrap QML shell wiring."""
 from __future__ import annotations
 
-import sys
-from unittest.mock import MagicMock
-
-# Ensure PySide6 mocks are available so bootstrap can be imported
-# without a real Qt runtime.
-sys.modules.setdefault("PySide6", MagicMock())
-sys.modules.setdefault("PySide6.QtCore", MagicMock())
-sys.modules.setdefault("PySide6.QtGui", MagicMock())
-sys.modules.setdefault("PySide6.QtQml", MagicMock())
-sys.modules.setdefault("PySide6.QtWidgets", MagicMock())
+from tests.qt_mock import install
+install(mock_gui=True)
 
 
 def test_bootstrap_imports_qml_shell():
