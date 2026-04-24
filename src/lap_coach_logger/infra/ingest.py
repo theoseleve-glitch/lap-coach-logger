@@ -38,6 +38,7 @@ from urllib.request import Request, urlopen
 _INGEST_ENDPOINT = "/api/v1/sessions/ingest"
 _MANIFEST_FILENAME = "manifest.json"
 _DEFAULT_CHUNK_SIZE_BYTES = 5 * 1024 * 1024  # T044: 5 MiB per ADR-012
+_CURSOR_FILENAME = ".ingest_cursor.json"  # T045: session-completion marker
 
 
 @dataclass(frozen=True)
@@ -110,6 +111,14 @@ class IngestClient:
             )
 
         manifest_bytes = manifest_path.read_bytes()
+
+        # T045: skip the whole upload if the bundle has a cursor for the
+        # same session_id (previous successful call). Any mismatch or
+        # malformed cursor falls through to a fresh upload attempt.
+        cached = _load_completion_cursor(bundle_dir, manifest_bytes)
+        if cached is not None:
+            return cached
+
         boundary = uuid.uuid4().hex
         body = _build_multipart_body(
             bundle_dir, manifest_bytes, boundary, self._chunk_size_bytes
@@ -133,13 +142,15 @@ class IngestClient:
             with urlopen(req, timeout=self._timeout_s) as resp:
                 raw = resp.read().decode("utf-8", errors="replace")
                 payload = json.loads(raw) if raw else {}
-                return IngestResult(
+                result = IngestResult(
                     success=True,
                     session_id=payload.get("session_id"),
                     ingest_job_id=payload.get("ingest_job_id"),
                     status_stream_url=payload.get("status_stream"),
                     http_status=resp.status,
                 )
+                _persist_completion_cursor(bundle_dir, result)
+                return result
         except HTTPError as exc:
             return IngestResult(
                 success=False,
@@ -215,6 +226,52 @@ def _chunked_parts(
         end = start + chunk_size_bytes
         pieces.append((f"{path.name}.part{idx}of{total}", data[start:end]))
     return pieces
+
+
+def _load_completion_cursor(
+    bundle_dir: Path, manifest_bytes: bytes
+) -> IngestResult | None:
+    """Return a cached ``IngestResult`` iff the cursor matches this session.
+
+    Mismatched / malformed / absent cursors fall through to a fresh
+    upload so stale or partial state can't silently skip work.
+    """
+    cursor_path = bundle_dir / _CURSOR_FILENAME
+    if not cursor_path.exists():
+        return None
+    try:
+        cursor = json.loads(cursor_path.read_text(encoding="utf-8"))
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+    except (OSError, ValueError, UnicodeDecodeError):
+        return None
+    if not isinstance(cursor, dict) or not isinstance(manifest, dict):
+        return None
+    if cursor.get("session_id") != manifest.get("session_id"):
+        return None
+    return IngestResult(
+        success=True,
+        session_id=cursor.get("session_id"),
+        ingest_job_id=cursor.get("ingest_job_id"),
+        status_stream_url=cursor.get("status_stream_url"),
+        http_status=cursor.get("http_status"),
+    )
+
+
+def _persist_completion_cursor(bundle_dir: Path, result: IngestResult) -> None:
+    """Write the 202-response fields so the next upload can short-circuit."""
+    payload = {
+        "session_id": result.session_id,
+        "ingest_job_id": result.ingest_job_id,
+        "status_stream_url": result.status_stream_url,
+        "http_status": result.http_status,
+    }
+    try:
+        (bundle_dir / _CURSOR_FILENAME).write_text(
+            json.dumps(payload, indent=2), encoding="utf-8"
+        )
+    except OSError:
+        # Persistence is best-effort; upload already succeeded.
+        pass
 
 
 def _session_idempotency_key(manifest_bytes: bytes) -> str | None:
