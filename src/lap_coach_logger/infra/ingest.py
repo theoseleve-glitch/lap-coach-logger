@@ -37,6 +37,7 @@ from urllib.request import Request, urlopen
 
 _INGEST_ENDPOINT = "/api/v1/sessions/ingest"
 _MANIFEST_FILENAME = "manifest.json"
+_DEFAULT_CHUNK_SIZE_BYTES = 5 * 1024 * 1024  # T044: 5 MiB per ADR-012
 
 
 @dataclass(frozen=True)
@@ -67,10 +68,14 @@ class IngestClient:
         base_url: str,
         auth_token: str,
         timeout_s: float = 60.0,
+        chunk_size_bytes: int = _DEFAULT_CHUNK_SIZE_BYTES,
     ) -> None:
+        if chunk_size_bytes <= 0:
+            raise ValueError("chunk_size_bytes must be positive")
         self._base_url = base_url.rstrip("/")
         self._auth_token = auth_token
         self._timeout_s = timeout_s
+        self._chunk_size_bytes = chunk_size_bytes
 
     @property
     def base_url(self) -> str:
@@ -79,6 +84,10 @@ class IngestClient:
     @property
     def timeout_s(self) -> float:
         return self._timeout_s
+
+    @property
+    def chunk_size_bytes(self) -> int:
+        return self._chunk_size_bytes
 
     def upload(self, *, bundle_dir: Path) -> IngestResult:
         """Upload a finalized bundle to ``/api/v1/sessions/ingest`` (T042).
@@ -102,7 +111,9 @@ class IngestClient:
 
         manifest_bytes = manifest_path.read_bytes()
         boundary = uuid.uuid4().hex
-        body = _build_multipart_body(bundle_dir, manifest_bytes, boundary)
+        body = _build_multipart_body(
+            bundle_dir, manifest_bytes, boundary, self._chunk_size_bytes
+        )
 
         url = f"{self._base_url}{_INGEST_ENDPOINT}"
         headers = {
@@ -145,14 +156,17 @@ class IngestClient:
 
 
 def _build_multipart_body(
-    bundle_dir: Path, manifest_bytes: bytes, boundary: str
+    bundle_dir: Path,
+    manifest_bytes: bytes,
+    boundary: str,
+    chunk_size_bytes: int,
 ) -> bytes:
     """Build a multipart/form-data body carrying the manifest + chunks.
 
     Manifest is always field ``manifest`` (JSON). Every other regular
-    file in ``bundle_dir`` is appended as a ``chunks[]`` part with the
-    file's name preserved; directories and the manifest itself are
-    skipped.
+    file in ``bundle_dir`` is appended as one or more ``chunks[]``
+    parts; files larger than ``chunk_size_bytes`` are split into
+    ``<name>.part<i>of<N>`` slices so the backend can reassemble.
     """
     parts: list[bytes] = []
     parts.append(
@@ -167,17 +181,40 @@ def _build_multipart_body(
     for path in sorted(bundle_dir.iterdir()):
         if not path.is_file() or path.name == _MANIFEST_FILENAME:
             continue
-        parts.append(
-            _form_part(
-                boundary,
-                field_name="chunks[]",
-                filename=path.name,
-                content_type="application/octet-stream",
-                data=path.read_bytes(),
+        for filename, data in _chunked_parts(path, chunk_size_bytes):
+            parts.append(
+                _form_part(
+                    boundary,
+                    field_name="chunks[]",
+                    filename=filename,
+                    content_type="application/octet-stream",
+                    data=data,
+                )
             )
-        )
     parts.append(f"--{boundary}--\r\n".encode("utf-8"))
     return b"\r\n".join(parts)
+
+
+def _chunked_parts(
+    path: Path, chunk_size_bytes: int
+) -> list[tuple[str, bytes]]:
+    """Slice *path* into ``<=chunk_size_bytes`` pieces with ordered names.
+
+    Files at or below ``chunk_size_bytes`` stay as a single
+    ``(path.name, <bytes>)`` tuple so small bundles keep their wire
+    shape unchanged. Larger files split into ``part<i>of<N>``
+    filenames so the server can reassemble in order.
+    """
+    data = path.read_bytes()
+    if len(data) <= chunk_size_bytes:
+        return [(path.name, data)]
+    total = (len(data) + chunk_size_bytes - 1) // chunk_size_bytes
+    pieces: list[tuple[str, bytes]] = []
+    for idx in range(total):
+        start = idx * chunk_size_bytes
+        end = start + chunk_size_bytes
+        pieces.append((f"{path.name}.part{idx}of{total}", data[start:end]))
+    return pieces
 
 
 def _session_idempotency_key(manifest_bytes: bytes) -> str | None:

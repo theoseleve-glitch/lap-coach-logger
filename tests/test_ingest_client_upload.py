@@ -188,6 +188,92 @@ def test_upload_sets_idempotency_key_from_manifest_session_id(
     )
 
 
+def test_upload_splits_large_telemetry_into_multiple_chunks(
+    tmp_path: Path,
+    mock_ingest_server: tuple[str, type[_MockIngestHandler]],
+) -> None:
+    """T044: telemetry > chunk_size_bytes sent as multiple chunks[] parts.
+
+    Uses a small chunk_size in the test so we don't need to generate
+    real 5MB blobs. A 10000-byte telemetry file with 4096-byte chunks
+    must produce 3 chunks[] parts (4096 + 4096 + 1808 bytes).
+    """
+    from lap_coach_logger.infra.ingest import IngestClient
+
+    base_url, handler = mock_ingest_server
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+    (bundle_dir / "manifest.json").write_text(
+        json.dumps({"session_id": "01900000-0000-7000-8000-00000000c044"}),
+        encoding="utf-8",
+    )
+    (bundle_dir / "telemetry.parquet").write_bytes(b"x" * 10000)
+
+    client = IngestClient(base_url=base_url, auth_token="t", chunk_size_bytes=4096)
+    client.upload(bundle_dir=bundle_dir)
+
+    body = handler.last_body or b""
+    chunk_count = body.count(b'name="chunks[]"')
+    assert chunk_count == 3, f"expected 3 chunks[] parts, got {chunk_count}"
+
+
+def test_upload_small_telemetry_stays_single_chunk(
+    tmp_path: Path,
+    mock_ingest_server: tuple[str, type[_MockIngestHandler]],
+) -> None:
+    """T044: telemetry ≤ chunk_size_bytes stays as one chunks[] part."""
+    from lap_coach_logger.infra.ingest import IngestClient
+
+    base_url, handler = mock_ingest_server
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+    (bundle_dir / "manifest.json").write_text(
+        json.dumps({"session_id": "01900000-0000-7000-8000-00000000c045"}),
+        encoding="utf-8",
+    )
+    (bundle_dir / "telemetry.parquet").write_bytes(b"x" * 100)
+
+    client = IngestClient(base_url=base_url, auth_token="t", chunk_size_bytes=4096)
+    client.upload(bundle_dir=bundle_dir)
+
+    body = handler.last_body or b""
+    assert body.count(b'name="chunks[]"') == 1
+
+
+def test_upload_chunk_filenames_include_index_and_total(
+    tmp_path: Path,
+    mock_ingest_server: tuple[str, type[_MockIngestHandler]],
+) -> None:
+    """T044: each chunk's filename carries its index so the backend can reassemble."""
+    from lap_coach_logger.infra.ingest import IngestClient
+
+    base_url, handler = mock_ingest_server
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+    (bundle_dir / "manifest.json").write_text(
+        json.dumps({"session_id": "01900000-0000-7000-8000-00000000c046"}),
+        encoding="utf-8",
+    )
+    (bundle_dir / "telemetry.parquet").write_bytes(b"x" * 10000)
+
+    client = IngestClient(base_url=base_url, auth_token="t", chunk_size_bytes=4096)
+    client.upload(bundle_dir=bundle_dir)
+
+    body = handler.last_body or b""
+    # Each chunk part must have a filename that identifies its place in the sequence.
+    assert b"telemetry.parquet.part0of3" in body
+    assert b"telemetry.parquet.part1of3" in body
+    assert b"telemetry.parquet.part2of3" in body
+
+
+def test_upload_default_chunk_size_is_5mb() -> None:
+    """T044: default chunk size matches the ADR-012 5 MB target."""
+    from lap_coach_logger.infra.ingest import IngestClient
+
+    client = IngestClient(base_url="http://unused.test", auth_token="t")
+    assert client.chunk_size_bytes == 5 * 1024 * 1024
+
+
 def test_upload_idempotency_key_is_stable_across_retries(
     tmp_path: Path,
     mock_ingest_server: tuple[str, type[_MockIngestHandler]],
