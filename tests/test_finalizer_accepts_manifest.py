@@ -208,3 +208,59 @@ def test_manifest_json_absent_on_legacy_kwarg_path(tmp_path: Path) -> None:
     assert not (out / "manifest.json").exists(), (
         "legacy path must not emit v2 manifest.json (keeps old consumers quiet)"
     )
+
+
+def test_finalize_writes_telemetry_parquet_by_default(tmp_path: Path) -> None:
+    """T027: pyarrow-backed parquet is the primary telemetry output."""
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(_samples(), manifest=_manifest())
+    assert out is not None
+    assert (out / "telemetry.parquet").exists(), (
+        "expected telemetry.parquet as primary output (pyarrow)"
+    )
+    assert (out / "telemetry.parquet").stat().st_size > 0
+
+
+def test_finalize_falls_back_to_csv_when_parquet_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """T027: CSV fallback engages when parquet writing raises."""
+    from lap_coach_logger.writers import finalizer as finalizer_mod
+
+    class _BrokenParquetWriter:
+        def __init__(self, *_a, **_kw) -> None:
+            pass
+
+        def open(self, *_a, **_kw) -> None:
+            raise RuntimeError("simulated parquet failure")
+
+        def write_samples(self, *_a, **_kw) -> None:
+            raise RuntimeError("unreachable")
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(finalizer_mod, "ParquetWriter", _BrokenParquetWriter)
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(_samples(), manifest=_manifest())
+    assert out is not None
+    # Parquet should be absent, CSV fallback should be present.
+    assert not (out / "telemetry.parquet").exists()
+    assert (out / "telemetry.csv").exists(), (
+        "CSV fallback must engage when parquet writing fails"
+    )
+    assert (out / "telemetry.csv").stat().st_size > 0
+
+
+def test_finalize_telemetry_file_is_non_empty_and_contains_samples(
+    tmp_path: Path,
+) -> None:
+    """T027: emitted telemetry file has a row per sample (smoke-level)."""
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(_samples(n=40), manifest=_manifest())
+    assert out is not None
+    telemetry = out / "telemetry.parquet"
+    assert telemetry.exists()
+    # A parquet file with 40 rows should be at least 1KB — smoke floor.
+    assert telemetry.stat().st_size > 500
