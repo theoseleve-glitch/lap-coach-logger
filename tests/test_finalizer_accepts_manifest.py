@@ -480,3 +480,59 @@ def test_manifest_checksum_matches_on_re_read(tmp_path: Path) -> None:
         assert digest == (
             "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
         )
+
+
+# -- T031 --------------------------------------------------------------------
+
+def _list_dirs(root: Path) -> list[str]:
+    return sorted(p.name for p in root.iterdir() if p.is_dir())
+
+
+def test_atomic_rename_removes_temp_prefix_on_success(tmp_path: Path) -> None:
+    """T031: after successful finalize, no ``_tmp_`` directory lingers."""
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(_samples(), manifest=_manifest(), laps=_laps())
+    assert out is not None
+
+    # Final bundle dir exists; no sibling _tmp_ scaffold remains.
+    assert out.is_dir()
+    temps = [name for name in _list_dirs(tmp_path) if name.startswith("_tmp_")]
+    assert temps == [], f"stale _tmp_ dirs after finalize: {temps}"
+
+
+def test_finalize_failure_leaves_no_final_dir_only_tmp(tmp_path: Path) -> None:
+    """T031: a mid-write exception must leave the FINAL name absent.
+
+    Partial bundles are allowed to linger under ``_tmp_`` for later
+    cleanup (``cleanup_stale_temps``), but the final folder name MUST
+    NOT appear — consumers pick up only complete bundles.
+    """
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+
+    # Force a late-stage write to raise by replacing the instance method.
+    def _explode(*_a, **_kw):  # type: ignore[no-untyped-def]
+        raise RuntimeError("simulated late-stage writer failure")
+
+    fin._write_events = _explode  # type: ignore[method-assign]
+
+    out = fin.finalize(_samples(), manifest=_manifest(), laps=_laps())
+    assert out is None, "finalize must return None on failure"
+
+    # No final bundle dir — consumers see nothing.
+    dirs = _list_dirs(tmp_path)
+    final_candidates = [d for d in dirs if not d.startswith("_tmp_")]
+    assert final_candidates == [], (
+        f"final dir appeared despite mid-write failure: {final_candidates}"
+    )
+
+
+def test_cleanup_stale_temps_removes_orphan_tmp_dirs(tmp_path: Path) -> None:
+    """T031: ``cleanup_stale_temps`` sweeps any orphaned ``_tmp_`` scaffolds."""
+    # Simulate an orphan from a prior crashed run.
+    orphan = tmp_path / "_tmp_2026-04-24_10-00-00__iracing__sebring__unknown"
+    orphan.mkdir()
+    (orphan / "partial.json").write_text("{}", encoding="utf-8")
+
+    cleaned = SessionFinalizer.cleanup_stale_temps(tmp_path)
+    assert cleaned >= 1
+    assert not orphan.exists()
