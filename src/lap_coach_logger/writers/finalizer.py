@@ -307,25 +307,51 @@ class SessionFinalizer:
                 if iracing_raw_samples:
                     extra["iracing_raw_sample_count"] = len(iracing_raw_samples)
 
-            from lap_coach_logger.writers.bundle_v2 import write_bundle_v2
-            write_bundle_v2(
-                tmp_dir,
-                session_id=session_uid or folder_name,
-                sim_name=sim or "",
-                raw_car=car_name or "",
-                raw_track=track or "",
-                raw_track_layout=extra.get("track_layout"),
-                session_type_raw=session_type or "",
-                mode=extra.get("mode", "sprint"),
-                driver_name=driver_name or "",
-                start_time=started_at.isoformat(),
-                end_time=ended_at.isoformat(),
-                sample_count=len(samples),
-                duration_s=duration_s,
-                laps=[l.to_dict() for l in (laps or [])],
-                events=[e.to_dict() for e in (events or [])],
-                quality_report=quality_report.to_dict() if quality_report else None,
+            from lap_coach_logger.writers.bundle_v2 import (
+                write_bundle_v2,
+                write_bundle_v2_from_manifest,
             )
+            laps_payload = [l.to_dict() for l in (laps or [])]
+            events_payload = [e.to_dict() for e in (events or [])]
+            quality_payload = (
+                quality_report.to_dict() if quality_report else None
+            )
+            # T040: route the manifest-supplied path through the canonical
+            # adapter so session identity / timing / sample stats are
+            # derived from the shared SessionManifest in one place.
+            if manifest is not None:
+                write_bundle_v2_from_manifest(
+                    tmp_dir,
+                    manifest=manifest,
+                    raw_car=car_name or "",
+                    raw_track=track or "",
+                    raw_track_layout=extra.get("track_layout"),
+                    session_type_raw=session_type or "",
+                    mode=extra.get("mode", "sprint"),
+                    driver_name=driver_name or "",
+                    laps=laps_payload,
+                    events=events_payload,
+                    quality_report=quality_payload,
+                )
+            else:
+                write_bundle_v2(
+                    tmp_dir,
+                    session_id=session_uid or folder_name,
+                    sim_name=sim or "",
+                    raw_car=car_name or "",
+                    raw_track=track or "",
+                    raw_track_layout=extra.get("track_layout"),
+                    session_type_raw=session_type or "",
+                    mode=extra.get("mode", "sprint"),
+                    driver_name=driver_name or "",
+                    start_time=started_at.isoformat(),
+                    end_time=ended_at.isoformat(),
+                    sample_count=len(samples),
+                    duration_s=duration_s,
+                    laps=laps_payload,
+                    events=events_payload,
+                    quality_report=quality_payload,
+                )
 
             # ── manifest.json (Bundle v2 contract, T026/T030) ──
             # When a shared SessionManifest is supplied, emit the canonical

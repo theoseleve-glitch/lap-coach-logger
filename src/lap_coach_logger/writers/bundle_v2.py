@@ -20,6 +20,7 @@ from typing import Any
 from lap_coach_logger import __version__
 from lap_coach_logger.normalization.resolver import CanonicalResolver
 from lap_coach_logger.writers.analysis_writer import build_analysis
+from lap_schemas.v1 import SessionManifest as SharedSessionManifest
 
 log = logging.getLogger(__name__)
 
@@ -217,6 +218,56 @@ def write_bundle_v2(
     )
 
     return manifest
+
+
+def write_bundle_v2_from_manifest(
+    session_dir: Path,
+    *,
+    manifest: SharedSessionManifest,
+    raw_car: str,
+    raw_track: str,
+    raw_track_layout: str | None,
+    session_type_raw: str,
+    mode: str,
+    driver_name: str,
+    laps: list[dict[str, Any]],
+    events: list[dict[str, Any]],
+    quality_report: dict[str, Any] | None = None,
+    resolver: CanonicalResolver | None = None,
+) -> dict[str, Any]:
+    """Canonical entry point: derive bundle v2 kwargs from a ``SessionManifest`` (T040).
+
+    Centralises the canonical→legacy translation that used to live
+    inline in ``SessionFinalizer.finalize``. The legacy wire format
+    (sim_display_name, duration_s, sample_count, start_time, end_time)
+    is still what ``write_bundle_v2`` consumes — this helper is the
+    single place that maps canonical field names onto it.
+    """
+    if not isinstance(manifest, SharedSessionManifest):
+        raise TypeError(
+            "write_bundle_v2_from_manifest(manifest=...) expects a "
+            "lap_schemas.v1.SessionManifest instance; got "
+            f"{type(manifest).__name__}"
+        )
+    return write_bundle_v2(
+        session_dir,
+        session_id=str(manifest.session_id),
+        sim_name=manifest.sim_title or manifest.source,
+        raw_car=raw_car,
+        raw_track=raw_track,
+        raw_track_layout=raw_track_layout,
+        session_type_raw=session_type_raw,
+        mode=mode,
+        driver_name=driver_name,
+        start_time=manifest.started_at.isoformat(),
+        end_time=manifest.ended_at.isoformat(),
+        sample_count=manifest.total_samples,
+        duration_s=manifest.duration_seconds,
+        laps=laps,
+        events=events,
+        quality_report=quality_report,
+        resolver=resolver,
+    )
 
 
 def _compute_bundle_hash(file_entries: list[dict], session_dir: Path) -> str:
