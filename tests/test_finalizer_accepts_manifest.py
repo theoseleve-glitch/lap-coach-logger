@@ -536,3 +536,69 @@ def test_cleanup_stale_temps_removes_orphan_tmp_dirs(tmp_path: Path) -> None:
     cleaned = SessionFinalizer.cleanup_stale_temps(tmp_path)
     assert cleaned >= 1
     assert not orphan.exists()
+
+
+# -- T032 --------------------------------------------------------------------
+
+def _manifest_with_sensors(*sensors: SensorConfig) -> SessionManifest:
+    m = _manifest()
+    return m.model_copy(
+        update={
+            "sensor_config": SensorConfigSnapshot(
+                sensors=tuple(sensors),
+                hardware_id="desktop-rig-01",
+                firmware_version="2.0.0",
+            )
+        }
+    )
+
+
+def test_manifest_sensor_config_persists_to_disk(tmp_path: Path) -> None:
+    """T032: sensor_config (sensors + adapter info) persists via manifest.json."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    manifest = _manifest_with_sensors(
+        SensorConfig(name="irsdk", sample_rate_hz=60.0, enabled=True),
+        SensorConfig(name="racebox_gnss", sample_rate_hz=25.0, enabled=False),
+    )
+    out = fin.finalize(_samples(), manifest=manifest)
+    assert out is not None
+
+    data = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    sc = data.get("sensor_config")
+    assert isinstance(sc, dict) and sc, "manifest.json must include sensor_config"
+    assert sc.get("hardware_id") == "desktop-rig-01"
+    assert sc.get("firmware_version") == "2.0.0"
+
+
+def test_sensor_config_round_trips_via_pydantic_model(tmp_path: Path) -> None:
+    """T032: re-reading manifest.json reconstructs the exact SensorConfigSnapshot."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    manifest = _manifest_with_sensors(
+        SensorConfig(name="irsdk", sample_rate_hz=60.0),
+    )
+    out = fin.finalize(_samples(), manifest=manifest)
+    assert out is not None
+
+    data = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    parsed = SessionManifest.model_validate(data)
+    assert parsed.sensor_config == manifest.sensor_config
+
+
+def test_sensor_config_sensors_list_populated_and_nonempty(tmp_path: Path) -> None:
+    """T032: sensors tuple carries at least one entry with adapter + rate."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(_samples(), manifest=_manifest())
+    assert out is not None
+
+    data = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    sensors = data["sensor_config"]["sensors"]
+    assert isinstance(sensors, list) and sensors, "sensors must be populated"
+    first = sensors[0]
+    assert first["name"]  # adapter name set
+    assert first["sample_rate_hz"] > 0  # rate is positive-only per schema
