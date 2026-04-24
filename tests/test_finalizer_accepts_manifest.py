@@ -602,3 +602,83 @@ def test_sensor_config_sensors_list_populated_and_nonempty(tmp_path: Path) -> No
     first = sensors[0]
     assert first["name"]  # adapter name set
     assert first["sample_rate_hz"] > 0  # rate is positive-only per schema
+
+
+# -- T033 --------------------------------------------------------------------
+
+def _rich_data_quality() -> DataQuality:
+    return DataQuality(
+        score=88.5,
+        gps_fix_quality=4.0,
+        gps_satellite_count_avg=11,
+        channel_completeness=97.25,
+        sample_gaps_count=3,
+        sample_rate_stability=0.02,
+        warnings=("sample_gap_at_lap_2",),
+        recommendations=("check_gps_antenna",),
+        usable_for_overlays=True,
+        usable_for_long_term_coaching=False,
+    )
+
+
+def _manifest_with_quality(dq: DataQuality) -> SessionManifest:
+    return _manifest().model_copy(update={"data_quality": dq})
+
+
+def test_data_quality_all_submetrics_persist(tmp_path: Path) -> None:
+    """T033: every DataQuality sub-metric survives the manifest round-trip."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    dq = _rich_data_quality()
+    out = fin.finalize(_samples(), manifest=_manifest_with_quality(dq))
+    assert out is not None
+
+    data = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    written = data.get("data_quality")
+    assert isinstance(written, dict) and written
+
+    for key in (
+        "score",
+        "gps_fix_quality",
+        "gps_satellite_count_avg",
+        "channel_completeness",
+        "sample_gaps_count",
+        "sample_rate_stability",
+        "warnings",
+        "recommendations",
+        "usable_for_overlays",
+        "usable_for_long_term_coaching",
+    ):
+        assert key in written, f"data_quality.{key} missing from manifest.json"
+
+
+def test_data_quality_round_trips_via_pydantic_model(tmp_path: Path) -> None:
+    """T033: DataQuality reconstructs byte-for-byte via model_validate."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    dq = _rich_data_quality()
+    out = fin.finalize(_samples(), manifest=_manifest_with_quality(dq))
+    assert out is not None
+
+    data = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    parsed = SessionManifest.model_validate(data)
+    assert parsed.data_quality == dq
+
+
+def test_data_quality_score_within_schema_bounds(tmp_path: Path) -> None:
+    """T033: score respects 0-100 constraint; warnings/recommendations stay tuples."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    dq = _rich_data_quality()
+    out = fin.finalize(_samples(), manifest=_manifest_with_quality(dq))
+    assert out is not None
+
+    data = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    written = data["data_quality"]
+    assert 0 <= written["score"] <= 100
+    assert 0 <= written["channel_completeness"] <= 100
+    assert isinstance(written["warnings"], list) and written["warnings"]
+    assert isinstance(written["recommendations"], list) and written["recommendations"]
