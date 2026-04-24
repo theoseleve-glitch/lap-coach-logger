@@ -41,6 +41,7 @@ from lap_coach_logger.writers.bundle_schema import (
     SessionEvent,
     compute_file_sha256,
 )
+from lap_schemas.v1 import SessionManifest as SharedSessionManifest
 from lap_coach_logger.writers.channels import (
     build_channels_payload,
     build_raw_channels_payload,
@@ -135,7 +136,8 @@ class SessionFinalizer:
         self,
         samples: list[TelemetrySample],
         *,
-        started_at: datetime,
+        manifest: SharedSessionManifest | None = None,
+        started_at: datetime | None = None,
         ended_at: datetime | None = None,
         sim: str | None = None,
         track: str | None = None,
@@ -156,7 +158,32 @@ class SessionFinalizer:
         raw_columns: list[str] | None = None,
         raw_session_info: dict[str, Any] | None = None,
     ) -> Path | None:
-        """Write session bundle and return the final folder path (or None on total failure)."""
+        """Write session bundle and return the final folder path (or None on total failure).
+
+        T025 (step 1 of the rewrite): when ``manifest`` is a
+        ``SessionManifest`` it becomes the authoritative source for
+        session identity + timing + sim/track; the kwargs are used as
+        fallback only when ``manifest`` is ``None`` (legacy path).
+        """
+        if manifest is not None:
+            if not isinstance(manifest, SharedSessionManifest):
+                raise TypeError(
+                    "SessionFinalizer.finalize(manifest=...) expects a "
+                    "lap_schemas.v1.SessionManifest instance; got "
+                    f"{type(manifest).__name__}"
+                )
+            session_uid = str(manifest.session_id)
+            started_at = manifest.started_at
+            ended_at = manifest.ended_at
+            sim = manifest.sim_title or sim
+            track = manifest.track_layout or track
+            adapter_name = adapter_name or manifest.capture_app
+
+        if started_at is None:
+            raise TypeError(
+                "SessionFinalizer.finalize() requires either ``manifest`` or "
+                "``started_at`` kwarg"
+            )
         ended_at = ended_at or datetime.now(timezone.utc)
         duration_s = (ended_at - started_at).total_seconds()
 
