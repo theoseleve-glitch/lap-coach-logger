@@ -1,27 +1,13 @@
 """Live telemetry processing pipeline for the overlay HUD.
 
-Composes tracker instances (lap comparison, corner tracking) into a
-single ``process()`` call that returns aggregated overlay state.
+Composes the three :class:`LiveProcessor` sub-processors
+(:class:`CoachingLiveProcessor`, :class:`DashboardLiveProcessor`,
+:class:`InputDiagnosticsProcessor`) into a single ``process()`` call
+that returns the aggregated overlay state the ``OverlayViewModel``
+consumes (sprint T006).
 
-Import audit (sprint T001)
---------------------------
-Every external symbol referenced at module load resolves against the current
-tree. Reproduce with
+Reproduce import audit (sprint T001) with
 ``python -c "import lap_coach_logger.core.live_telemetry_processor"``.
-
-- ``lap_coach_logger.core.live_coach.LiveCoachTracker`` -- present
-- ``lap_coach_logger.core.live_dashboard.LiveCornerTracker`` -- present
-- ``lap_coach_logger.core.live_input_diagnostics.LiveInputDiagnosticsTracker`` -- present
-- ``lap_coach_logger.core.live_lap_compare.LiveLapComparisonTracker`` -- present
-- ``lap_coach_logger.core.schema.TelemetrySample`` -- present
-- ``lap_coach_logger.core.tire_model.TireDegradationTracker`` -- present
-
-Missing module references: none.
-
-Note: T002-T006 will split this monolith into a ``LiveProcessor`` ABC plus
-``CoachingLiveProcessor``/``DashboardLiveProcessor``/``InputDiagnosticsProcessor``
-composed via that ABC. Those targets are not missing today -- they do not yet
-exist -- so they are out of scope for this audit.
 """
 
 from __future__ import annotations
@@ -29,32 +15,24 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from lap_coach_logger.core.telemetry_utils import to_float as _float
-
 from lap_coach_logger.coaching.corner_insights import (
     CornerInsight,
     analyze_corner_comparisons,
 )
-from lap_coach_logger.core.live_coach import LiveCoachTracker
-from lap_coach_logger.core.live_dashboard import LiveCornerTracker
-from lap_coach_logger.core.live_input_diagnostics import LiveInputDiagnosticsTracker
-from lap_coach_logger.core.live_lap_compare import LiveLapComparisonTracker
+from lap_coach_logger.core.coaching_live_processor import CoachingLiveProcessor
+from lap_coach_logger.core.dashboard_live_processor import DashboardLiveProcessor
+from lap_coach_logger.core.input_diagnostics_processor import (
+    InputDiagnosticsProcessor,
+)
 from lap_coach_logger.core.schema import TelemetrySample
-from lap_coach_logger.core.tire_model import TireDegradationTracker
+from lap_coach_logger.core.telemetry_utils import to_float as _float
 
 log = logging.getLogger(__name__)
 
 
-def _format_lap_time(seconds: float | None) -> str:
-    """Format seconds as ``M:SS.mmm`` or empty string when unavailable."""
-    if seconds is None or seconds <= 0:
-        return ""
-    minutes = int(seconds) // 60
-    remainder = seconds - minutes * 60
-    return f"{minutes}:{remainder:06.3f}"
-
-
-def _build_sample_from_live(live: dict[str, Any], snap: dict[str, Any]) -> TelemetrySample:
+def _build_sample_from_live(
+    live: dict[str, Any], snap: dict[str, Any]
+) -> TelemetrySample:
     """Construct a TelemetrySample from the coordinator snapshot dicts."""
     return TelemetrySample(
         sim=str(snap.get("sim") or ""),
@@ -81,7 +59,7 @@ def _build_sample_from_live(live: dict[str, Any], snap: dict[str, Any]) -> Telem
 
 
 class LiveTelemetryProcessor:
-    """Composes live analysis trackers into a single processing pipeline."""
+    """Composes the three LiveProcessor sub-processors into one pipeline."""
 
     # -- Lockup / wheelspin heuristic thresholds --------------------------------
     _LOCKUP_BRAKE_MIN: float = 0.8
@@ -93,112 +71,50 @@ class LiveTelemetryProcessor:
     _WHEELSPIN_SPEED_MIN_KPH: float = 20.0
 
     def __init__(self) -> None:
-        self._lap_tracker = LiveLapComparisonTracker()
-        self._coach_tracker = LiveCoachTracker()
-        self._input_tracker = LiveInputDiagnosticsTracker()
-        self._corner_tracker = LiveCornerTracker()
-        self._tire_tracker = TireDegradationTracker()
+        self._coaching = CoachingLiveProcessor()
+        self._dashboard = DashboardLiveProcessor()
+        self._input = InputDiagnosticsProcessor()
         # Cache last published insights so we can detect lap-boundary
         # transitions without re-running the analyser every snapshot.
         self._last_insights_lap: int | None = None
         self._last_insights: list[CornerInsight] = []
 
     def process(self, live_dict: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
-        """Process a raw snapshot, return aggregated overlay state.
-
-        Returns dict with keys:
-        - ``live_delta_s``: float -- current vs best delta in seconds
-        - ``best_lap_time_s``: float | None
-        - ``last_lap_time_s``: float | None
-        - ``current_lap_time_s``: float | None
-        - ``best_lap_time_fmt``: str -- formatted best lap time
-        - ``last_lap_time_fmt``: str -- formatted last lap time
-        - ``current_lap_time_fmt``: str -- formatted current lap elapsed
-        - ``sector_rows``: list of dicts
-        """
+        """Process a raw snapshot, return aggregated overlay state."""
         sample = _build_sample_from_live(live_dict, snap)
+        derived = snap.get("derived")
 
-        # Feed the sample into the lap comparison tracker.
-        # dashboard_state can carry sector splits from the sim.
-        self._lap_tracker.push_sample(
-            sample,
-            dashboard_state=live_dict,
-            derived_state=snap.get("derived"),
-        )
+        # Fan the sample through the three sub-processors via the ABC.
+        for sub in (self._dashboard, self._coaching, self._input):
+            sub.on_sample(sample, dashboard_state=live_dict, derived_state=derived)
 
-        # Pull the full comparison snapshot.
-        compare = self._lap_tracker.snapshot()
+        dash = self._dashboard.snapshot()
+        coach = self._coaching.snapshot()
+        inp = self._input.snapshot()
 
-        live_delta_s = compare.get("current_vs_best_delta_s") or 0.0
-        best_lap_time_s = compare.get("best_lap_time_s")
-        current_lap_time_s = compare.get("current_lap_time_s")
-
-        # last_lap_time_s comes from the tracker's last finalized profile.
-        last_profile = self._lap_tracker._last_profile
-        last_lap_time_s = last_profile.lap_time_s if last_profile else None
-
-        # -- Corner insights — self-comparison last lap vs session best.
-        # Re-analyse only when a new lap has finalised (cheap check).
-        best_profile = self._lap_tracker._best_profile
+        # Corner insights — recompute only on lap boundary.
+        lap_tracker = self._dashboard._lap_tracker  # noqa: SLF001
+        last_profile = lap_tracker._last_profile  # noqa: SLF001
+        best_profile = lap_tracker._best_profile  # noqa: SLF001
         if last_profile is not None and last_profile.lap_number != self._last_insights_lap:
             self._last_insights = analyze_corner_comparisons(last_profile, best_profile)
             self._last_insights_lap = last_profile.lap_number
 
-        # -- Lockup / wheelspin heuristic detection --------------------------
-        lockup_active = self._detect_lockup(sample)
-        wheelspin_active = self._detect_wheelspin(sample)
-
-        # -- Coaching tracker ------------------------------------------------
-        self._coach_tracker.push_sample(
-            sample,
-            dashboard_state=live_dict,
-            derived_state=snap.get("derived"),
-        )
-        coach_snap = self._coach_tracker.snapshot()
-        coaching_alerts = coach_snap.get("alerts", [])
-        coaching_prompts = coach_snap.get("coaching", [])
-        coaching_cards = self._build_coaching_cards(coaching_alerts, coaching_prompts)
-
-        # -- Corner tracker (uses raw snapshot dict, not TelemetrySample) ------
-        self._corner_tracker.push_snapshot(live_dict)
-        corner_rows = self._corner_tracker.rows()
-
-        # -- Tire degradation tracker ------------------------------------------
-        tire_temps = (
-            _float(live_dict.get("tyre_temp_lf")) or 0,
-            _float(live_dict.get("tyre_temp_rf")) or 0,
-            _float(live_dict.get("tyre_temp_lr")) or 0,
-            _float(live_dict.get("tyre_temp_rr")) or 0,
-        )
-        lap_num = _int(live_dict.get("lap_number")) or 0
-        if any(t > 0 for t in tire_temps) and lap_num > 0:
-            self._tire_tracker.push_sample(tire_temps, lap_num)
-        tire_state = self._tire_tracker.state.to_dict()
-
-        # -- Input diagnostics -----------------------------------------------
-        self._input_tracker.push_sample(
-            sample,
-            dashboard_state=live_dict,
-            derived_state=snap.get("derived"),
-        )
-        input_snap = self._input_tracker.snapshot()
-        input_smoothness = self._compute_smoothness(input_snap)
-
         return {
-            "live_delta_s": live_delta_s,
-            "best_lap_time_s": best_lap_time_s,
-            "last_lap_time_s": last_lap_time_s,
-            "current_lap_time_s": current_lap_time_s,
-            "best_lap_time_fmt": _format_lap_time(best_lap_time_s),
-            "last_lap_time_fmt": _format_lap_time(last_lap_time_s),
-            "current_lap_time_fmt": _format_lap_time(current_lap_time_s),
-            "sector_rows": compare.get("sector_rows", []),
-            "lockup_active": lockup_active,
-            "wheelspin_active": wheelspin_active,
-            "coaching_cards": coaching_cards,
-            "input_smoothness": input_smoothness,
-            "corner_rows": corner_rows,
-            "tire_state": tire_state,
+            "live_delta_s": dash["live_delta_s"],
+            "best_lap_time_s": dash["best_lap_time_s"],
+            "last_lap_time_s": dash["last_lap_time_s"],
+            "current_lap_time_s": dash["current_lap_time_s"],
+            "best_lap_time_fmt": dash["best_lap_time_fmt"],
+            "last_lap_time_fmt": dash["last_lap_time_fmt"],
+            "current_lap_time_fmt": dash["current_lap_time_fmt"],
+            "sector_rows": dash["sector_rows"],
+            "corner_rows": dash["corner_rows"],
+            "tire_state": dash["tire_state"],
+            "lockup_active": self._detect_lockup(sample),
+            "wheelspin_active": self._detect_wheelspin(sample),
+            "coaching_cards": coach["cards"],
+            "input_smoothness": inp["smoothness"],
             "corner_insights": list(self._last_insights),
             "corner_insights_lap": self._last_insights_lap,
         }
@@ -212,7 +128,6 @@ class LiveTelemetryProcessor:
         long_g = sample.long_accel_g
         if brake is None or speed is None or long_g is None:
             return False
-        # long_accel_g is negative under braking in most sims; compare abs.
         return (
             brake >= self._LOCKUP_BRAKE_MIN
             and speed >= self._LOCKUP_SPEED_MIN_KPH
@@ -232,56 +147,13 @@ class LiveTelemetryProcessor:
             and speed >= self._WHEELSPIN_SPEED_MIN_KPH
         )
 
-    @staticmethod
-    def _build_coaching_cards(
-        alerts: list[dict], prompts: list[dict],
-    ) -> list[dict]:
-        """Merge alerts and coaching prompts into a unified card list."""
-        cards: list[dict] = []
-        for alert in alerts:
-            severity = str(alert.get("severity", "caution"))
-            if severity == "error":
-                severity = "critical"
-            cards.append({
-                "headline": str(alert.get("title", "")),
-                "sub": str(alert.get("detail", "")),
-                "category": "ALERT",
-                "severity": severity,
-                "confidence": 90,
-                "sector": "",
-            })
-        for prompt in prompts:
-            cards.append({
-                "headline": str(prompt.get("title", "")),
-                "sub": str(prompt.get("detail", "")),
-                "category": "COACHING",
-                "severity": "caution",
-                "confidence": 80,
-                "sector": str(prompt.get("corner", "")),
-            })
-        return cards
-
-    @staticmethod
-    def _compute_smoothness(input_snap: dict) -> float:
-        """Derive a 0-1 smoothness score from input diagnostics."""
-        rows = input_snap.get("rows", {})
-        brake_score = rows.get("brake_trace", {}).get("score")
-        throttle_score = rows.get("throttle_modulation", {}).get("score")
-        scores = [s for s in (brake_score, throttle_score) if isinstance(s, (int, float))]
-        if not scores:
-            return 0.75  # default before enough data
-        return max(0.0, min(1.0, sum(scores) / len(scores) / 100.0))
-
     def reset(self) -> None:
-        """Reset all trackers (new session)."""
-        self._lap_tracker.reset()
-        self._coach_tracker.reset()
-        self._input_tracker.reset()
-        self._corner_tracker.reset()
-        self._tire_tracker.reset()
+        """Reset all sub-processors (new session)."""
+        self._coaching.on_session_end()
+        self._dashboard.on_session_end()
+        self._input.on_session_end()
         self._last_insights_lap = None
         self._last_insights = []
-
 
 
 def _int(value: object) -> int | None:
