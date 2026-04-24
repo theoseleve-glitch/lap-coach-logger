@@ -1,0 +1,33 @@
+# Pre-commit hook configuration (sprint T014).
+#
+# Install locally with:
+#   pipx install pre-commit   # or: python -m pip install pre-commit
+#   pre-commit install
+#
+# Runs on staged Python files before every commit. CI (T015/T016) runs
+# the same hooks on the whole tree to guard main from drift.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        additional_dependencies: []
+        files: ^src/
+
+  - repo: local
+    hooks:
+      - id: pytest-staged
+        name: pytest (quick suite)
+        entry: python -m pytest -q --no-header
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        types: [python]
