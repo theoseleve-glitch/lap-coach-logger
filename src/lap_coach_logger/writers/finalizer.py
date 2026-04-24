@@ -39,7 +39,6 @@ from lap_coach_logger.writers.bundle_schema import (
     ChannelDef,
     LapRecord,
     SessionEvent,
-    SessionManifest,
     compute_file_sha256,
 )
 from lap_coach_logger.writers.channels import (

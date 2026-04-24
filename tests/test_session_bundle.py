@@ -19,8 +19,8 @@ from lap_coach_logger.normalization.mapper import TELEMETRY_SCHEMA_VERSION
 from lap_coach_logger.writers.bundle_schema import (
     BUNDLE_SCHEMA_VERSION,
     LapRecord,
+    LegacySessionManifest,
     SessionEvent,
-    SessionManifest,
     compute_file_sha256,
 )
 from lap_coach_logger.writers.channels import build_channel_defs
@@ -339,7 +339,7 @@ class TestBundleSchemaModels:
         assert "detail" not in d
 
     def test_manifest_to_dict(self) -> None:
-        m = SessionManifest(session_id="s1", logger_version="1.0.0")
+        m = LegacySessionManifest(session_id="s1", logger_version="1.0.0")
         d = m.to_dict()
         assert d["session_id"] == "s1"
         assert d["schema_version"] == BUNDLE_SCHEMA_VERSION

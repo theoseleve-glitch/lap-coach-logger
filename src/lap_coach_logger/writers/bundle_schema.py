@@ -15,6 +15,14 @@ import hashlib
 from dataclasses import dataclass, field
 from typing import Any
 
+# Shared v2 contract. Sprint T022 replaces the local ``SessionManifest``
+# dataclass with this Pydantic model so the desktop bundle pipeline
+# writes to the same shape every other consumer reads. The legacy
+# dataclass is retained as ``LegacySessionManifest`` for transitional
+# code paths until the T025-T034 SessionFinalizer rewrite adopts the
+# new shape throughout.
+from lap_schemas.v1 import SessionManifest  # noqa: F401
+
 BUNDLE_SCHEMA_VERSION = "1.0.0"
 
 
@@ -89,8 +97,13 @@ class ChannelDef:
 # ------------------------------------------------------------------
 
 @dataclass
-class SessionManifest:
-    """Top-level session manifest written as ``session.json``."""
+class LegacySessionManifest:
+    """Transitional v1-bundle manifest (pre-T022 shape).
+
+    Superseded by ``lap_schemas.v1.SessionManifest`` (re-exported here
+    as ``SessionManifest``). Retained until the SessionFinalizer
+    rewrite in T025-T034 adopts the shared shape throughout.
+    """
     session_id: str
     schema_version: str = BUNDLE_SCHEMA_VERSION
     telemetry_schema_version: str = ""
