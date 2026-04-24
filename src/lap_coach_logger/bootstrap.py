@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 
+from lap_coach_logger.adapters.assetto_corsa_adapter import AssettoCorsaAdapter
 from lap_coach_logger.adapters.acc_adapter import ACCAdapter
 from lap_coach_logger.adapters.assetto_corsa_adapter import AssettoCorsaAdapter
 from lap_coach_logger.adapters.iracing_adapter import IRacingAdapter
@@ -157,10 +158,10 @@ def _build_adapters(config: AppConfig) -> list:
     adapters = []
     if config.iracing.enabled:
         adapters.append(IRacingAdapter())
-    if config.acc.enabled:
-        adapters.append(ACCAdapter())
     if config.assetto_corsa.enabled:
         adapters.append(AssettoCorsaAdapter())
+    if config.acc.enabled:
+        adapters.append(ACCAdapter())
     if config.lmu.enabled:
         adapters.append(LMUAdapter())
     log.info("Enabled adapters: %s", [a.sim_name for a in adapters])

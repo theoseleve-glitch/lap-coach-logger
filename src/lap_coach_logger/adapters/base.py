@@ -87,6 +87,10 @@ class SimAdapter(abc.ABC):
         """Return SDK runtime metadata (tick rate, buffer info, etc.)."""
         return {}
 
+    def read_dashboard_state(self) -> dict[str, Any] | None:
+        """Return UI-focused live state that does not belong in TelemetrySample."""
+        return None
+
     # -- convenience (non-abstract) ----------------------------------------
 
     @property

@@ -64,6 +64,8 @@ class TestConfigValidation:
         cfg2 = AppConfig.from_dict(d)
         assert cfg2.debug is True
         assert cfg2.start_with_windows is True
+        assert cfg2.overlay.refresh_rate_hz == cfg.overlay.refresh_rate_hz
+        assert cfg2.overlay.opacity == cfg.overlay.opacity
 
     def test_writer_debug_csv_default_false(self) -> None:
         cfg = AppConfig()
@@ -98,6 +100,39 @@ class TestConfigValidation:
         cfg.lap_analysis.max_lap_time_s = 90.0
         errors = cfg.validate()
         assert any("lap_analysis.max_lap_time_s" in e for e in errors)
+
+    def test_sync_enabled_requires_api_url(self) -> None:
+        cfg = AppConfig()
+        cfg.sync.enabled = True
+        cfg.sync.api_url = ""
+        cfg.sync.device_token = "tok"
+        errors = cfg.validate()
+        assert any("sync.api_url" in e for e in errors)
+
+    def test_sync_enabled_requires_device_token(self) -> None:
+        cfg = AppConfig()
+        cfg.sync.enabled = True
+        cfg.sync.device_token = ""
+        errors = cfg.validate()
+        assert any("sync.device_token" in e for e in errors)
+
+    def test_overlay_refresh_rate_validation(self) -> None:
+        cfg = AppConfig()
+        cfg.overlay.refresh_rate_hz = 10
+        errors = cfg.validate()
+        assert any("overlay.refresh_rate_hz" in e for e in errors)
+
+    def test_overlay_opacity_validation(self) -> None:
+        cfg = AppConfig()
+        cfg.overlay.opacity = 0.1
+        errors = cfg.validate()
+        assert any("overlay.opacity" in e for e in errors)
+
+    def test_overlay_pin_mode_validation(self) -> None:
+        cfg = AppConfig()
+        cfg.overlay.pin_mode = "invalid"
+        errors = cfg.validate()
+        assert any("overlay.pin_mode" in e for e in errors)
 
 
 # -- Health monitor --

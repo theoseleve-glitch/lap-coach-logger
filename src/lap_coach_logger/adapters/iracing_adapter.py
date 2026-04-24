@@ -203,6 +203,54 @@ class IRacingAdapter(SimAdapter):
             log.debug("Error reading iRacing sample", exc_info=True)
             return None
 
+    def read_dashboard_state(self) -> dict[str, Any] | None:
+        if not self._connected or self._ir is None:
+            return None
+
+        ir = self._ir
+        try:
+            ir.freeze_var_buffer_latest()  # type: ignore[union-attr]
+            return {
+                "lap_time_s": self._get_float(ir, "LapCurrentLapTime"),
+                "last_lap_time_s": self._get_float(ir, "LapLastLapTime"),
+                "best_lap_time_s": self._get_float(ir, "LapBestLapTime"),
+                "live_delta_s": _first_float(
+                    self._get_float(ir, "LapDeltaToBestLap"),
+                    self._get_float(ir, "LapDeltaToSessionBestLap"),
+                ),
+                "current_sector_index": self._get_int(ir, "LapCurrentSector"),
+                "fuel_level": self._get_float(ir, "FuelLevel"),
+                "session_status": (
+                    "pit_road"
+                    if self._get_bool(ir, "OnPitRoad")
+                    else ("on_track" if self._get_bool(ir, "IsOnTrack") else None)
+                ),
+                "flag_state": _iracing_flag_state(self._get_int(ir, "SessionFlags")),
+                "tyre_pressure_lf": self._get_float(ir, "LFpressure"),
+                "tyre_pressure_rf": self._get_float(ir, "RFpressure"),
+                "tyre_pressure_lr": self._get_float(ir, "LRpressure"),
+                "tyre_pressure_rr": self._get_float(ir, "RRpressure"),
+                "tyre_temp_lf": _first_float(self._get_float(ir, "LFtempCL"), self._get_float(ir, "LFtempCM")),
+                "tyre_temp_rf": _first_float(self._get_float(ir, "RFtempCL"), self._get_float(ir, "RFtempCM")),
+                "tyre_temp_lr": _first_float(self._get_float(ir, "LRtempCL"), self._get_float(ir, "LRtempCM")),
+                "tyre_temp_rr": _first_float(self._get_float(ir, "RRtempCL"), self._get_float(ir, "RRtempCM")),
+                "tyre_wear_lf": _first_float(self._get_float(ir, "LFwearM"), self._get_float(ir, "LFwearL")),
+                "tyre_wear_rf": _first_float(self._get_float(ir, "RFwearM"), self._get_float(ir, "RFwearL")),
+                "tyre_wear_lr": _first_float(self._get_float(ir, "LRwearM"), self._get_float(ir, "LRwearL")),
+                "tyre_wear_rr": _first_float(self._get_float(ir, "RRwearM"), self._get_float(ir, "RRwearL")),
+                "brake_temp_lf": self._get_float(ir, "LFbrakeTemp"),
+                "brake_temp_rf": self._get_float(ir, "RFbrakeTemp"),
+                "brake_temp_lr": self._get_float(ir, "LRbrakeTemp"),
+                "brake_temp_rr": self._get_float(ir, "RRbrakeTemp"),
+                "tc_level": self._get_float(ir, "dcTractionControl"),
+                "abs_level": self._get_float(ir, "dcABS"),
+                "engine_map": _first_float(self._get_float(ir, "dcFuelMixture"), self._get_float(ir, "dcEnginePower")),
+                "brake_bias_pct": self._get_float(ir, "dcBrakeBias"),
+            }
+        except Exception:
+            log.debug("Error reading iRacing dashboard state", exc_info=True)
+            return None
+
     @property
     def connected(self) -> bool:
         return self._connected
@@ -599,3 +647,35 @@ def _flatten_dict(obj: Any, prefix: str, result: dict[str, Any]) -> None:
             result[prefix] = None
         else:
             result[prefix] = obj
+
+
+def _first_float(*values: float | None) -> float | None:
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _iracing_flag_state(flags: int | None) -> str | None:
+    if flags is None or flags <= 0 or not _HAS_IRSDK:
+        return None
+    try:
+        if flags & int(irsdk.Flags.red):  # type: ignore[attr-defined]
+            return "red"
+        if flags & int(irsdk.Flags.checkered):  # type: ignore[attr-defined]
+            return "checkered"
+        if flags & int(irsdk.Flags.yellow_waving):  # type: ignore[attr-defined]
+            return "yellow_waving"
+        if flags & int(irsdk.Flags.yellow):  # type: ignore[attr-defined]
+            return "yellow"
+        if flags & int(irsdk.Flags.caution_waving):  # type: ignore[attr-defined]
+            return "caution_waving"
+        if flags & int(irsdk.Flags.caution):  # type: ignore[attr-defined]
+            return "caution"
+        if flags & int(irsdk.Flags.white):  # type: ignore[attr-defined]
+            return "white"
+        if flags & int(irsdk.Flags.green):  # type: ignore[attr-defined]
+            return "green"
+    except Exception:
+        return f"flags_{flags}"
+    return f"flags_{flags}"

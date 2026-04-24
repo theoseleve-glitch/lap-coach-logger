@@ -15,16 +15,16 @@ def build_status_detail(
     if last_error:
         return f"Last error: {last_error}"
     if not is_monitoring:
-        return "Monitoring paused. Use Start Monitoring to resume."
+        return "Monitoring paused. Use Resume Monitoring to continue."
     if sim:
         if raw_state == "arming":
-            return f"Connected to {sim}  \u2022  Session detected, waiting for first telemetry sample"
+            return f"Connected to {sim}  •  Session detected, waiting for first telemetry sample"
         if raw_state == "ready_for_review":
-            return f"Connected to {sim}  \u2022  Session finalized and ready for review"
+            return f"Connected to {sim}  •  Session finalized and ready for review"
         if raw_state == "failed":
-            return f"Connected to {sim}  \u2022  Last session failed"
-        return f"Connected to {sim}  \u2022  Session state: {session_state}"
+            return f"Connected to {sim}  •  Last session failed"
+        return f"Connected to {sim}  •  Session state: {session_state}"
     if raw_state == "idle" and latest_session:
         ended = latest_session.get("ended") or "last run"
-        return f"Waiting for a simulator  \u2022  Last saved session: {ended}"
+        return f"Waiting for a simulator  •  Last saved session: {ended}"
     return "Waiting for a supported simulator"

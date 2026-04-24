@@ -132,6 +132,42 @@ def _lmu_gear(raw: dict[str, Any]) -> int | None:
     return first_int(raw, "Gear")
 
 
+def _lmu_pct(raw: dict[str, Any], *keys: str) -> float | None:
+    value = first_float(raw, *keys)
+    if value is None:
+        return None
+    return value / 100.0 if value > 1.0 else value
+
+
+def _lmu_speed_kph(raw: dict[str, Any]) -> float | None:
+    value = first_float(raw, "Ground Speed", "GPS Speed")
+    if value is None:
+        return None
+    return value * 3.6 if value <= 120.0 else value
+
+
+def _lmu_bool(raw: dict[str, Any], *keys: str) -> bool | None:
+    for key in keys:
+        if key not in raw:
+            continue
+        value = raw.get(key)
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"1", "true", "yes", "y", "on"}:
+                return True
+            if lowered in {"0", "false", "no", "n", "off"}:
+                return False
+        bool_value = clean_bool(value)
+        if bool_value is not None:
+            return bool_value
+    return None
+
+
+def _assetto_corsa_session_type(raw: dict[str, Any]) -> str | None:
+    session_code = first_int(raw, "session")
+    return SESSION_TYPE_MAP.get(session_code, "unknown") if session_code is not None else None
+
+
 SIM_FIELD_MAPPINGS: dict[str, dict[str, MappingRule]] = {
     "Le Mans Ultimate": {
         "session_time_s": MappingRule(("Session Time",), lambda raw: first_float(raw, "Session Time")),
@@ -232,6 +268,77 @@ SIM_FIELD_MAPPINGS: dict[str, dict[str, MappingRule]] = {
         "is_in_pits": MappingRule(("isInPit",), lambda raw: first_bool(raw, "isInPit")),
         "session_type": MappingRule(("session",), _acc_session_type),
         "raw_source_timestamp": MappingRule(("packetId",), lambda raw: first_float(raw, "packetId")),
+    },
+    "Assetto Corsa": {
+        "session_time_s": MappingRule(("iCurrentTime",), _acc_session_time_s),
+        "lap_number": MappingRule(("completedLaps",), _acc_lap_number),
+        "lap_distance_m": MappingRule(("normalizedCarPosition", "trackSPlineLength"), _acc_lap_distance),
+        "lap_dist_pct": MappingRule(("normalizedCarPosition",), lambda raw: first_float(raw, "normalizedCarPosition")),
+        "speed_kph": MappingRule(("speedKmh",), lambda raw: first_float(raw, "speedKmh")),
+        "throttle_pct": MappingRule(("gas",), lambda raw: first_float(raw, "gas")),
+        "brake_pct": MappingRule(("brake",), lambda raw: first_float(raw, "brake")),
+        "clutch_pct": MappingRule(("clutch",), lambda raw: first_float(raw, "clutch")),
+        "steering_deg": MappingRule(("steerAngle",), lambda raw: rad_to_deg(first_float(raw, "steerAngle"))),
+        "gear": MappingRule(("gear",), _acc_gear),
+        "rpm": MappingRule(("rpms",), lambda raw: first_float(raw, "rpms")),
+        "world_pos_x": MappingRule((), lambda raw: None),
+        "world_pos_y": MappingRule((), lambda raw: None),
+        "world_pos_z": MappingRule((), lambda raw: None),
+        "yaw_deg": MappingRule(("heading",), lambda raw: rad_to_deg(first_float(raw, "heading"))),
+        "lat_accel_g": MappingRule(("accG_x",), lambda raw: first_float(raw, "accG_x")),
+        "long_accel_g": MappingRule(("accG_z",), lambda raw: first_float(raw, "accG_z")),
+        "track_temp_c": MappingRule(("roadTemp",), lambda raw: first_float(raw, "roadTemp")),
+        "air_temp_c": MappingRule(("airTemp",), lambda raw: first_float(raw, "airTemp")),
+        "abs_level": MappingRule(("abs",), lambda raw: first_float(raw, "abs")),
+        "tc_level": MappingRule(("tc",), lambda raw: first_float(raw, "tc")),
+        "pitch": MappingRule(("pitch",), lambda raw: first_float(raw, "pitch")),
+        "roll": MappingRule(("roll",), lambda raw: first_float(raw, "roll")),
+        "tyre_temp_lf": MappingRule(("tyreCoreTemperature_0",), lambda raw: first_float(raw, "tyreCoreTemperature_0")),
+        "tyre_temp_rf": MappingRule(("tyreCoreTemperature_1",), lambda raw: first_float(raw, "tyreCoreTemperature_1")),
+        "tyre_temp_lr": MappingRule(("tyreCoreTemperature_2",), lambda raw: first_float(raw, "tyreCoreTemperature_2")),
+        "tyre_temp_rr": MappingRule(("tyreCoreTemperature_3",), lambda raw: first_float(raw, "tyreCoreTemperature_3")),
+        "fuel_level": MappingRule(("fuel",), lambda raw: first_float(raw, "fuel")),
+        "water_temp": MappingRule(("waterTemp",), lambda raw: first_float(raw, "waterTemp")),
+        "oil_temp": MappingRule((), lambda raw: None),
+        "is_on_track": MappingRule(("status",), lambda raw: first_int(raw, "status") == 2 if first_int(raw, "status") is not None else None),
+        "is_in_pits": MappingRule(("isInPit",), lambda raw: first_bool(raw, "isInPit")),
+        "session_type": MappingRule(("session",), _assetto_corsa_session_type),
+        "raw_source_timestamp": MappingRule(("packetId",), lambda raw: first_float(raw, "packetId")),
+    },
+    "Le Mans Ultimate": {
+        "session_time_s": MappingRule(("Session Time", "GPS Time"), lambda raw: first_float(raw, "Session Time", "GPS Time")),
+        "lap_number": MappingRule(("Lap",), lambda raw: first_int(raw, "Lap")),
+        "lap_distance_m": MappingRule(("Lap Dist",), lambda raw: first_float(raw, "Lap Dist")),
+        "lap_dist_pct": MappingRule(("Lap Dist Pct",), lambda raw: first_float(raw, "Lap Dist Pct")),
+        "speed_kph": MappingRule(("Ground Speed", "GPS Speed"), _lmu_speed_kph),
+        "throttle_pct": MappingRule(("Throttle Pos",), lambda raw: _lmu_pct(raw, "Throttle Pos")),
+        "brake_pct": MappingRule(("Brake Pos",), lambda raw: _lmu_pct(raw, "Brake Pos")),
+        "clutch_pct": MappingRule(("Clutch Pos",), lambda raw: _lmu_pct(raw, "Clutch Pos")),
+        "steering_deg": MappingRule(("Steered Angle",), lambda raw: first_float(raw, "Steered Angle")),
+        "gear": MappingRule(("Gear",), lambda raw: first_int(raw, "Gear")),
+        "rpm": MappingRule(("Engine RPM",), lambda raw: first_float(raw, "Engine RPM")),
+        "world_pos_x": MappingRule(("World Pos X",), lambda raw: first_float(raw, "World Pos X")),
+        "world_pos_y": MappingRule(("World Pos Y",), lambda raw: first_float(raw, "World Pos Y")),
+        "world_pos_z": MappingRule(("World Pos Z",), lambda raw: first_float(raw, "World Pos Z")),
+        "yaw_deg": MappingRule((), lambda raw: None),
+        "lat_accel_g": MappingRule(("Lateral Acceleration",), lambda raw: first_float(raw, "Lateral Acceleration")),
+        "long_accel_g": MappingRule(("Longitudinal Acceleration",), lambda raw: first_float(raw, "Longitudinal Acceleration")),
+        "track_temp_c": MappingRule(("Track Temperature",), lambda raw: first_float(raw, "Track Temperature")),
+        "air_temp_c": MappingRule(("Ambient Temperature",), lambda raw: first_float(raw, "Ambient Temperature")),
+        "abs_level": MappingRule(("ABS Level",), lambda raw: first_float(raw, "ABS Level")),
+        "tc_level": MappingRule(("TC Level",), lambda raw: first_float(raw, "TC Level")),
+        "pitch": MappingRule((), lambda raw: None),
+        "roll": MappingRule((), lambda raw: None),
+        "tyre_temp_lf": MappingRule(("Tyre Temp LF",), lambda raw: first_float(raw, "Tyre Temp LF")),
+        "tyre_temp_rf": MappingRule(("Tyre Temp RF",), lambda raw: first_float(raw, "Tyre Temp RF")),
+        "tyre_temp_lr": MappingRule(("Tyre Temp LR",), lambda raw: first_float(raw, "Tyre Temp LR")),
+        "tyre_temp_rr": MappingRule(("Tyre Temp RR",), lambda raw: first_float(raw, "Tyre Temp RR")),
+        "fuel_level": MappingRule(("Fuel Level",), lambda raw: first_float(raw, "Fuel Level")),
+        "water_temp": MappingRule(("Engine Water Temp",), lambda raw: first_float(raw, "Engine Water Temp")),
+        "oil_temp": MappingRule(("Engine Oil Temp",), lambda raw: first_float(raw, "Engine Oil Temp")),
+        "is_on_track": MappingRule(("In Pits",), lambda raw: None if _lmu_bool(raw, "In Pits") is None else not _lmu_bool(raw, "In Pits")),
+        "is_in_pits": MappingRule(("In Pits",), lambda raw: _lmu_bool(raw, "In Pits")),
+        "raw_source_timestamp": MappingRule(("Session Time", "GPS Time"), lambda raw: first_float(raw, "Session Time", "GPS Time")),
     },
 }
 

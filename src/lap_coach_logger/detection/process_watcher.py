@@ -71,6 +71,9 @@ class ProcessWatcher:
     def active_adapter(self) -> SimAdapter | None:
         return self._active_adapter
 
+    def set_poll_interval(self, interval_s: float) -> None:
+        self._poll_interval = max(0.1, float(interval_s))
+
     # -- internals ----------------------------------------------------------
 
     def _run(self) -> None:

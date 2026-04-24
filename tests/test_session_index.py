@@ -49,9 +49,9 @@ def _make_samples(count: int = 40) -> list[TelemetrySample]:
     return samples
 
 
-def _finalize_bundle(root: Path, *, session_uid: str) -> Path:
+def _finalize_bundle(root: Path, *, session_uid: str, started_at: datetime | None = None) -> Path:
     fin = SessionFinalizer(root)
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = started_at or datetime(2026, 1, 1, tzinfo=timezone.utc)
     result = fin.finalize(
         _make_samples(),
         started_at=now,
@@ -170,3 +170,31 @@ class TestSessionIndexSqlite:
         assert len(after) == 1
         assert float(after[0]["duration_s"]) == 999.0
         assert float(after[0]["duration_s"]) != original_duration
+
+    def test_sync_preserves_older_entries_outside_recent_scan_window(self, tmp_path: Path) -> None:
+        output_root = tmp_path / "sessions"
+        output_root.mkdir(parents=True, exist_ok=True)
+        for idx in range(4):
+            _finalize_bundle(
+                output_root,
+                session_uid=f"uid-{idx}",
+                started_at=datetime(2026, 1, 1, 0, 0, idx, tzinfo=timezone.utc),
+            )
+
+        index = SessionIndex(tmp_path / "index")
+
+        first = index.sync_from_output(
+            output_root=output_root,
+            parse_entry=load_history_entry,
+            max_dirs=None,
+            recent_scan_limit=1,
+        )
+        assert len(first) == 4
+
+        second = index.sync_from_output(
+            output_root=output_root,
+            parse_entry=load_history_entry,
+            max_dirs=None,
+            recent_scan_limit=1,
+        )
+        assert len(second) == 4

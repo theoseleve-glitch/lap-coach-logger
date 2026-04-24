@@ -88,6 +88,49 @@ def build_channels_payload() -> dict[str, object]:
     }
 
 
+def _infer_raw_dtype(value: Any) -> str:
+    """Infer a conservative manifest dtype from a sample raw value."""
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int):
+        return "int64"
+    if isinstance(value, float):
+        return "float64"
+    if isinstance(value, str):
+        return "string"
+    return "float64"
+
+
+def build_raw_channels_payload(
+    column_names: list[str],
+    *,
+    preview_row: dict[str, Any] | None = None,
+) -> dict[str, object]:
+    """Build a generic raw-channel manifest from flattened column names."""
+    channels: list[dict[str, Any]] = []
+    for col in column_names:
+        _, sep, remainder = col.partition("__")
+        raw_field_name = remainder if sep else col
+        parts = raw_field_name.rsplit("__", 1)
+        is_array = len(parts) == 2 and parts[1].isdigit()
+        preview_value = preview_row.get(col) if preview_row else None
+        channels.append({
+            "column_name": col,
+            "raw_field_name": raw_field_name,
+            "is_array_element": is_array,
+            "dtype": _infer_raw_dtype(preview_value),
+            "units": None,
+            "description": None,
+            "missing_allowed": True,
+        })
+
+    return {
+        "schema_version": TELEMETRY_SCHEMA_VERSION,
+        "channel_count": len(channels),
+        "channels": channels,
+    }
+
+
 def build_raw_iracing_channels_payload(
     column_names: list[str],
     var_schema: list[dict[str, Any]] | None = None,
@@ -157,46 +200,3 @@ def _detect_column_prefix(column_names: list[str]) -> str | None:
     return None
 
 
-def build_raw_channels_payload(
-    column_names: list[str],
-    raw_samples: list[dict[str, Any]],
-    sim_prefix: str,
-) -> dict[str, object]:
-    """Build a channels_<sim>_raw.json payload for generic raw capture.
-
-    Inspects *raw_samples* to infer dtype per column.
-    Strips the common column prefix to derive ``raw_field_name``.
-    """
-    channels: list[dict[str, Any]] = []
-    first_row = raw_samples[0] if raw_samples else {}
-
-    # Detect common prefix from actual column names (e.g. "ac__" for Assetto Corsa)
-    detected_prefix = _detect_column_prefix(column_names)
-
-    for col in column_names:
-        # Strip detected prefix to get raw_field_name
-        raw_field = col[len(detected_prefix):] if detected_prefix and col.startswith(detected_prefix) else col
-
-        # Infer dtype from first row value
-        value = first_row.get(col)
-        if isinstance(value, float):
-            dtype = "float64"
-        elif isinstance(value, int):
-            dtype = "int64"
-        elif isinstance(value, str):
-            dtype = "string"
-        else:
-            dtype = "object"
-
-        channels.append({
-            "column_name": col,
-            "raw_field_name": raw_field,
-            "dtype": dtype,
-            "missing_allowed": True,
-        })
-
-    return {
-        "schema_version": TELEMETRY_SCHEMA_VERSION,
-        "channel_count": len(channels),
-        "channels": channels,
-    }

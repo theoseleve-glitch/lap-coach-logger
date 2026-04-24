@@ -35,7 +35,7 @@ def test_status_detail_reports_paused_state() -> None:
         latest_session={},
     )
 
-    assert detail == "Monitoring paused. Use Start Monitoring to resume."
+    assert detail == "Monitoring paused. Use Resume Monitoring to continue."
 
 
 def test_status_detail_surfaces_last_session_when_idle() -> None:

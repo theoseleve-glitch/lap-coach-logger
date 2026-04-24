@@ -282,6 +282,139 @@ class TestLapTiming:
         assert len(laps) == 3
 
 
+class TestLiveDashboardSnapshot:
+
+    def test_latest_snapshot_includes_dashboard_and_derived_metrics(self, tmp_path: Path) -> None:
+        coord = SessionCoordinator(_config(tmp_path))
+
+        first = _sample(raw_ts=1.0, lap=1)
+        first.session_time_s = 30.0
+        first.fuel_level = 50.0
+        coord._append_sample(
+            first,
+            {
+                "lap_time_s": 30.0,
+                "fuel_level": 50.0,
+                "current_sector_index": 2,
+                "last_sector_time_s": 12.4,
+                "session_status": "live",
+                "flag_state": "green",
+            },
+        )
+
+        second = _sample(raw_ts=2.0, lap=2)
+        second.session_time_s = 121.0
+        second.fuel_level = 46.0
+        coord._append_sample(
+            second,
+            {
+                "lap_time_s": 1.0,
+                "last_lap_time_s": 91.0,
+                "fuel_level": 46.0,
+            },
+        )
+
+        snap = coord.latest_sample_snapshot()
+        assert snap["lap_time_s"] == 1.0
+        assert snap["last_lap_time_s"] == 91.0
+        assert snap["best_lap_time_s"] == 91.0
+        assert snap["fuel_per_lap_l"] == 4.0
+        assert snap["laps_remaining_est"] == 11.5
+        assert snap["sector_1_time_s"] == 12.4
+
+    def test_live_coaching_snapshot_tracks_live_alerts(self, tmp_path: Path) -> None:
+        coord = SessionCoordinator(_config(tmp_path))
+
+        for index, session_time_s in enumerate((10.0, 10.4, 10.8)):
+            sample = _sample(raw_ts=float(index + 1), lap=1)
+            sample.lap_dist_pct = 0.10 + index * 0.01
+            sample.session_time_s = session_time_s
+            sample.speed_kph = 126.0
+            sample.brake_pct = 0.95
+            sample.long_accel_g = -1.28
+            sample.tyre_temp_lf = 60.0
+            sample.tyre_temp_rf = 61.0
+            sample.tyre_temp_lr = 62.0
+            sample.tyre_temp_rr = 60.0
+            coord._append_sample(
+                sample,
+                {
+                    "brake_temp_lf": 760.0,
+                    "brake_temp_rf": 742.0,
+                    "brake_temp_lr": 705.0,
+                    "brake_temp_rr": 711.0,
+                },
+            )
+
+        coach = coord.live_coaching_snapshot()
+        titles = {item["title"] for item in coach["alerts"]}
+
+        assert "Tyres cold" in titles
+        assert "Excessive brake temp" in titles
+        assert "Lockups detected" in titles
+
+    def test_hardware_diagnostics_snapshot_tracks_input_quality(self, tmp_path: Path) -> None:
+        coord = SessionCoordinator(_config(tmp_path))
+
+        for index in range(14):
+            sample = _sample(raw_ts=float(index + 1), lap=1)
+            sample.session_time_s = index * 0.5
+            sample.speed_kph = 130.0
+            sample.throttle_pct = 0.15
+            sample.brake_pct = 0.20
+            sample.steering_deg = 14.0
+            sample.lat_accel_g = 0.42
+            sample.long_accel_g = -0.16
+            coord._append_sample(sample, {"ffb_clip_pct": 0.99})
+
+        diagnostics = coord.hardware_diagnostics_snapshot()
+        rows = diagnostics["rows"]
+        titles = {item["title"] for item in diagnostics["flags"]}
+
+        assert rows["pedal_overlap"]["label"] == "High"
+        assert rows["deadzone"]["label"] == "Possible Deadzone"
+        assert rows["ffb_clipping"]["label"] == "Detected"
+        assert "Pedal overlap" in titles
+        assert "Deadzone suspected" in titles
+        assert "FFB clipping" in titles
+
+    def test_platform_analysis_snapshot_tracks_loaded_balance(self, tmp_path: Path) -> None:
+        coord = SessionCoordinator(_config(tmp_path))
+
+        for index in range(16):
+            sample = _sample(raw_ts=float(index + 1), lap=1)
+            sample.session_time_s = index * 0.5
+            sample.speed_kph = 190.0
+            sample.throttle_pct = 0.40
+            sample.brake_pct = 0.08
+            sample.steering_deg = 30.0
+            sample.lat_accel_g = 0.40
+            sample.long_accel_g = 0.10
+            sample.pitch = 8.1
+            sample.roll = 5.0
+            coord._append_sample(
+                sample,
+                {
+                    "ride_height_front": 62.0 if index < 6 else 48.0,
+                    "ride_height_rear": 92.0 if index < 6 else 66.0,
+                    "suspension_travel_lf": 8.0 if index < 6 else 15.0,
+                    "suspension_travel_rf": 8.5 if index < 6 else 15.2,
+                    "suspension_travel_lr": 6.0 if index < 6 else 10.0,
+                    "suspension_travel_rr": 6.2 if index < 6 else 10.1,
+                },
+            )
+
+        platform = coord.platform_analysis_snapshot()
+        rows = platform["rows"]
+        titles = {item["title"] for item in platform["flags"]}
+
+        assert rows["ride_height_compression"]["label"] == "Bottoming Risk"
+        assert rows["front_rear_limitation"]["label"] == "Front Limited"
+        assert rows["aero_balance"]["label"] == "Front Aero Weak"
+        assert "Bottoming risk" in titles
+        assert "Aero balance suspicion" in titles
+
+
 # ---------------------------------------------------------------------------
 # Tests: Edge cases and recovery scenarios
 # ---------------------------------------------------------------------------

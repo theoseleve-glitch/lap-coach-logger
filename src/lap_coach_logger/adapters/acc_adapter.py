@@ -47,6 +47,7 @@ _ACC_OFF = 0
 _ACC_REPLAY = 1
 _ACC_LIVE = 2
 _ACC_PAUSE = 3
+_RAW_PREFIX = "acc__"
 
 
 class ACCAdapter(SimAdapter):
@@ -63,6 +64,7 @@ class ACCAdapter(SimAdapter):
         self._car_name: str | None = None
         self._track_length_m: float = 0.0
         self._fuel_capacity: float | None = None
+        self._sector_count: int = 3
 
     # -- SimAdapter interface -----------------------------------------------
 
@@ -108,6 +110,7 @@ class ACCAdapter(SimAdapter):
         self._track_name = None
         self._car_name = None
         self._track_length_m = 0.0
+        self._sector_count = 3
 
     def is_session_active(self) -> bool:
         """Return True only when ACC status is LIVE (on-track driving)."""
@@ -177,63 +180,41 @@ class ACCAdapter(SimAdapter):
             log.debug("Error reading ACC sample", exc_info=True)
             return None
 
-    @property
-    def connected(self) -> bool:
-        return self._connected
-
-    def supports_raw_capture(self) -> bool:
-        return True
-
-    def read_raw_sample(self) -> dict[str, Any] | None:
-        if not self._connected:
-            return None
-        try:
-            row: dict[str, Any] = {}
-            self._flatten_struct(self._read_physics(), "acc__physics", row)
-            self._flatten_struct(self._read_graphics(), "acc__graphics", row)
-            row["acc__sample_timestamp_utc"] = datetime.now(timezone.utc).isoformat()
-            return row
-        except Exception:
-            log.debug("Error reading ACC raw sample", exc_info=True)
-            return None
-
-    def read_session_info_snapshot(self) -> dict[str, Any] | None:
-        if not self._connected:
-            return None
-        try:
-            return {
-                "static": self._struct_to_dict(self._read_static()),
-                "graphics": self._struct_to_dict(self._read_graphics()),
-            }
-        except Exception:
-            log.debug("Error reading ACC session info snapshot", exc_info=True)
-            return None
-
     def read_dashboard_state(self) -> dict[str, Any] | None:
         if not self._connected:
             return None
+
         try:
             phys = self._read_physics()
             gfx = self._read_graphics()
+            live_delta_s = _milliseconds_to_seconds(gfx.iDeltaLapTime)
+            if live_delta_s is not None and not bool(gfx.isDeltaPositive):
+                live_delta_s *= -1.0
+            tyre_pressures = [
+                _clean_float(phys.wheelsPressure[idx]) or _clean_float(getattr(gfx, f"mfdTyrePressure{suffix}"))
+                for idx, suffix in enumerate(("LF", "RF", "LR", "RR"))
+            ]
             return {
-                "lap_time_s": _ms_to_s(gfx.iCurrentTime),
-                "last_lap_time_s": _ms_to_s(gfx.iLastTime),
-                "best_lap_time_s": _ms_to_s(gfx.iBestTime),
-                "live_delta_s": _ms_to_s(gfx.iDeltaLapTime) if gfx.isDeltaPositive else _negate(_ms_to_s(gfx.iDeltaLapTime)),
-                "current_sector_index": max(1, int(gfx.currentSectorIndex) + 1),
-                "last_sector_time_s": _ms_to_s(gfx.lastSectorTime),
+                "lap_time_s": _milliseconds_to_seconds(gfx.iCurrentTime),
+                "last_lap_time_s": _milliseconds_to_seconds(gfx.iLastTime),
+                "best_lap_time_s": _milliseconds_to_seconds(gfx.iBestTime),
+                "live_delta_s": live_delta_s,
+                "current_sector_index": _normalize_sector_index(gfx.currentSectorIndex),
+                "last_sector_time_s": _milliseconds_to_seconds(gfx.lastSectorTime),
+                "sector_count": self._sector_count,
                 "fuel_level": _clean_float(phys.fuel),
                 "fuel_per_lap_l": _clean_float(gfx.fuelXLap),
-                "fuel_estimated_laps": _clean_float(gfx.fuelEstimatedLaps),
+                "laps_remaining_est": _clean_float(gfx.fuelEstimatedLaps),
+                "session_status": _ACC_STATUS_NAMES.get(int(gfx.status), f"status_{int(gfx.status)}"),
                 "flag_state": _acc_flag_state(gfx),
-                "tc_level": int(gfx.TC),
-                "abs_level": int(gfx.ABS),
-                "engine_map": int(gfx.EngineMap),
-                "rpm": _clean_float(phys.rpms),
-                "tyre_pressure_lf": _clean_float(phys.wheelsPressure[0]),
-                "tyre_pressure_rf": _clean_float(phys.wheelsPressure[1]),
-                "tyre_pressure_lr": _clean_float(phys.wheelsPressure[2]),
-                "tyre_pressure_rr": _clean_float(phys.wheelsPressure[3]),
+                "tyre_pressure_lf": tyre_pressures[0],
+                "tyre_pressure_rf": tyre_pressures[1],
+                "tyre_pressure_lr": tyre_pressures[2],
+                "tyre_pressure_rr": tyre_pressures[3],
+                "tyre_temp_lf": _clean_float(phys.tyreCoreTemperature[0]),
+                "tyre_temp_rf": _clean_float(phys.tyreCoreTemperature[1]),
+                "tyre_temp_lr": _clean_float(phys.tyreCoreTemperature[2]),
+                "tyre_temp_rr": _clean_float(phys.tyreCoreTemperature[3]),
                 "tyre_wear_lf": _clean_float(phys.tyrewear[0]),
                 "tyre_wear_rf": _clean_float(phys.tyrewear[1]),
                 "tyre_wear_lr": _clean_float(phys.tyrewear[2]),
@@ -242,11 +223,66 @@ class ACCAdapter(SimAdapter):
                 "brake_temp_rf": _clean_float(phys.brakeTemp[1]),
                 "brake_temp_lr": _clean_float(phys.brakeTemp[2]),
                 "brake_temp_rr": _clean_float(phys.brakeTemp[3]),
-                "brake_bias_pct": _clean_float(phys.brakeBias),
+                "ride_height_front": _clean_float(phys.rideHeight[0]),
+                "ride_height_rear": _clean_float(phys.rideHeight[1]),
+                "suspension_travel_lf": _clean_float(phys.suspensionTravel[0]),
+                "suspension_travel_rf": _clean_float(phys.suspensionTravel[1]),
+                "suspension_travel_lr": _clean_float(phys.suspensionTravel[2]),
+                "suspension_travel_rr": _clean_float(phys.suspensionTravel[3]),
+                "tc_level": int(gfx.TC) if int(gfx.TC) >= 0 else None,
+                "abs_level": int(gfx.ABS) if int(gfx.ABS) >= 0 else None,
+                "engine_map": int(gfx.EngineMap) if int(gfx.EngineMap) >= 0 else None,
+                "brake_bias_pct": _normalize_percent(phys.brakeBias),
             }
         except Exception:
             log.debug("Error reading ACC dashboard state", exc_info=True)
             return None
+
+    @property
+    def connected(self) -> bool:
+        return self._connected
+
+    # -- extended capture interface -----------------------------------------
+
+    def supports_raw_capture(self) -> bool:
+        return True
+
+    def read_raw_sample(self) -> dict[str, Any] | None:
+        if not self._connected:
+            return None
+
+        try:
+            row: dict[str, Any] = {}
+            self._flatten_struct(self._read_physics(), f"{_RAW_PREFIX}physics", row)
+            self._flatten_struct(self._read_graphics(), f"{_RAW_PREFIX}graphics", row)
+            row[f"{_RAW_PREFIX}sample_timestamp_utc"] = datetime.now(timezone.utc).isoformat()
+            return row
+        except Exception:
+            log.debug("Error reading ACC raw sample", exc_info=True)
+            return None
+
+    def read_session_info_snapshot(self) -> dict[str, Any] | None:
+        if not self._connected:
+            return None
+
+        try:
+            static = self._struct_to_dict(self._read_static())
+            graphics = self._struct_to_dict(self._read_graphics())
+            return {
+                "static": static,
+                "graphics": graphics,
+            }
+        except Exception:
+            log.debug("Error reading ACC session info snapshot", exc_info=True)
+            return None
+
+    def get_sdk_metadata(self) -> dict[str, Any]:
+        return {
+            "session_uid": self._session_uid,
+            "track_name": self._track_name,
+            "car_name": self._car_name,
+            "track_length_m": self._track_length_m,
+        }
 
     # -- internals ----------------------------------------------------------
 
@@ -279,6 +315,7 @@ class ACCAdapter(SimAdapter):
             self._car_name = static.carModel.strip("\x00").strip() or None
             self._track_length_m = float(static.trackSPlineLength) if static.trackSPlineLength > 0 else 0.0
             self._fuel_capacity = float(static.maxFuel) if static.maxFuel > 0 else None
+            self._sector_count = int(static.sectorCount) if int(static.sectorCount) > 0 else 3
         except Exception:
             log.debug("Could not read ACC static metadata", exc_info=True)
 
@@ -295,7 +332,8 @@ class ACCAdapter(SimAdapter):
     @classmethod
     def _flatten_struct(cls, struct_obj: ctypes.Structure, prefix: str, out: dict[str, Any]) -> None:
         for field_name, _ in getattr(struct_obj, "_fields_", []):
-            cls._flatten_value(f"{prefix}__{field_name}", getattr(struct_obj, field_name), out)
+            value = getattr(struct_obj, field_name)
+            cls._flatten_value(f"{prefix}__{field_name}", value, out)
 
     @classmethod
     def _flatten_value(cls, prefix: str, value: Any, out: dict[str, Any]) -> None:
@@ -329,6 +367,14 @@ class ACCAdapter(SimAdapter):
         return str(value)
 
 
+_ACC_STATUS_NAMES = {
+    _ACC_OFF: "off",
+    _ACC_REPLAY: "replay",
+    _ACC_LIVE: "live",
+    _ACC_PAUSE: "paused",
+}
+
+
 def _clean_float(value: object) -> float | None:
     if not isinstance(value, (int, float)):
         return None
@@ -338,27 +384,42 @@ def _clean_float(value: object) -> float | None:
     return number
 
 
-def _ms_to_s(value: object) -> float | None:
+def _milliseconds_to_seconds(value: object) -> float | None:
     number = _clean_float(value)
     if number is None or number <= 0:
         return None
     return number / 1000.0
 
 
-def _negate(value: float | None) -> float | None:
-    return -value if value is not None else None
+def _normalize_percent(value: object) -> float | None:
+    number = _clean_float(value)
+    if number is None:
+        return None
+    if 0.0 <= number <= 1.0:
+        return round(number * 100.0, 2)
+    return round(number, 2)
+
+
+def _normalize_sector_index(value: object) -> int | None:
+    if not isinstance(value, int):
+        return None
+    return max(1, value + 1)
 
 
 def _acc_flag_state(gfx: SPageFileGraphic) -> str | None:
-    try:
-        if int(gfx.GlobalGreen) == 1:
-            return "green"
-        if int(gfx.GlobalYellow) == 1:
-            return "yellow"
-        if int(gfx.GlobalRed) == 1:
-            return "red"
-        if int(gfx.GlobalWhite) == 1:
-            return "white"
-    except Exception:
-        pass
+    if int(gfx.GlobalRed):
+        return "red"
+    if int(gfx.GlobalChequered):
+        return "checkered"
+    if int(gfx.GlobalYellow) or int(gfx.GlobalYellow1) or int(gfx.GlobalYellow2) or int(gfx.GlobalYellow3):
+        return "yellow"
+    if int(gfx.GlobalWhite):
+        return "white"
+    if int(gfx.GlobalGreen):
+        return "green"
+    track_status = str(gfx.trackStatus or "").strip("\x00").strip()
+    if track_status:
+        return track_status.lower()
+    if int(gfx.flag) > 0:
+        return f"flag_{int(gfx.flag)}"
     return None

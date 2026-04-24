@@ -26,6 +26,9 @@ ABOUT_ART_CANDIDATES = (
 MONOGRAM_CANDIDATES = (
     "assets/branding/monogram.svg",
 )
+OVERLAY_WORKSPACE_HERO_CANDIDATES = (
+    "assets/overlay_workspace/hero-placeholder.svg",
+)
 
 
 def resolve_asset(*candidates: str) -> Path | None:
@@ -58,18 +61,15 @@ def monogram_path() -> Path | None:
 
 def overlay_workspace_hero_path() -> Path | None:
     """Return the hero/banner image for the overlay workspace panel."""
-    return resolve_asset(
-        "assets/overlay_workspace/hero.png",
-        "assets/overlay_workspace/hero.svg",
-    )
+    return resolve_asset(*OVERLAY_WORKSPACE_HERO_CANDIDATES)
 
 
 def overlay_workspace_icon_path(name: str) -> Path | None:
     """Return the icon for a named workspace section."""
-    return resolve_asset(
-        f"assets/overlay_workspace/icons/{name}.svg",
-        f"assets/overlay_workspace/icons/{name}.png",
-    )
+    cleaned = str(name or "").strip()
+    if not cleaned:
+        return None
+    return resolve_asset(f"assets/overlay_workspace/icons/{cleaned}.svg")
 
 
 def qml_dir() -> Path:

@@ -44,6 +44,27 @@ class IRacingConfig(SimConfig):
 
 
 @dataclass
+class ACCConfig(SimConfig):
+    """ACC-specific settings."""
+    # Write the full ACC shared-memory payload alongside the normalized output
+    raw_capture_enabled: bool = True
+
+
+@dataclass
+class AssettoCorsaConfig(SimConfig):
+    """Classic Assetto Corsa-specific settings."""
+    # Write the raw shared-memory payload alongside the normalized output
+    raw_capture_enabled: bool = True
+
+
+@dataclass
+class LMUConfig(SimConfig):
+    """Le Mans Ultimate-specific settings."""
+    # Write the raw LMU shared-memory payload alongside the normalized output
+    raw_capture_enabled: bool = True
+
+
+@dataclass
 class SessionConfig:
     """Thresholds that guard session lifecycle transitions."""
     # Minimum number of samples before a session is worth saving
@@ -125,6 +146,15 @@ class SyncConfig:
 
 
 @dataclass
+class OverlayConfig:
+    """Desktop overlay presentation settings."""
+    enabled: bool = False
+    refresh_rate_hz: int = 60
+    opacity: float = 0.92
+    pin_mode: str = "overlay_on_top"
+
+
+@dataclass
 class AppConfig:
     """Top-level application configuration."""
     output_dir: str = field(default_factory=lambda: str(default_output_dir()))
@@ -134,11 +164,12 @@ class AppConfig:
     debug: bool = False
     low_resource_mode: bool = False
     start_with_windows: bool = False
+    low_resource_mode: bool = False
     driver_name: str = ""
     iracing: IRacingConfig = field(default_factory=IRacingConfig)
-    acc: SimConfig = field(default_factory=SimConfig)
-    assetto_corsa: SimConfig = field(default_factory=SimConfig)
-    lmu: SimConfig = field(default_factory=SimConfig)
+    assetto_corsa: AssettoCorsaConfig = field(default_factory=AssettoCorsaConfig)
+    acc: ACCConfig = field(default_factory=ACCConfig)
+    lmu: LMUConfig = field(default_factory=LMUConfig)
     writer: WriterConfig = field(default_factory=WriterConfig)
     session: SessionConfig = field(default_factory=SessionConfig)
     quality: QualityConfig = field(default_factory=QualityConfig)
@@ -163,9 +194,9 @@ class AppConfig:
     def from_dict(cls, data: dict) -> AppConfig:
         """Construct from a (possibly partial) dict, applying defaults."""
         iracing = IRacingConfig(**data.pop("iracing", {}))
-        acc = SimConfig(**data.pop("acc", {}))
-        assetto_corsa = SimConfig(**data.pop("assetto_corsa", {}))
-        lmu = SimConfig(**data.pop("lmu", {}))
+        assetto_corsa = AssettoCorsaConfig(**data.pop("assetto_corsa", {}))
+        acc = ACCConfig(**data.pop("acc", {}))
+        lmu = LMUConfig(**data.pop("lmu", {}))
         writer = WriterConfig(**data.pop("writer", {}))
         session = SessionConfig(**data.pop("session", {}))
         quality = QualityConfig(**data.pop("quality", {}))
@@ -177,8 +208,8 @@ class AppConfig:
         filtered = {k: v for k, v in data.items() if k in known}
         return cls(
             iracing=iracing,
-            acc=acc,
             assetto_corsa=assetto_corsa,
+            acc=acc,
             lmu=lmu,
             writer=writer,
             session=session,
@@ -232,6 +263,16 @@ class AppConfig:
             errors.append("lap_analysis.min_lap_time_s must be >= 0")
         if self.lap_analysis.max_lap_time_s <= self.lap_analysis.min_lap_time_s:
             errors.append("lap_analysis.max_lap_time_s must be > min_lap_time_s")
+        if self.sync.enabled and not self.sync.api_url.strip():
+            errors.append("sync.api_url must not be empty when sync is enabled")
+        if self.sync.enabled and not self.sync.device_token.strip():
+            errors.append("sync.device_token must not be empty when sync is enabled")
+        if not (15 <= self.overlay.refresh_rate_hz <= 120):
+            errors.append("overlay.refresh_rate_hz must be between 15 and 120")
+        if not (0.3 <= self.overlay.opacity <= 1.0):
+            errors.append("overlay.opacity must be between 0.3 and 1.0")
+        if self.overlay.pin_mode not in {"overlay_on_top", "dashboard_on_top", "floating"}:
+            errors.append("overlay.pin_mode must be overlay_on_top, dashboard_on_top, or floating")
         if not self.output_dir:
             errors.append("output_dir must not be empty")
         return errors

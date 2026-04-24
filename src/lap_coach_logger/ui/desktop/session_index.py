@@ -12,6 +12,7 @@ log = logging.getLogger(__name__)
 
 _DB_FILE = "session_index.sqlite3"
 _SCHEMA_VERSION = 1
+_DEFAULT_RECENT_SCAN_LIMIT = 150
 
 
 class SessionIndex:
@@ -36,9 +37,16 @@ class SessionIndex:
         *,
         output_root: Path,
         parse_entry: Callable[[Path], dict[str, Any]],
-        max_dirs: int = 150,
+        max_dirs: int | None = 150,
+        recent_scan_limit: int | None = _DEFAULT_RECENT_SCAN_LIMIT,
     ) -> list[dict[str, Any]]:
-        """Incrementally sync index from output directory and return latest indexed entries."""
+        """Incrementally sync index from output directory and return indexed entries.
+
+        The index always preserves older bundles once discovered. Recent bundles are
+        rescanned on every refresh, and if the output directory contains bundles
+        that have never been indexed, the full archive is scanned until the index
+        catches up.
+        """
         output_root = Path(output_root)
         if not output_root.exists():
             self.clear()
@@ -46,12 +54,16 @@ class SessionIndex:
 
         dirs = [p for p in output_root.iterdir() if p.is_dir() and not p.name.startswith("_tmp_")]
         dirs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-        dirs = dirs[:max_dirs]
+        actual_paths = {str(folder) for folder in dirs}
+        indexed_paths = self._indexed_paths()
 
-        seen_paths: set[str] = set()
-        for folder in dirs:
+        if recent_scan_limit is None or not actual_paths.issubset(indexed_paths):
+            dirs_to_scan = dirs
+        else:
+            dirs_to_scan = dirs[:recent_scan_limit]
+
+        for folder in dirs_to_scan:
             folder_str = str(folder)
-            seen_paths.add(folder_str)
             try:
                 bundle_mtime = folder.stat().st_mtime
             except OSError:
@@ -67,12 +79,11 @@ class SessionIndex:
             except Exception:
                 log.debug("Skipping index update for %s (parse failed)", folder, exc_info=True)
 
-        self._delete_missing_or_out_of_scope(valid_paths=seen_paths)
+        self._delete_missing_entries(actual_paths=actual_paths)
         return self.list_entries(limit=max_dirs)
 
-    def list_entries(self, *, limit: int = 150) -> list[dict[str, Any]]:
-        cur = self._conn.execute(
-            """
+    def list_entries(self, *, limit: int | None = 150) -> list[dict[str, Any]]:
+        query = """
             SELECT
                 session_id,
                 path,
@@ -95,10 +106,13 @@ class SessionIndex:
                 bundle_mtime
             FROM sessions
             ORDER BY COALESCE(created_at, ended_at_utc, '') DESC
-            LIMIT ?
-            """,
-            (int(limit),),
-        )
+            """
+        params: tuple[object, ...] = ()
+        if limit is not None:
+            query = f"{query}\nLIMIT ?"
+            params = (int(limit),)
+
+        cur = self._conn.execute(query, params)
         rows = cur.fetchall()
         return [self._row_to_entry(row) for row in rows]
 
@@ -196,10 +210,14 @@ class SessionIndex:
         )
         self._conn.commit()
 
-    def _delete_missing_or_out_of_scope(self, *, valid_paths: set[str]) -> None:
+    def _indexed_paths(self) -> set[str]:
+        cur = self._conn.execute("SELECT path FROM sessions")
+        return {str(r[0]) for r in cur.fetchall() if r and r[0]}
+
+    def _delete_missing_entries(self, *, actual_paths: set[str]) -> None:
         cur = self._conn.execute("SELECT path FROM sessions")
         existing_paths = [str(r[0]) for r in cur.fetchall()]
-        to_delete = [p for p in existing_paths if p not in valid_paths or not Path(p).exists()]
+        to_delete = [p for p in existing_paths if p not in actual_paths]
         if not to_delete:
             return
         self._conn.executemany("DELETE FROM sessions WHERE path = ?", [(p,) for p in to_delete])

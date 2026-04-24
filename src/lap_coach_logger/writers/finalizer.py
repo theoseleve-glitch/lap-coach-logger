@@ -53,6 +53,13 @@ from lap_coach_logger.writers.parquet_writer import ParquetWriter
 log = logging.getLogger(__name__)
 
 _TEMP_PREFIX = "_tmp_"
+_RAW_CAPTURE_SLUGS = {
+    "iRacing": "iracing",
+    "ACC": "acc",
+    "Assetto Corsa": "assetto_corsa",
+    "Le Mans Ultimate": "lmu",
+    "LMU": "lmu",
+}
 
 
 # ------------------------------------------------------------------
@@ -79,6 +86,12 @@ def session_folder_name(
     ts = started_at.strftime("%Y-%m-%d_%H-%M-%S")
     parts = [ts, _safe_slug(sim), _safe_slug(track), _safe_slug(session_type)]
     return "__".join(parts)
+
+
+def _raw_capture_slug(sim_name: str | None) -> str | None:
+    if not sim_name:
+        return None
+    return _RAW_CAPTURE_SLUGS.get(sim_name, _safe_slug(sim_name, fallback="raw").lower())
 
 
 def _validate_samples(samples: list[TelemetrySample]) -> list[str]:
@@ -157,6 +170,8 @@ class SessionFinalizer:
         raw_samples: list[dict[str, Any]] | None = None,
         raw_columns: list[str] | None = None,
         raw_session_info: dict[str, Any] | None = None,
+        raw_catalogs: dict[str, Any] | None = None,
+        raw_var_schema: list[dict[str, Any]] | None = None,
     ) -> Path | None:
         """Write session bundle and return the final folder path (or None on total failure).
 
@@ -197,6 +212,17 @@ class SessionFinalizer:
         final_dir = self._output_root / folder_name
 
         extra = dict(extra_metadata) if extra_metadata else {}
+        if raw_capture_sim is None and (
+            iracing_raw_samples
+            or iracing_session_info is not None
+            or iracing_catalogs is not None
+        ):
+            raw_capture_sim = "iRacing"
+        raw_samples = raw_samples if raw_samples is not None else iracing_raw_samples
+        raw_columns = raw_columns if raw_columns is not None else iracing_raw_columns
+        raw_session_info = raw_session_info if raw_session_info is not None else iracing_session_info
+        raw_catalogs = raw_catalogs if raw_catalogs is not None else iracing_catalogs
+        raw_var_schema = raw_var_schema if raw_var_schema is not None else iracing_var_schema
 
         try:
             self._output_root.mkdir(parents=True, exist_ok=True)
@@ -223,54 +249,39 @@ class SessionFinalizer:
             self._write_channels(tmp_dir)
 
             # ── iRacing raw telemetry outputs ──
-            iracing_files: dict[str, str] = {}
-            if iracing_raw_samples:
-                raw_file = self._write_iracing_raw_telemetry(
-                    tmp_dir, iracing_raw_samples, iracing_raw_columns,
+            raw_files: dict[str, str] = {}
+            raw_slug = _raw_capture_slug(raw_capture_sim)
+            if raw_slug and raw_samples:
+                raw_file = self._write_raw_telemetry(
+                    tmp_dir, raw_slug, raw_samples, raw_columns,
                 )
                 if raw_file:
-                    iracing_files["telemetry_iracing_raw"] = raw_file
-                # channels_iracing_raw.json
-                cols = iracing_raw_columns or (sorted(iracing_raw_samples[0].keys()) if iracing_raw_samples else [])
-                self._write_iracing_raw_channels(tmp_dir, cols, iracing_var_schema)
-                iracing_files["channels_iracing_raw"] = "channels_iracing_raw.json"
+                    raw_files[f"telemetry_{raw_slug}_raw"] = raw_file
+                cols = raw_columns or sorted(raw_samples[0].keys())
+                self._write_raw_channels(
+                    tmp_dir,
+                    raw_slug,
+                    cols,
+                    preview_row=raw_samples[0] if raw_samples else None,
+                    var_schema=raw_var_schema,
+                )
+                raw_files[f"channels_{raw_slug}_raw"] = f"channels_{raw_slug}_raw.json"
 
-            if iracing_session_info is not None:
-                (tmp_dir / "session_info_iracing.json").write_text(
-                    json.dumps(iracing_session_info, indent=2, default=str),
+            if raw_slug and raw_session_info is not None:
+                session_info_name = f"session_info_{raw_slug}.json"
+                (tmp_dir / session_info_name).write_text(
+                    json.dumps(raw_session_info, indent=2, default=str),
                     encoding="utf-8",
                 )
-                iracing_files["session_info_iracing"] = "session_info_iracing.json"
+                raw_files[f"session_info_{raw_slug}"] = session_info_name
 
-            if iracing_catalogs is not None:
-                (tmp_dir / "iracing_catalogs.json").write_text(
-                    json.dumps(iracing_catalogs, indent=2, default=str),
+            if raw_slug and raw_catalogs is not None:
+                catalogs_name = f"{raw_slug}_catalogs.json"
+                (tmp_dir / catalogs_name).write_text(
+                    json.dumps(raw_catalogs, indent=2, default=str),
                     encoding="utf-8",
                 )
-                iracing_files["iracing_catalogs"] = "iracing_catalogs.json"
-
-            # ── generic raw capture outputs (ACC, LMU, Assetto Corsa, etc.) ──
-            if raw_samples and raw_capture_sim:
-                sim_tag = raw_capture_sim.lower().replace(" ", "_")
-                raw_cols = raw_columns or (sorted(raw_samples[0].keys()) if raw_samples else [])
-                raw_tel_file = f"telemetry_{sim_tag}_raw.csv"
-                self._write_raw_csv(tmp_dir / raw_tel_file, raw_samples, raw_cols)
-                extra["raw_capture"] = {"sim": raw_capture_sim}
-                extra[f"{sim_tag}_raw_files"] = {f"telemetry_{sim_tag}_raw": raw_tel_file}
-                extra[f"{sim_tag}_raw_sample_count"] = len(raw_samples)
-
-                # Raw channels metadata
-                channels_file = f"channels_{sim_tag}_raw.json"
-                channels_meta = build_raw_channels_payload(raw_cols, raw_samples, sim_tag)
-                (tmp_dir / channels_file).write_text(
-                    json.dumps(channels_meta, indent=2), encoding="utf-8",
-                )
-                if raw_session_info is not None:
-                    info_file = f"session_info_{sim_tag}.json"
-                    (tmp_dir / info_file).write_text(
-                        json.dumps(raw_session_info, indent=2, default=str),
-                        encoding="utf-8",
-                    )
+                raw_files[f"{raw_slug}_catalogs"] = catalogs_name
 
             # ── laps.json ──
             self._write_laps(tmp_dir, laps or [])
@@ -299,13 +310,20 @@ class SessionFinalizer:
             self._write_quality_report(tmp_dir, quality_report.to_dict())
 
             # ── session.json v2 + analysis.json (Phase 6: v2-only) ──
-            # Extracts car_name from extra before v2 writer consumes it.
+            # Extract car_name from extra before v2 writer consumes it.
             car_name = extra.pop("car", None)
-            # Inject iRacing file references for v2 raw_source provenance
-            if iracing_files:
-                extra["iracing_raw_files"] = iracing_files
-                if iracing_raw_samples:
-                    extra["iracing_raw_sample_count"] = len(iracing_raw_samples)
+
+            # Inject raw-capture file references into source_metadata
+            # (generic path — works for iRacing, ACC, LMU, AC, etc.).
+            if raw_files and raw_slug:
+                extra["raw_capture"] = {
+                    "sim": raw_capture_sim,
+                    "files": raw_files,
+                }
+                extra[f"{raw_slug}_raw_files"] = raw_files
+                if raw_samples:
+                    extra["raw_capture"]["sample_count"] = len(raw_samples)
+                    extra[f"{raw_slug}_raw_sample_count"] = len(raw_samples)
 
             from lap_coach_logger.writers.bundle_v2 import (
                 write_bundle_v2,
@@ -497,13 +515,14 @@ class SessionFinalizer:
         )
 
     # ------------------------------------------------------------------
-    def _write_iracing_raw_telemetry(
+    def _write_raw_telemetry_legacy_unused(
         self,
         folder: Path,
+        raw_slug: str,
         raw_samples: list[dict[str, Any]],
         column_names: list[str] | None,
     ) -> str | None:
-        """Write ``telemetry_iracing_raw.csv`` (primary) or ``.parquet`` (fallback).
+        """Write sim-specific raw telemetry CSV (primary) or Parquet (fallback).
 
         Returns the filename written, or None on total failure.
         """
@@ -511,9 +530,11 @@ class SessionFinalizer:
             return None
 
         cols = column_names or sorted(raw_samples[0].keys())
+        csv_name = f"telemetry_{raw_slug}_raw.csv"
+        parquet_name = f"telemetry_{raw_slug}_raw.parquet"
 
         # Primary: CSV
-        csv_path = folder / "telemetry_iracing_raw.csv"
+        csv_path = folder / csv_name
         try:
             import csv as csv_mod
             with open(csv_path, "w", newline="", encoding="utf-8") as f:
@@ -521,7 +542,7 @@ class SessionFinalizer:
                 writer.writeheader()
                 for row in raw_samples:
                     writer.writerow({c: row.get(c) for c in cols})
-            return "telemetry_iracing_raw.csv"
+            return csv_name
         except Exception:
             log.warning("iRacing raw CSV write failed – trying Parquet", exc_info=True)
             csv_path.unlink(missing_ok=True)
@@ -545,7 +566,7 @@ class SessionFinalizer:
 
     # ------------------------------------------------------------------
     @staticmethod
-    def _write_iracing_raw_channels(
+    def _write_iracing_raw_channels_legacy_unused(
         folder: Path,
         column_names: list[str],
         var_schema: list[dict[str, Any]] | None = None,
@@ -569,6 +590,66 @@ class SessionFinalizer:
             writer.writeheader()
             for row in raw_samples:
                 writer.writerow({c: row.get(c) for c in column_names})
+
+    # ------------------------------------------------------------------
+    def _write_raw_telemetry(
+        self,
+        folder: Path,
+        raw_slug: str,
+        raw_samples: list[dict[str, Any]],
+        column_names: list[str] | None,
+    ) -> str | None:
+        """Write sim-specific raw telemetry CSV (primary) or Parquet (fallback)."""
+        if not raw_samples:
+            return None
+
+        cols = column_names or sorted(raw_samples[0].keys())
+        csv_name = f"telemetry_{raw_slug}_raw.csv"
+        parquet_name = f"telemetry_{raw_slug}_raw.parquet"
+
+        try:
+            import csv as csv_mod
+
+            with open(folder / csv_name, "w", newline="", encoding="utf-8") as f:
+                writer = csv_mod.DictWriter(f, fieldnames=cols, extrasaction="ignore")
+                writer.writeheader()
+                for row in raw_samples:
+                    writer.writerow({c: row.get(c) for c in cols})
+            return csv_name
+        except Exception:
+            log.warning("%s raw CSV write failed while falling back to Parquet", raw_slug, exc_info=True)
+            (folder / csv_name).unlink(missing_ok=True)
+
+        try:
+            import pyarrow as pa
+            import pyarrow.parquet as pq
+
+            arrays = {col: [row.get(col) for row in raw_samples] for col in cols}
+            table = pa.table(arrays)
+            pq.write_table(table, folder / parquet_name, compression=self._compression)
+            return parquet_name
+        except Exception:
+            log.exception("%s raw Parquet write also failed", raw_slug)
+            return None
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _write_raw_channels(
+        folder: Path,
+        raw_slug: str,
+        column_names: list[str],
+        *,
+        preview_row: dict[str, Any] | None = None,
+        var_schema: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Write the sim-specific raw channel manifest."""
+        if raw_slug == "iracing":
+            payload = build_raw_iracing_channels_payload(column_names, var_schema)
+        else:
+            payload = build_raw_channels_payload(column_names, preview_row=preview_row)
+        (folder / f"channels_{raw_slug}_raw.json").write_text(
+            json.dumps(payload, indent=2), encoding="utf-8"
+        )
 
     # ------------------------------------------------------------------
     @staticmethod

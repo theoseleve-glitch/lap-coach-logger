@@ -1,11 +1,420 @@
-"""Color constants for the desktop overlay and workspace UI."""
+"""Color constants for the desktop overlay and workspace UI.
 
-ASPHALT = "#06080B"
-CHALK = "#F2F4F7"
-STEEL = "#9AA5B4"
-CONCRETE = "#5E6673"
-PIT_ORANGE = "#C6A24C"
-SAFETY_RED = "#CE2D2D"
-MARSHAL_YELLOW = "#E0AF47"
-ACID_GREEN = "#35C978"
-RACING_PURPLE = "#7A6BBF"
+Design system based on the LAP COACH brand charter:
+    Asphalt Black  #000000     Concrete    #141414
+    Steel          #949494     Chalk       #F0EDE5
+    Pit Orange     #C9A84C     Safety Red  #FF2A2A
+    Acid Green     #22C55E     Marshal Yellow #FACC15
+    Racing Purple  #8B5CF6
+"""
+
+from __future__ import annotations
+
+WINDOW_MIN_WIDTH = 1180
+WINDOW_MIN_HEIGHT = 760
+
+# -- charter colours -------------------------------------------------------
+ASPHALT   = "#000000"
+CONCRETE  = "#141414"
+STEEL     = "#949494"
+CHALK     = "#F0EDE5"
+PIT_ORANGE = "#C9A84C"
+SAFETY_RED = "#FF2A2A"
+ACID_GREEN = "#22C55E"
+MARSHAL_YELLOW = "#FACC15"
+RACING_PURPLE  = "#8B5CF6"
+
+STATUS_COLORS = {
+    "Idle": STEEL,
+    "Simulator Detected": PIT_ORANGE,
+    "Waiting": PIT_ORANGE,
+    "Arming": MARSHAL_YELLOW,
+    "Recording": ACID_GREEN,
+    "Finalizing": MARSHAL_YELLOW,
+    "Ready for Review": PIT_ORANGE,
+    "Failed": SAFETY_RED,
+}
+
+APP_STYLESHEET = f"""
+/* ── Base ── */
+QWidget {{
+    background-color: {ASPHALT};
+    color: {CHALK};
+    font-family: 'Segoe UI', 'Inter', sans-serif;
+    font-size: 13px;
+}}
+QMainWindow {{
+    background-color: {ASPHALT};
+}}
+QStackedWidget {{
+    background-color: {ASPHALT};
+}}
+QScrollArea {{
+    background-color: {ASPHALT};
+    border: none;
+}}
+QScrollArea > QWidget > QWidget {{
+    background-color: {ASPHALT};
+}}
+QDialog {{
+    background-color: {CONCRETE};
+}}
+
+/* ── Sidebar ── */
+QFrame#Sidebar {{
+    background-color: #08090B;
+    border-right: 1px solid rgba(240, 237, 229, 0.06);
+}}
+QFrame#Sidebar QFrame#SidebarBrandBlock {{
+    background: transparent;
+}}
+QFrame#Sidebar QFrame#SidebarMonoWrap {{
+    min-width: 42px;
+    max-width: 42px;
+    min-height: 42px;
+    max-height: 42px;
+    background: rgba(240, 237, 229, 0.03);
+    border: 1px solid rgba(240, 237, 229, 0.06);
+    border-radius: 12px;
+}}
+QFrame#Sidebar QLabel#AppTitle {{
+    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: {CHALK};
+    letter-spacing: 1px;
+}}
+QFrame#Sidebar QLabel#AppSubtitle {{
+    font-family: 'Consolas', 'Space Mono', monospace;
+    font-size: 10px;
+    color: rgba(148, 148, 148, 0.78);
+    letter-spacing: 1.5px;
+}}
+QFrame#Sidebar QListWidget#ShellNav {{
+    background: transparent;
+    border: none;
+    outline: none;
+}}
+QFrame#Sidebar QListWidget#ShellNav::item {{
+    padding: 11px 12px;
+    margin: 1px 0;
+    border-radius: 10px;
+    color: rgba(148, 148, 148, 0.86);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.8px;
+}}
+QFrame#Sidebar QListWidget#ShellNav::item:selected {{
+    background: rgba(240, 237, 229, 0.05);
+    border-left: none;
+    color: {CHALK};
+}}
+QFrame#Sidebar QListWidget#ShellNav::item:hover:!selected {{
+    background: rgba(240, 237, 229, 0.03);
+    color: rgba(240, 237, 229, 0.92);
+}}
+QFrame#Sidebar QFrame#SidebarUtilityArea {{
+    border-top: 1px solid rgba(240, 237, 229, 0.06);
+    padding-top: 8px;
+}}
+QPushButton#SidebarUtilityButton,
+QPushButton#SidebarUtilityButtonMuted {{
+    text-align: left;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: rgba(240, 237, 229, 0.82);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.6px;
+}}
+QPushButton#SidebarUtilityButton:hover,
+QPushButton#SidebarUtilityButtonMuted:hover {{
+    background: rgba(240, 237, 229, 0.04);
+    border-color: rgba(240, 237, 229, 0.06);
+}}
+QPushButton#SidebarUtilityButtonMuted {{
+    color: rgba(148, 148, 148, 0.82);
+}}
+
+/* ── TopBar ── */
+QFrame#TopBar {{
+    background-color: #090A0D;
+    border-bottom: 1px solid rgba(240, 237, 229, 0.05);
+}}
+QFrame#TopBar QFrame#TopBarStatusCluster {{
+    background: transparent;
+}}
+QLabel#TopBarStatusDetail {{
+    color: rgba(148, 148, 148, 0.78);
+    font-size: 12px;
+}}
+QFrame#TopBar QFrame#TopBarActionCluster {{
+    background: rgba(240, 237, 229, 0.02);
+    border: 1px solid rgba(240, 237, 229, 0.05);
+    border-radius: 13px;
+    padding: 4px;
+}}
+
+/* ── Cards ── */
+QFrame#Card {{
+    background-color: {CONCRETE};
+    border: 1px solid rgba(240, 237, 229, 0.06);
+    border-radius: 12px;
+}}
+QLabel#SectionTitle {{
+    font-size: 10px;
+    font-weight: 600;
+    color: {PIT_ORANGE};
+    letter-spacing: 2px;
+}}
+QLabel#CardHeading {{
+    font-size: 18px;
+    font-weight: 700;
+    color: {CHALK};
+    letter-spacing: 0.5px;
+}}
+QLabel#MetricValue {{
+    font-size: 26px;
+    font-weight: 700;
+    color: {CHALK};
+    font-family: 'Consolas', 'Space Mono', monospace;
+}}
+QLabel#MetricLabel {{
+    font-size: 10px;
+    color: {STEEL};
+    letter-spacing: 1.5px;
+}}
+QLabel#MetricUnit {{
+    font-size: 11px;
+    color: {STEEL};
+    font-family: 'Consolas', 'Space Mono', monospace;
+}}
+
+/* ── Buttons ── */
+QPushButton {{
+    background-color: rgba(240, 237, 229, 0.06);
+    border: 1px solid rgba(240, 237, 229, 0.10);
+    border-radius: 8px;
+    padding: 8px 16px;
+    color: {CHALK};
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+}}
+QPushButton:hover {{
+    background-color: rgba(240, 237, 229, 0.10);
+    border: 1px solid rgba(240, 237, 229, 0.15);
+}}
+QPushButton:pressed {{
+    background-color: rgba(240, 237, 229, 0.04);
+}}
+QPushButton#PrimaryButton {{
+    background-color: {PIT_ORANGE};
+    border: 1px solid {PIT_ORANGE};
+    color: {ASPHALT};
+    font-weight: 700;
+}}
+QPushButton#PrimaryButton:hover {{
+    background-color: #D4B35A;
+}}
+QPushButton#PrimaryButton:pressed {{
+    background-color: #B89940;
+}}
+QPushButton#DangerButton {{
+    background-color: rgba(255, 42, 42, 0.12);
+    border: 1px solid rgba(255, 42, 42, 0.25);
+    color: {SAFETY_RED};
+}}
+QPushButton#DangerButton:hover {{
+    background-color: rgba(255, 42, 42, 0.20);
+}}
+QPushButton#TopBarPrimaryAction,
+QPushButton#TopBarDangerAction,
+QPushButton#TopBarUtilityAction {{
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+}}
+QPushButton#TopBarUtilityAction {{
+    background: transparent;
+    border: 1px solid transparent;
+    color: rgba(240, 237, 229, 0.84);
+}}
+QPushButton#TopBarUtilityAction:hover {{
+    background: rgba(240, 237, 229, 0.06);
+    border-color: rgba(240, 237, 229, 0.07);
+}}
+QPushButton#TopBarPrimaryAction {{
+    background-color: {PIT_ORANGE};
+    border: 1px solid {PIT_ORANGE};
+    color: {ASPHALT};
+}}
+QPushButton#TopBarPrimaryAction:hover {{
+    background-color: #D4B35A;
+}}
+QPushButton#TopBarDangerAction {{
+    background-color: rgba(255, 42, 42, 0.10);
+    border: 1px solid rgba(255, 42, 42, 0.18);
+    color: #FF7A7A;
+}}
+QPushButton#TopBarDangerAction:hover {{
+    background-color: rgba(255, 42, 42, 0.16);
+}}
+
+/* ── Inputs ── */
+QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
+    background-color: rgba(240, 237, 229, 0.04);
+    border: 1px solid rgba(240, 237, 229, 0.08);
+    border-radius: 8px;
+    padding: 7px 10px;
+    color: {CHALK};
+    font-family: 'Consolas', 'Space Mono', monospace;
+    font-size: 12px;
+}}
+QLineEdit:focus, QTextEdit:focus {{
+    border: 1px solid {PIT_ORANGE};
+}}
+
+/* ── Tables / Lists ── */
+QTableWidget, QTreeWidget, QListWidget {{
+    background-color: rgba(240, 237, 229, 0.02);
+    border: 1px solid rgba(240, 237, 229, 0.06);
+    border-radius: 8px;
+    gridline-color: rgba(240, 237, 229, 0.06);
+    font-family: 'Consolas', 'Space Mono', monospace;
+    font-size: 12px;
+    outline: none;
+}}
+QListWidget::item {{
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin: 2px 4px;
+    color: {STEEL};
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+}}
+QListWidget::item:selected {{
+    background-color: rgba(201, 168, 76, 0.15);
+    color: {PIT_ORANGE};
+    border-left: 3px solid {PIT_ORANGE};
+}}
+QListWidget::item:hover:!selected {{
+    background-color: rgba(240, 237, 229, 0.04);
+    color: {CHALK};
+}}
+QHeaderView::section {{
+    background-color: {CONCRETE};
+    color: {STEEL};
+    border: none;
+    border-right: 1px solid rgba(240, 237, 229, 0.06);
+    border-bottom: 1px solid rgba(240, 237, 229, 0.06);
+    padding: 8px 10px;
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+}}
+QTableWidget::item {{
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(240, 237, 229, 0.04);
+}}
+QTableWidget::item:selected {{
+    background-color: rgba(201, 168, 76, 0.12);
+    color: {CHALK};
+}}
+
+/* ── Tabs ── */
+QTabWidget::pane {{
+    border: 1px solid rgba(240, 237, 229, 0.06);
+    border-radius: 8px;
+}}
+QTabBar::tab {{
+    background: rgba(240, 237, 229, 0.04);
+    color: {STEEL};
+    padding: 10px 18px;
+    margin-right: 2px;
+    border-radius: 6px 6px 0 0;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 1px;
+}}
+QTabBar::tab:selected {{
+    background: {PIT_ORANGE};
+    color: {ASPHALT};
+    font-weight: 700;
+}}
+QTabBar::tab:hover:!selected {{
+    background: rgba(240, 237, 229, 0.08);
+    color: {CHALK};
+}}
+
+/* ── Scrollbars ── */
+QScrollBar:vertical {{
+    background: transparent;
+    width: 8px;
+    margin: 4px 0;
+}}
+QScrollBar::handle:vertical {{
+    background: rgba(240, 237, 229, 0.12);
+    border-radius: 4px;
+    min-height: 30px;
+}}
+QScrollBar::handle:vertical:hover {{
+    background: rgba(201, 168, 76, 0.3);
+}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0;
+}}
+QScrollBar:horizontal {{
+    background: transparent;
+    height: 8px;
+    margin: 0 4px;
+}}
+QScrollBar::handle:horizontal {{
+    background: rgba(240, 237, 229, 0.12);
+    border-radius: 4px;
+    min-width: 30px;
+}}
+
+/* ── Checkbox ── */
+QCheckBox {{
+    color: {STEEL};
+    font-size: 11px;
+    letter-spacing: 1px;
+    spacing: 8px;
+}}
+QCheckBox::indicator {{
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(240, 237, 229, 0.15);
+    border-radius: 4px;
+    background: transparent;
+}}
+QCheckBox::indicator:checked {{
+    background-color: {PIT_ORANGE};
+    border-color: {PIT_ORANGE};
+}}
+
+/* ── Status Bar ── */
+QStatusBar {{
+    background-color: {CONCRETE};
+    color: {STEEL};
+    border-top: 1px solid rgba(240, 237, 229, 0.06);
+    font-size: 11px;
+    font-family: 'Consolas', 'Space Mono', monospace;
+}}
+
+/* ── Tooltips ── */
+QToolTip {{
+    background-color: {CONCRETE};
+    color: {CHALK};
+    border: 1px solid rgba(240, 237, 229, 0.10);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+}}
+"""

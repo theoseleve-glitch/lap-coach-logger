@@ -1,9 +1,9 @@
-"""iRacing full-capture orchestration.
+"""Raw capture session orchestration.
 
 Manages:
-  - Raw telemetry buffer (all IRSDK vars, flattened)
+  - Raw telemetry buffer (all sim-native vars, flattened)
   - Session-info snapshot
-  - Static reference catalog loading and bundling
+  - Optional static reference catalog loading and bundling
   - Observed sample-rate tracking
 """
 
@@ -26,8 +26,8 @@ _CATALOG_FILES = {
 }
 
 
-class IRacingRawCapture:
-    """Collects raw iRacing data alongside the normalized stream."""
+class RawCaptureSession:
+    """Collect raw sim-native data alongside the normalized stream."""
 
     def __init__(self) -> None:
         self._raw_buffer: list[dict[str, Any]] = []
@@ -126,6 +126,10 @@ class IRacingRawCapture:
                 data["count"] = len(data["data"])
 
         self._catalogs = catalogs
+
+
+# Backward-compatible alias for existing imports/tests.
+IRacingRawCapture = RawCaptureSession
 
 
 def _load_catalog(explicit_path: str, default_filename: str) -> dict[str, Any]:

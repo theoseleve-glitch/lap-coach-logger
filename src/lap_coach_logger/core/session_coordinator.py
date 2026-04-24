@@ -32,10 +32,15 @@ from datetime import datetime, timezone
 from typing import Any
 
 from lap_coach_logger.adapters.base import SimAdapter
-from lap_coach_logger.config.models import AppConfig, IRacingConfig
+from lap_coach_logger.config.models import ACCConfig, AppConfig, AssettoCorsaConfig, IRacingConfig, LMUConfig
+from lap_coach_logger.core.ghost_reference import GhostReference
+from lap_coach_logger.core.ghost_tracker import GhostDelta, GhostTracker
 from lap_coach_logger.core.health import HealthMonitor
 from lap_coach_logger.core.iracing_raw_capture import IRacingRawCapture
 from lap_coach_logger.core.lap_analysis import classify_laps
+from lap_coach_logger.core.live_coach import LiveCoachTracker
+from lap_coach_logger.core.live_input_diagnostics import LiveInputDiagnosticsTracker
+from lap_coach_logger.core.live_platform_analysis import LivePlatformAnalysisTracker
 from lap_coach_logger.core.schema import TelemetrySample
 from lap_coach_logger.core.session_state import SessionState, SessionStateMachine
 from lap_coach_logger.utils.shutdown import shutdown_requested
@@ -75,20 +80,40 @@ class SessionCoordinator:
         self._session_uid: str | None = None
         self._dropped_samples: int = 0
         self._latest_sample: TelemetrySample | None = None
+        self._latest_dashboard_state: dict[str, Any] = {}
+        self._derived_dashboard_state: dict[str, Any] = {}
+        self._live_coach = LiveCoachTracker()
+        self._live_input_diagnostics = LiveInputDiagnosticsTracker()
+        self._live_platform_analysis = LivePlatformAnalysisTracker()
+        # Ghost coaching overlay
+        self._ghost_tracker: GhostTracker | None = None
+        self._ghost_reference: GhostReference | None = None
+        self._latest_ghost_delta: GhostDelta | None = None
         self._events: list[SessionEvent] = []
         self._record_thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._monitoring = False
         self._waiting_active_polls: int = 0
         self._arming_started_at: float | None = None
+        self._current_lap_number: int | None = None
+        self._current_lap_start_session_time_s: float | None = None
+        self._current_lap_start_fuel_level: float | None = None
+        self._last_lap_time_s: float | None = None
+        self._best_lap_time_s: float | None = None
+        self._fuel_burn_per_lap: list[float] = []
+        self._sector_count: int = 3
+        self._current_sector_markers: dict[int, float] = {}
+        self._current_sector_splits: dict[int, float] = {}
+        self._last_sector_splits: dict[int, float] = {}
 
         # Data-freeze tracking
         self._last_raw_ts: float | None = None
         self._last_raw_ts_changed_at: float = 0.0
 
-        # iRacing raw capture state
+        # Raw capture state
         self._raw_capture: IRacingRawCapture | None = None
-        self._iracing_var_schema: list[dict[str, Any]] | None = None
+        self._raw_capture_sim: str | None = None
+        self._raw_var_schema: list[dict[str, Any]] | None = None
 
     # -- properties --------------------------------------------------------
 
@@ -129,58 +154,49 @@ class SessionCoordinator:
     def latest_sample_snapshot(self) -> dict[str, object]:
         """Return a shallow dict snapshot of the latest sample for UI display."""
         with self._lock:
-            if self._latest_sample is None:
+            sample = self._latest_sample.to_dict() if self._latest_sample is not None else {}
+            dashboard = dict(self._latest_dashboard_state)
+            derived = dict(self._derived_dashboard_state)
+            if not sample and not dashboard and not derived:
                 return {}
-            d = self._latest_sample.to_dict()
-        return {
-            "timestamp_utc": d.get("timestamp_utc"),
-            "raw_source_timestamp": d.get("raw_source_timestamp"),
-            "sim": d.get("sim"),
-            "track_name": d.get("track_name"),
-            "car_name": d.get("car_name"),
-            "session_type": d.get("session_type"),
-            "speed_kph": d.get("speed_kph"),
-            "rpm": d.get("rpm"),
-            "gear": d.get("gear"),
-            "throttle_pct": d.get("throttle_pct"),
-            "brake_pct": d.get("brake_pct"),
-            "steering_deg": d.get("steering_deg"),
-            "clutch_pct": d.get("clutch_pct"),
-            "lap_number": d.get("lap_number"),
-            "lap_distance_m": d.get("lap_distance_m"),
-            "session_time_s": d.get("session_time_s"),
-            "is_on_track": d.get("is_on_track"),
-            "is_in_pits": d.get("is_in_pits"),
-            "fuel_level": d.get("fuel_level"),
-            "lat_accel_g": d.get("lat_accel_g"),
-            "long_accel_g": d.get("long_accel_g"),
-            "lap_dist_pct": d.get("lap_dist_pct"),
-            "track_length_m": d.get("track_length_m"),
-            # Orientation
-            "yaw_deg": d.get("yaw_deg"),
-            "pitch_deg": d.get("pitch"),
-            "roll_deg": d.get("roll"),
-            # Tyre temperatures
-            "tyre_temp_lf": d.get("tyre_temp_lf"),
-            "tyre_temp_rf": d.get("tyre_temp_rf"),
-            "tyre_temp_lr": d.get("tyre_temp_lr"),
-            "tyre_temp_rr": d.get("tyre_temp_rr"),
-            # Brake temperatures
-            "brake_temp_lf": d.get("brake_temp_lf"),
-            "brake_temp_rf": d.get("brake_temp_rf"),
-            "brake_temp_lr": d.get("brake_temp_lr"),
-            "brake_temp_rr": d.get("brake_temp_rr"),
-            # World position
-            "world_pos_x": d.get("world_pos_x"),
-            "world_pos_y": d.get("world_pos_y"),
-            "world_pos_z": d.get("world_pos_z"),
-            # Race position
-            "position": d.get("position"),
-            "num_cars": d.get("num_cars"),
-            # Environment
-            "track_temp_c": d.get("track_temp_c"),
-            "air_temp_c": d.get("air_temp_c"),
-        }
+        snapshot: dict[str, object] = dict(sample)
+        snapshot.update(dashboard)
+        snapshot.update(derived)
+        return snapshot
+
+    def live_coaching_snapshot(self) -> dict[str, object]:
+        """Return the latest coaching and alert state for lap_pc."""
+        with self._lock:
+            return dict(self._live_coach.snapshot())
+
+    def hardware_diagnostics_snapshot(self) -> dict[str, object]:
+        """Return the latest input and FFB diagnostics for lap_pc."""
+        with self._lock:
+            return dict(self._live_input_diagnostics.snapshot())
+
+    def platform_analysis_snapshot(self) -> dict[str, object]:
+        """Return the latest ride-height and aero-platform diagnostics for lap_pc."""
+        with self._lock:
+            return dict(self._live_platform_analysis.snapshot())
+
+    def ghost_coaching_snapshot(self) -> dict[str, object]:
+        """Return the latest ghost delta for the overlay."""
+        with self._lock:
+            delta = self._latest_ghost_delta
+            if delta is None:
+                return {}
+            return {
+                "ghost_speed_delta_kph": round(delta.speed_delta_kph, 1),
+                "ghost_throttle_delta_pct": round(delta.throttle_delta_pct, 3),
+                "ghost_brake_delta_pct": round(delta.brake_delta_pct, 3),
+                "ghost_steering_delta_deg": round(delta.steering_delta_deg, 1),
+                "ghost_cumulative_delta_s": round(delta.cumulative_delta_s, 3),
+                "ghost_theoretical_speed_kph": round(delta.theoretical_speed_kph, 1),
+                "ghost_theoretical_throttle_pct": round(delta.theoretical_throttle_pct, 3),
+                "ghost_theoretical_brake_pct": round(delta.theoretical_brake_pct, 3),
+                "ghost_theoretical_steering_deg": round(delta.theoretical_steering_deg, 1),
+                "ghost_loaded": True,
+            }
 
     # -- detection callbacks (called from ProcessWatcher) ------------------
 
@@ -281,15 +297,15 @@ class SessionCoordinator:
             and self._config.iracing.sample_mode == "auto_sdk"
         )
         use_raw_capture = (
-            use_tick_driven
-            and isinstance(self._config.iracing, IRacingConfig)
-            and self._config.iracing.raw_capture_enabled
+            adapter is not None
+            and adapter.supports_raw_capture()
+            and self._raw_capture_enabled(adapter)
         )
 
         if use_tick_driven:
             log.info("iRacing auto_sdk mode: tick-driven sampling enabled")
         if use_raw_capture:
-            log.info("iRacing raw capture enabled")
+            log.info("%s raw capture enabled", adapter.sim_name if adapter else "sim")
 
         while not shutdown_requested():
             state = self._fsm.state
@@ -303,7 +319,7 @@ class SessionCoordinator:
                         with self._lock:
                             self._begin_arming()
                             if use_raw_capture:
-                                self._init_raw_capture()
+                                self._init_raw_capture(adapter)
                 except Exception:
                     log.debug("Error checking session activity", exc_info=True)
                 time.sleep(self._config.poll_interval_s)
@@ -335,13 +351,14 @@ class SessionCoordinator:
 
                     sample = adapter.read_sample()
                     if sample is not None:
+                        dashboard_state = self._read_dashboard_state(adapter)
                         self._record_event("recording_started")
                         self._transition(
                             SessionState.RECORDING,
                             reason="first valid telemetry sample received",
                             event="recording_started",
                         )
-                        self._append_sample(sample)
+                        self._append_sample(sample, dashboard_state)
                         # Capture raw alongside if enabled
                         if use_raw_capture:
                             self._capture_raw_sample(adapter)
@@ -405,7 +422,8 @@ class SessionCoordinator:
 
                     sample = adapter.read_sample()
                     if sample is not None:
-                        self._append_sample(sample)
+                        dashboard_state = self._read_dashboard_state(adapter)
+                        self._append_sample(sample, dashboard_state)
 
                         # Capture raw alongside if enabled
                         if use_raw_capture:
@@ -482,8 +500,10 @@ class SessionCoordinator:
         self._last_raw_ts = None
         self._last_raw_ts_changed_at = time.monotonic()
         self._events.clear()
-        if self._raw_capture is not None:
-            self._raw_capture.reset()
+        self._raw_capture = None
+        self._raw_capture_sim = None
+        self._raw_var_schema = None
+        self._reset_live_state()
         self._record_event("valid_session_found")
         self._transition(
             SessionState.ARMING,
@@ -497,29 +517,289 @@ class SessionCoordinator:
             last_error=None,
         )
 
-    def _append_sample(self, sample: TelemetrySample) -> None:
+    def _append_sample(
+        self,
+        sample: TelemetrySample,
+        dashboard_state: dict[str, Any] | None = None,
+    ) -> None:
         """Append sample with buffer cap protection."""
-        self._latest_sample = sample
-        if len(self._buffer) >= _MAX_BUFFER_SAMPLES:
-            self._dropped_samples += 1
-            if self._dropped_samples % 1000 == 1:
-                log.warning(
-                    "Buffer at capacity (%d) — dropping samples (total dropped: %d)",
-                    _MAX_BUFFER_SAMPLES, self._dropped_samples,
-                )
+        with self._lock:
+            self._latest_sample = sample
+            self._latest_dashboard_state = dict(dashboard_state or {})
+            self._update_live_metrics_locked(sample, self._latest_dashboard_state)
+            self._live_coach.push_sample(
+                sample,
+                dashboard_state=self._latest_dashboard_state,
+                derived_state=self._derived_dashboard_state,
+            )
+            self._live_input_diagnostics.push_sample(
+                sample,
+                dashboard_state=self._latest_dashboard_state,
+                derived_state=self._derived_dashboard_state,
+            )
+            self._live_platform_analysis.push_sample(
+                sample,
+                dashboard_state=self._latest_dashboard_state,
+                derived_state=self._derived_dashboard_state,
+            )
+            # Ghost coaching: try to load reference on first sample with track info
+            if self._ghost_tracker is None and sample.track_name and sample.car_name:
+                try:
+                    from pathlib import Path
+                    output_dir = Path(self._config.output_path)
+                    ref = GhostReference.find_latest(output_dir, sample.track_name, sample.car_name)
+                    if ref is not None:
+                        self._ghost_reference = ref
+                        self._ghost_tracker = GhostTracker(ref)
+                        log.info("Ghost loaded for %s / %s (%.3fs)",
+                                 ref.track_name, ref.car_name, ref.theoretical_lap_time_s)
+                    else:
+                        # Set tracker to a sentinel to prevent retrying every sample
+                        self._ghost_tracker = False  # type: ignore[assignment]
+                except Exception:
+                    log.debug("Failed to load ghost reference", exc_info=True)
+                    self._ghost_tracker = False  # type: ignore[assignment]
+
+            if isinstance(self._ghost_tracker, GhostTracker):
+                ghost_delta = self._ghost_tracker.update(sample)
+                if ghost_delta is not None:
+                    self._latest_ghost_delta = ghost_delta
+
+            if len(self._buffer) >= _MAX_BUFFER_SAMPLES:
+                self._dropped_samples += 1
+                if self._dropped_samples % 1000 == 1:
+                    log.warning(
+                        "Buffer at capacity (%d) — dropping samples (total dropped: %d)",
+                        _MAX_BUFFER_SAMPLES, self._dropped_samples,
+                    )
+                return
+
+            self._buffer.append(sample)
+            if self._session_uid is None:
+                self._session_uid = sample.session_uid
+
+    def _read_dashboard_state(self, adapter: SimAdapter) -> dict[str, Any]:
+        """Read sim-specific dashboard data without failing the monitor loop."""
+        try:
+            state = adapter.read_dashboard_state()
+        except Exception:
+            log.debug("Error reading %s dashboard state", adapter.sim_name, exc_info=True)
+            return {}
+        return dict(state or {})
+
+    def _reset_live_state(self) -> None:
+        self._latest_dashboard_state = {}
+        self._derived_dashboard_state = {}
+        self._live_coach.reset()
+        self._live_input_diagnostics.reset()
+        self._live_platform_analysis.reset()
+        self._ghost_tracker = None
+        self._ghost_reference = None
+        self._latest_ghost_delta = None
+        self._current_lap_number = None
+        self._current_lap_start_session_time_s = None
+        self._current_lap_start_fuel_level = None
+        self._last_lap_time_s = None
+        self._best_lap_time_s = None
+        self._fuel_burn_per_lap = []
+        self._sector_count = 3
+        self._current_sector_markers = {}
+        self._current_sector_splits = {}
+        self._last_sector_splits = {}
+
+    def _update_live_metrics_locked(
+        self,
+        sample: TelemetrySample,
+        dashboard_state: dict[str, Any],
+    ) -> None:
+        lap_time_s = _positive_float(dashboard_state.get("lap_time_s"))
+        last_lap_time_s = _positive_float(dashboard_state.get("last_lap_time_s"))
+        best_lap_time_s = _positive_float(dashboard_state.get("best_lap_time_s"))
+        fuel_level = _nonnegative_float(
+            dashboard_state.get("fuel_level"),
+            fallback=sample.fuel_level,
+        )
+        session_time_s = _nonnegative_float(sample.session_time_s)
+        sector_count = _positive_int(dashboard_state.get("sector_count"), fallback=self._sector_count) or 3
+        self._sector_count = max(3, sector_count)
+
+        if best_lap_time_s is not None:
+            if self._best_lap_time_s is None or best_lap_time_s < self._best_lap_time_s:
+                self._best_lap_time_s = best_lap_time_s
+        if last_lap_time_s is not None:
+            self._last_lap_time_s = last_lap_time_s
+            if self._best_lap_time_s is None or last_lap_time_s < self._best_lap_time_s:
+                self._best_lap_time_s = last_lap_time_s
+
+        self._update_lap_tracking_locked(
+            lap_number=sample.lap_number,
+            session_time_s=session_time_s,
+            lap_time_s=lap_time_s,
+            last_lap_time_s=last_lap_time_s,
+            fuel_level=fuel_level,
+        )
+        self._apply_explicit_sector_splits_locked(dashboard_state)
+        self._update_sector_progress_locked(
+            current_sector_index=_positive_int(dashboard_state.get("current_sector_index")),
+            last_sector_time_s=_positive_float(dashboard_state.get("last_sector_time_s")),
+        )
+
+        if lap_time_s is None and session_time_s is not None and self._current_lap_start_session_time_s is not None:
+            lap_time_s = max(0.0, session_time_s - self._current_lap_start_session_time_s)
+
+        fuel_per_lap_l = _positive_float(dashboard_state.get("fuel_per_lap_l"))
+        if fuel_per_lap_l is None and self._fuel_burn_per_lap:
+            fuel_per_lap_l = sum(self._fuel_burn_per_lap) / len(self._fuel_burn_per_lap)
+
+        laps_remaining_est = _positive_float(dashboard_state.get("laps_remaining_est"))
+        if laps_remaining_est is None and fuel_level is not None and fuel_per_lap_l and fuel_per_lap_l > 0:
+            laps_remaining_est = fuel_level / fuel_per_lap_l
+
+        derived: dict[str, Any] = {}
+        if lap_time_s is not None:
+            derived["lap_time_s"] = round(lap_time_s, 3)
+        if self._last_lap_time_s is not None:
+            derived["last_lap_time_s"] = round(self._last_lap_time_s, 3)
+        if self._best_lap_time_s is not None:
+            derived["best_lap_time_s"] = round(self._best_lap_time_s, 3)
+        if fuel_per_lap_l is not None:
+            derived["fuel_per_lap_l"] = round(fuel_per_lap_l, 3)
+        if laps_remaining_est is not None:
+            derived["laps_remaining_est"] = round(laps_remaining_est, 2)
+        for idx in range(1, 4):
+            split = self._current_sector_splits.get(idx)
+            if split is None:
+                split = self._last_sector_splits.get(idx)
+            if split is not None:
+                derived[f"sector_{idx}_time_s"] = round(split, 3)
+        self._derived_dashboard_state = derived
+
+    def _update_lap_tracking_locked(
+        self,
+        *,
+        lap_number: int | None,
+        session_time_s: float | None,
+        lap_time_s: float | None,
+        last_lap_time_s: float | None,
+        fuel_level: float | None,
+    ) -> None:
+        if lap_number is None:
             return
 
-        self._buffer.append(sample)
-        if self._session_uid is None:
-            self._session_uid = sample.session_uid
+        inferred_lap_start = None
+        if session_time_s is not None and lap_time_s is not None:
+            inferred_lap_start = max(0.0, session_time_s - lap_time_s)
 
-    # -- iRacing raw capture helpers ----------------------------------------
+        if self._current_lap_number is None or lap_number < self._current_lap_number:
+            self._current_lap_number = lap_number
+            self._current_lap_start_session_time_s = (
+                inferred_lap_start if inferred_lap_start is not None else session_time_s
+            )
+            self._current_lap_start_fuel_level = fuel_level
+            self._current_sector_markers.clear()
+            self._current_sector_splits.clear()
+            return
 
-    def _init_raw_capture(self) -> None:
-        """Set up the raw capture helper and load catalogs."""
+        if lap_number > self._current_lap_number:
+            completed_lap_time = last_lap_time_s
+            if completed_lap_time is None and session_time_s is not None and self._current_lap_start_session_time_s is not None:
+                completed_lap_time = max(0.0, session_time_s - self._current_lap_start_session_time_s)
+
+            if completed_lap_time is not None and completed_lap_time > 0:
+                self._last_lap_time_s = completed_lap_time
+                if self._best_lap_time_s is None or completed_lap_time < self._best_lap_time_s:
+                    self._best_lap_time_s = completed_lap_time
+
+            if (
+                fuel_level is not None
+                and self._current_lap_start_fuel_level is not None
+                and self._current_lap_start_fuel_level >= fuel_level
+            ):
+                burn = self._current_lap_start_fuel_level - fuel_level
+                if burn > 0:
+                    self._fuel_burn_per_lap.append(burn)
+                    if len(self._fuel_burn_per_lap) > 6:
+                        self._fuel_burn_per_lap = self._fuel_burn_per_lap[-6:]
+
+            self._finalize_sector_splits_locked(completed_lap_time)
+            self._current_lap_number = lap_number
+            self._current_lap_start_session_time_s = (
+                inferred_lap_start if inferred_lap_start is not None else session_time_s
+            )
+            self._current_lap_start_fuel_level = fuel_level
+            self._current_sector_markers.clear()
+            self._current_sector_splits.clear()
+            return
+
+        if self._current_lap_start_session_time_s is None and (inferred_lap_start is not None or session_time_s is not None):
+            self._current_lap_start_session_time_s = (
+                inferred_lap_start if inferred_lap_start is not None else session_time_s
+            )
+        if self._current_lap_start_fuel_level is None and fuel_level is not None:
+            self._current_lap_start_fuel_level = fuel_level
+
+    def _apply_explicit_sector_splits_locked(self, dashboard_state: dict[str, Any]) -> None:
+        for idx in range(1, 4):
+            split = _positive_float(dashboard_state.get(f"sector_{idx}_time_s"))
+            if split is not None:
+                self._current_sector_splits[idx] = split
+
+    def _update_sector_progress_locked(
+        self,
+        *,
+        current_sector_index: int | None,
+        last_sector_time_s: float | None,
+    ) -> None:
+        if current_sector_index is None or last_sector_time_s is None:
+            return
+
+        completed_sector = current_sector_index - 1
+        if completed_sector < 1 or completed_sector > 3:
+            return
+
+        previous_marker = self._current_sector_markers.get(completed_sector - 1, 0.0)
+        previous_time = self._current_sector_markers.get(completed_sector)
+        if previous_time is not None and abs(previous_time - last_sector_time_s) < 0.001:
+            return
+
+        self._current_sector_markers[completed_sector] = last_sector_time_s
+        split = last_sector_time_s if completed_sector == 1 else last_sector_time_s - previous_marker
+        if split > 0:
+            self._current_sector_splits[completed_sector] = split
+
+    def _finalize_sector_splits_locked(self, completed_lap_time: float | None) -> None:
+        if completed_lap_time is not None and completed_lap_time > 0 and 2 in self._current_sector_markers:
+            sector_three = completed_lap_time - self._current_sector_markers[2]
+            if sector_three > 0:
+                self._current_sector_splits[3] = sector_three
+        if self._current_sector_splits:
+            self._last_sector_splits = dict(self._current_sector_splits)
+
+    def _raw_capture_enabled(self, adapter: SimAdapter) -> bool:
+        """Return True if raw capture is enabled for the active adapter."""
+        if adapter.sim_name == "iRacing":
+            return isinstance(self._config.iracing, IRacingConfig) and self._config.iracing.raw_capture_enabled
+        if adapter.sim_name == "Assetto Corsa":
+            return (
+                isinstance(self._config.assetto_corsa, AssettoCorsaConfig)
+                and self._config.assetto_corsa.raw_capture_enabled
+            )
+        if adapter.sim_name == "ACC":
+            return isinstance(self._config.acc, ACCConfig) and self._config.acc.raw_capture_enabled
+        if adapter.sim_name == "Le Mans Ultimate":
+            return isinstance(self._config.lmu, LMUConfig) and self._config.lmu.raw_capture_enabled
+        return False
+
+    # -- raw capture helpers -------------------------------------------------
+
+    def _init_raw_capture(self, adapter: SimAdapter) -> None:
+        """Set up the raw capture helper for the active adapter."""
         rc = IRacingRawCapture()
+        self._raw_capture_sim = adapter.sim_name
+        self._raw_var_schema = None
+
         iracing_cfg = self._config.iracing
-        if isinstance(iracing_cfg, IRacingConfig):
+        if adapter.sim_name == "iRacing" and isinstance(iracing_cfg, IRacingConfig):
             rc.load_catalogs(
                 localserver_track_fields_path=iracing_cfg.catalog_localserver_track_fields,
                 localserver_arq_messages_path=iracing_cfg.catalog_localserver_arq_messages,
@@ -528,7 +808,7 @@ class SessionCoordinator:
             # Cache the live var schema for channel metadata
             self._load_iracing_var_schema(iracing_cfg.catalog_live_var_schema)
         self._raw_capture = rc
-        log.info("iRacing raw capture initialized")
+        log.info("%s raw capture initialized", adapter.sim_name)
 
     def _load_iracing_var_schema(self, path: str) -> None:
         """Load the live var schema JSON for channel metadata."""
@@ -541,7 +821,7 @@ class SessionCoordinator:
         if p.exists():
             try:
                 with open(p, encoding="utf-8") as f:
-                    self._iracing_var_schema = json.load(f)
+                    self._raw_var_schema = json.load(f)
             except Exception:
                 log.debug("Could not load iRacing var schema", exc_info=True)
 
@@ -675,11 +955,12 @@ class SessionCoordinator:
             extra_metadata=self._build_extra_metadata(
                 duration, max_lap, first, lap_times, best_lap, lap_summary, env
             ),
-            iracing_raw_samples=self._raw_capture.raw_buffer if self._raw_capture else None,
-            iracing_raw_columns=self._raw_capture.get_raw_column_names() if self._raw_capture else None,
-            iracing_session_info=self._raw_capture.session_info_snapshot if self._raw_capture else None,
-            iracing_catalogs=self._raw_capture.catalogs if self._raw_capture else None,
-            iracing_var_schema=self._iracing_var_schema,
+            raw_capture_sim=self._raw_capture_sim,
+            raw_samples=self._raw_capture.raw_buffer if self._raw_capture else None,
+            raw_columns=self._raw_capture.get_raw_column_names() if self._raw_capture else None,
+            raw_session_info=self._raw_capture.session_info_snapshot if self._raw_capture else None,
+            raw_catalogs=self._raw_capture.catalogs if self._raw_capture else None,
+            raw_var_schema=self._raw_var_schema,
         )
         if result:
             self._record_event("finalize_succeeded", {"path": str(result)})
@@ -713,7 +994,7 @@ class SessionCoordinator:
         lap_times: dict, best_lap: float | None, lap_summary: Any,
         env: dict[str, float | None],
     ) -> dict[str, Any]:
-        """Assemble the extra_metadata dict including iRacing sampling info."""
+        """Assemble the extra_metadata dict including raw-capture info."""
         meta: dict[str, Any] = {
             "duration_s": round(duration, 2),
             "lap_count": max_lap,
@@ -731,18 +1012,21 @@ class SessionCoordinator:
             **env,
         }
 
-        # Add iRacing sampling metadata if available
+        # Add raw-capture metadata if available.
         adapter = self._active_adapter
         if adapter is not None and adapter.supports_raw_capture():
             sdk_meta = adapter.get_sdk_metadata()
-            iracing_cfg = self._config.iracing
-            sample_mode = (
-                iracing_cfg.sample_mode
-                if isinstance(iracing_cfg, IRacingConfig)
-                else "manual"
-            )
-            meta["sample_mode"] = sample_mode
-            meta["sdk_tick_rate_hz"] = sdk_meta.get("sdk_tick_rate_hz")
+            if self._raw_capture_sim:
+                meta["raw_capture_sim"] = self._raw_capture_sim
+            if adapter.sim_name == "iRacing":
+                iracing_cfg = self._config.iracing
+                sample_mode = (
+                    iracing_cfg.sample_mode
+                    if isinstance(iracing_cfg, IRacingConfig)
+                    else "manual"
+                )
+                meta["sample_mode"] = sample_mode
+                meta["sdk_tick_rate_hz"] = sdk_meta.get("sdk_tick_rate_hz")
             if self._raw_capture is not None:
                 observed = self._raw_capture.observed_sample_rate_hz
                 meta["observed_sample_rate_hz"] = observed
@@ -759,9 +1043,13 @@ class SessionCoordinator:
         self._last_raw_ts = None
         self._dropped_samples = 0
         self._latest_sample = None
+        self._reset_live_state()
         self._events.clear()
         if self._raw_capture is not None:
             self._raw_capture.reset()
+        self._raw_capture = None
+        self._raw_capture_sim = None
+        self._raw_var_schema = None
 
         if self._fsm.state == SessionState.READY_FOR_REVIEW and self._active_adapter is not None:
             self._health.update(sample_count=0)
@@ -793,6 +1081,10 @@ class SessionCoordinator:
         self._last_raw_ts = None
         self._dropped_samples = 0
         self._latest_sample = None
+        self._reset_live_state()
+        self._raw_capture = None
+        self._raw_capture_sim = None
+        self._raw_var_schema = None
         self._monitoring = False
         self._fsm.reset()
         self._health.update(state="idle", sim=None, sample_count=0)
@@ -815,3 +1107,29 @@ class SessionCoordinator:
                 self._reset()
         if self._record_thread and self._record_thread.is_alive():
             self._record_thread.join(timeout=5.0)
+
+
+def _positive_float(value: object) -> float | None:
+    if not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    if number <= 0:
+        return None
+    return number
+
+
+def _nonnegative_float(value: object, *, fallback: float | None = None) -> float | None:
+    candidate = value if isinstance(value, (int, float)) else fallback
+    if not isinstance(candidate, (int, float)):
+        return None
+    number = float(candidate)
+    if number < 0:
+        return None
+    return number
+
+
+def _positive_int(value: object, *, fallback: int | None = None) -> int | None:
+    candidate = value if isinstance(value, int) else fallback
+    if not isinstance(candidate, int):
+        return None
+    return candidate if candidate > 0 else None
