@@ -336,3 +336,69 @@ def test_laps_parquet_not_written_on_legacy_path(tmp_path: Path) -> None:
     )
     assert out is not None
     assert not (out / "laps.parquet").exists()
+
+
+# -- T029 --------------------------------------------------------------------
+
+def _events() -> list:
+    from lap_coach_logger.writers.bundle_schema import SessionEvent
+
+    return [
+        SessionEvent(
+            event="sector",
+            timestamp_utc=STARTED.isoformat(),
+            detail={"sector": 1, "time_s": 32.1},
+        ),
+        SessionEvent(
+            event="lap_complete",
+            timestamp_utc=STARTED.isoformat(),
+            detail={"lap_number": 1, "lap_time_s": 90.3},
+        ),
+        SessionEvent(
+            event="flag",
+            timestamp_utc=STARTED.isoformat(),
+            detail={"flag": "yellow", "sector": 2},
+        ),
+    ]
+
+
+def test_events_json_written_and_valid(tmp_path: Path) -> None:
+    """T029: events.json exists and parses as a JSON list."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(_samples(), manifest=_manifest(), events=_events())
+    assert out is not None
+    events_path = out / "events.json"
+    assert events_path.exists()
+
+    data = json.loads(events_path.read_text(encoding="utf-8"))
+    assert isinstance(data, list)
+    assert len(data) == 3
+
+
+def test_events_json_covers_sector_lap_and_flag_events(tmp_path: Path) -> None:
+    """T029: each event type lands in events.json with event+timestamp."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(_samples(), manifest=_manifest(), events=_events())
+    assert out is not None
+
+    data = json.loads((out / "events.json").read_text(encoding="utf-8"))
+    kinds = {row["event"] for row in data}
+    assert {"sector", "lap_complete", "flag"}.issubset(kinds)
+    for row in data:
+        assert "event" in row and row["event"]
+        assert "timestamp_utc" in row and row["timestamp_utc"]
+
+
+def test_events_json_is_empty_list_when_no_events(tmp_path: Path) -> None:
+    """T029: events list produces an empty JSON array, not absent file."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(_samples(), manifest=_manifest(), events=[])
+    assert out is not None
+    data = json.loads((out / "events.json").read_text(encoding="utf-8"))
+    assert data == []
