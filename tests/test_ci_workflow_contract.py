@@ -61,3 +61,30 @@ def test_workflow_test_job_runs_on_supported_runner() -> None:
     assert "windows" in runner.lower(), (
         f"test job runner is {runner!r}; Windows app needs a Windows runner"
     )
+
+
+def test_workflow_declares_lint_job_with_ruff_and_mypy() -> None:
+    """T016: ruff + mypy must run on PR to block merge on lint/type errors."""
+    wf = _load_workflow()
+    jobs = wf.get("jobs", {})
+    lint_job = jobs.get("lint")
+    assert lint_job is not None, "workflow does not declare a 'lint' job"
+    run_commands = "\n".join(_all_run_steps(lint_job))
+    assert "ruff" in run_commands, "lint job has no ruff step"
+    assert "mypy" in run_commands, "lint job has no mypy step"
+
+
+def test_lint_job_runs_on_pull_request() -> None:
+    """Lint must trigger on PR — otherwise it cannot block merge."""
+    wf = _load_workflow()
+    triggers = wf.get("on", wf.get(True))
+    assert triggers.get("pull_request") is not None, (
+        "workflow does not trigger on pull_request"
+    )
+    # Jobs all share the workflow trigger — no per-job gate would skip PR.
+    lint_job = wf["jobs"]["lint"]
+    # If the lint job declares an `if:` key excluding pull_request, that's a bug.
+    if_guard = str(lint_job.get("if", "")).lower()
+    assert "pull_request" not in if_guard or "!=" not in if_guard, (
+        f"lint job appears to skip PR events: if={if_guard!r}"
+    )
