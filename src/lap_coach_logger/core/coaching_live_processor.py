@@ -16,6 +16,7 @@ Produces two outputs per snapshot:
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from lap_coach_logger.core.detector_models import CoachingNote, DetectorConfig
@@ -25,15 +26,32 @@ from lap_coach_logger.core.live_processor import LiveProcessor
 from lap_coach_logger.core.schema import TelemetrySample
 
 
-class CoachingLiveProcessor(LiveProcessor):
-    """Live coaching sub-processor built on ``DetectorManager`` + ``LiveCoachTracker``."""
+_FEATURE_FLAG = "LIVE_COACHING_ENABLED"
+_FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 
-    __slots__ = ("detector_manager", "_coach_tracker", "_pending_notes")
+
+def _flag_enabled() -> bool:
+    raw = os.environ.get(_FEATURE_FLAG)
+    if raw is None:
+        return True
+    return raw.strip().lower() not in _FALSE_VALUES
+
+
+class CoachingLiveProcessor(LiveProcessor):
+    """Live coaching sub-processor built on ``DetectorManager`` + ``LiveCoachTracker``.
+
+    Respects the ``LIVE_COACHING_ENABLED`` environment flag: when false
+    (``0``/``false``/``no``/``off``, case-insensitive), ``on_sample`` is
+    a no-op and ``snapshot`` returns empty lists.
+    """
+
+    __slots__ = ("detector_manager", "_coach_tracker", "_pending_notes", "enabled")
 
     def __init__(self, config: DetectorConfig | None = None) -> None:
         self.detector_manager = DetectorManager(config)
         self._coach_tracker = LiveCoachTracker()
         self._pending_notes: list[CoachingNote] = []
+        self.enabled = _flag_enabled()
 
     def on_sample(
         self,
@@ -42,6 +60,8 @@ class CoachingLiveProcessor(LiveProcessor):
         dashboard_state: dict[str, Any] | None = None,
         derived_state: dict[str, Any] | None = None,
     ) -> None:
+        if not self.enabled:
+            return
         self._pending_notes = self.detector_manager.check(sample)
         self._coach_tracker.push_sample(
             sample,
@@ -60,6 +80,8 @@ class CoachingLiveProcessor(LiveProcessor):
         self._pending_notes = []
 
     def snapshot(self) -> dict[str, Any]:
+        if not self.enabled:
+            return {"notes": [], "cards": []}
         coach_snap = self._coach_tracker.snapshot()
         alerts = coach_snap.get("alerts", []) or []
         prompts = coach_snap.get("coaching", []) or []
