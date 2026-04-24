@@ -154,3 +154,57 @@ def test_finalize_manifest_requires_sessionmanifest_instance(tmp_path: Path) -> 
         fin.finalize(
             _samples(), manifest={"session_id": "bogus"}  # type: ignore[arg-type]
         )
+
+
+def test_manifest_written_in_bundle_v2_format(tmp_path: Path) -> None:
+    """T026: when manifest is supplied, bundle contains manifest.json (v2)."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    manifest = _manifest()
+    out = fin.finalize(_samples(), manifest=manifest)
+    assert out is not None
+
+    manifest_path = out / "manifest.json"
+    assert manifest_path.exists(), "Bundle v2 must contain manifest.json"
+
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    # Round-trip through the shared Pydantic model to prove the shape.
+    parsed = SessionManifest.model_validate(data)
+    assert parsed.session_id == manifest.session_id
+    assert parsed.bundle_version == "v2"
+    assert parsed.sim_title == "iracing"
+    assert parsed.track_layout == "sebring-full"
+
+
+def test_bundle_v2_manifest_persists_core_identity(tmp_path: Path) -> None:
+    """Manifest JSON must retain driver/car/track UUIDs for ingest joins."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    manifest = _manifest()
+    out = fin.finalize(_samples(), manifest=manifest)
+    assert out is not None
+
+    data = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    assert data["session_id"] == str(manifest.session_id)
+    assert data["driver_id"] == str(manifest.driver_id)
+    assert data["car_id"] == str(manifest.car_id)
+    assert data["track_id"] == str(manifest.track_id)
+
+
+def test_manifest_json_absent_on_legacy_kwarg_path(tmp_path: Path) -> None:
+    """Legacy ad-hoc-kwarg finalize path must NOT emit v2 manifest.json."""
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(
+        _samples(),
+        started_at=STARTED,
+        ended_at=ENDED,
+        sim="iracing",
+        track="nordschleife",
+        session_uid="legacy-uid",
+    )
+    assert out is not None
+    assert not (out / "manifest.json").exists(), (
+        "legacy path must not emit v2 manifest.json (keeps old consumers quiet)"
+    )

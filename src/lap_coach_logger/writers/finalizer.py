@@ -319,6 +319,17 @@ class SessionFinalizer:
                 quality_report=quality_report.to_dict() if quality_report else None,
             )
 
+            # ── manifest.json (Bundle v2 contract, T026) ──
+            # When a shared SessionManifest is supplied, emit the canonical
+            # v2 manifest.json alongside the legacy session.json. Downstream
+            # tooling reads manifest.json as the source of truth; the legacy
+            # file stays for backward compat until T039 removes it.
+            if manifest is not None:
+                (tmp_dir / "manifest.json").write_text(
+                    manifest.model_dump_json(indent=2),
+                    encoding="utf-8",
+                )
+
             # ── atomic rename (shutil.move for Windows safety) ──
             if final_dir.exists():
                 # Edge case: duplicate name — append disambiguator
