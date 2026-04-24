@@ -59,16 +59,3 @@ def test_ingest_result_fields_match_adr012() -> None:
         assert field in hints, f"IngestResult missing {field}"
 
 
-def test_ingest_client_upload_is_stub_until_t042() -> None:
-    """T041 ships the typed surface only — behavior lands in T042."""
-    from lap_coach_logger.infra.ingest import IngestClient
-
-    import pytest
-
-    client = IngestClient(
-        base_url="https://api.example.test",
-        auth_token="placeholder",
-        timeout_s=30.0,
-    )
-    with pytest.raises(NotImplementedError):
-        client.upload(bundle_dir=Path("."))
