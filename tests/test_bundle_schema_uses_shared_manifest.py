@@ -20,15 +20,19 @@ def test_bundle_schema_session_manifest_is_shared_pydantic_model() -> None:
     )
 
 
-def test_legacy_session_manifest_still_available_for_transition() -> None:
-    # Existing callers that still use the v1-bundle dataclass shape
-    # (e.g. test_session_bundle.py) migrate via LegacySessionManifest
-    # until T025-T034 rewrite the SessionFinalizer.
-    from lap_coach_logger.writers.bundle_schema import LegacySessionManifest
+def test_legacy_session_manifest_removed_after_v2_migration() -> None:
+    """T039: bundle_schema no longer ships the legacy v1 SessionManifest.
 
-    m = LegacySessionManifest(session_id="s1", logger_version="1.0.0")
-    assert m.session_id == "s1"
-    assert m.logger_version == "1.0.0"
+    The shared ``lap_schemas.v1.SessionManifest`` now owns the name,
+    and the SessionFinalizer rewrite (T025–T034) emits Bundle v2
+    manifest.json directly. Keeping the legacy dataclass around
+    would tempt new callers to write v1-shape bundles.
+    """
+    import lap_coach_logger.writers.bundle_schema as bs
+
+    assert not hasattr(bs, "LegacySessionManifest"), (
+        "T039: remove LegacySessionManifest — bundle_schema is v2-only now"
+    )
 
 
 def test_bundle_schema_lap_record_is_shared_pydantic_model() -> None:

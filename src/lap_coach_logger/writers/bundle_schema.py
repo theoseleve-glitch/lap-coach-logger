@@ -15,12 +15,13 @@ import hashlib
 from dataclasses import dataclass, field
 from typing import Any
 
-# Shared v2 contract. Sprint T022/T023 replace the local ``SessionManifest``
-# and ``LapRecord`` dataclasses with these Pydantic models so the desktop
-# bundle pipeline writes to the same shape every other consumer reads.
-# The legacy dataclasses are retained as ``LegacySessionManifest`` /
-# ``LegacyLapRecord`` for transitional code paths until the T025-T034
-# SessionFinalizer rewrite adopts the new shape throughout.
+# Shared v2 contract. Sprint T022/T023 replaced the local
+# ``SessionManifest`` and ``LapRecord`` dataclasses with these Pydantic
+# models so the desktop bundle pipeline writes the same shape every
+# other consumer reads. Sprint T039 removed the legacy
+# ``LegacySessionManifest`` dataclass once the SessionFinalizer (T025–T034)
+# started emitting v2 manifest.json directly. ``LegacyLapRecord`` stays
+# until lap_analysis / session_coordinator migrate to the shared shape.
 from lap_schemas.v1 import LapRecord, SessionManifest  # noqa: F401
 
 BUNDLE_SCHEMA_VERSION = "1.0.0"
@@ -98,86 +99,13 @@ class ChannelDef:
 
 
 # ------------------------------------------------------------------
-# Session manifest  (== session.json top-level)
+# Session manifest
 # ------------------------------------------------------------------
-
-@dataclass
-class LegacySessionManifest:
-    """Transitional v1-bundle manifest (pre-T022 shape).
-
-    Superseded by ``lap_schemas.v1.SessionManifest`` (re-exported here
-    as ``SessionManifest``). Retained until the SessionFinalizer
-    rewrite in T025-T034 adopts the shared shape throughout.
-    """
-    session_id: str
-    schema_version: str = BUNDLE_SCHEMA_VERSION
-    telemetry_schema_version: str = ""
-    logger_version: str = ""
-    adapter: str | None = None
-
-    # Sim
-    sim_name: str | None = None
-
-    # Timestamps
-    started_at_utc: str = ""
-    ended_at_utc: str = ""
-    timezone_offset: str | None = None
-
-    # Session
-    session_type: str | None = None
-    track_name: str | None = None
-    car_name: str | None = None
-
-    # Driver
-    driver_name: str | None = None
-
-    # Recording stats
-    sample_count: int = 0
-    dropped_sample_count: int = 0
-    sample_rate_hz: float | None = None
-    duration_s: float = 0.0
-    data_quality_score: float = 0.0
-
-    # Environment
-    track_temp_c: float | None = None
-    air_temp_c: float | None = None
-
-    # Lap summary
-    total_laps: int = 0
-    valid_laps: int = 0
-    clean_laps: int = 0
-    best_lap_time_s: float | None = None
-    best_clean_lap_time_s: float | None = None
-    representative_lap_number: int | None = None
-    representative_lap_time_s: float | None = None
-
-    # Review workflow
-    review_status: str = "ready"
-    review_updated_at_utc: str | None = None
-
-    # Sync workflow (offline-first; remote upload may be disabled)
-    sync_status: str = "not_queued"
-    sync_attempt_count: int = 0
-    last_sync_attempt_at: str | None = None
-    last_sync_error: str | None = None
-    bundle_hash: str | None = None
-    remote_id: str | None = None
-
-    # Validation output
-    quality_classification: str = "needs_review"
-    quality_score: float = 0.0
-    quality_report_file: str = "quality_report.json"
-
-    # Files
-    telemetry_file: str = "telemetry.csv"
-    telemetry_format: str = "csv"
-    telemetry_sha256: str | None = None
-
-    # Source metadata
-    source_metadata: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
+# The v1-bundle ``LegacySessionManifest`` dataclass has been removed
+# (sprint T039). ``SessionManifest`` is now the shared
+# ``lap_schemas.v1.SessionManifest`` re-export only — Bundle v2 is
+# the single source of truth. See T025–T034 for the finalizer path
+# that writes the new manifest.json.
 
 
 # ------------------------------------------------------------------

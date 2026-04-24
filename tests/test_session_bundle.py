@@ -19,7 +19,6 @@ from lap_coach_logger.normalization.mapper import TELEMETRY_SCHEMA_VERSION
 from lap_coach_logger.writers.bundle_schema import (
     BUNDLE_SCHEMA_VERSION,
     LegacyLapRecord as LapRecord,
-    LegacySessionManifest,
     SessionEvent,
     compute_file_sha256,
 )
@@ -338,11 +337,10 @@ class TestBundleSchemaModels:
         d = ev.to_dict()
         assert "detail" not in d
 
-    def test_manifest_to_dict(self) -> None:
-        m = LegacySessionManifest(session_id="s1", logger_version="1.0.0")
-        d = m.to_dict()
-        assert d["session_id"] == "s1"
-        assert d["schema_version"] == BUNDLE_SCHEMA_VERSION
+    # ``test_manifest_to_dict`` was removed in T039 together with the
+    # LegacySessionManifest dataclass. Coverage for the shared v2
+    # ``SessionManifest`` lives in test_bundle_schema_uses_shared_manifest.py
+    # and test_finalizer_accepts_manifest.py.
 
     def test_compute_file_sha256(self, tmp_path: Path) -> None:
         f = tmp_path / "test.bin"
