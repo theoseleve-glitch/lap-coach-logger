@@ -275,6 +275,14 @@ class SessionFinalizer:
             # ── laps.json ──
             self._write_laps(tmp_dir, laps or [])
 
+            # ── laps.parquet (Bundle v2, T028) ──
+            # Only when a shared SessionManifest is supplied AND there is
+            # at least one lap to persist. Rows keep the LegacyLapRecord
+            # shape so the file round-trips via
+            # ``LegacyLapRecord(**pyarrow_row)``.
+            if manifest is not None and laps:
+                self._write_laps_parquet(tmp_dir, laps)
+
             # ── events.json ──
             self._write_events(tmp_dir, events or [])
 
@@ -404,6 +412,21 @@ class SessionFinalizer:
         (folder / "laps.json").write_text(
             json.dumps(payload, indent=2), encoding="utf-8"
         )
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _write_laps_parquet(folder: Path, laps: list[LapRecord]) -> None:
+        """Write ``laps.parquet`` for Bundle v2 (T028).
+
+        Each row mirrors the ``LegacyLapRecord`` dataclass, so consumers
+        can reconstruct records via ``LegacyLapRecord(**row)``.
+        """
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        payload = [lap.to_dict() for lap in laps]
+        table = pa.Table.from_pylist(payload)
+        pq.write_table(table, folder / "laps.parquet")
 
     # ------------------------------------------------------------------
     @staticmethod

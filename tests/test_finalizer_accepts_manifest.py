@@ -264,3 +264,75 @@ def test_finalize_telemetry_file_is_non_empty_and_contains_samples(
     assert telemetry.exists()
     # A parquet file with 40 rows should be at least 1KB — smoke floor.
     assert telemetry.stat().st_size > 500
+
+
+# -- T028 --------------------------------------------------------------------
+
+def _laps(n: int = 3) -> list:
+    from lap_coach_logger.writers.bundle_schema import LegacyLapRecord
+
+    return [
+        LegacyLapRecord(
+            lap_number=i + 1,
+            start_session_time_s=float(i) * 90.0,
+            end_session_time_s=float(i + 1) * 90.0,
+            lap_time_s=90.0 + i * 0.5,
+            classification="clean" if i % 2 == 0 else "in_lap",
+            sample_count=1200,
+            max_speed_kph=200.0 + i,
+        )
+        for i in range(n)
+    ]
+
+
+def test_finalize_writes_laps_parquet_with_manifest(tmp_path: Path) -> None:
+    """T028: manifest path emits laps.parquet alongside laps.json."""
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(_samples(), manifest=_manifest(), laps=_laps())
+    assert out is not None
+    assert (out / "laps.parquet").exists(), "expected laps.parquet in v2 bundle"
+    assert (out / "laps.parquet").stat().st_size > 0
+
+
+def test_laps_parquet_round_trips_to_lap_record_shape(tmp_path: Path) -> None:
+    """T028: laps.parquet rows round-trip back to the LegacyLapRecord shape."""
+    from lap_coach_logger.writers.bundle_schema import LegacyLapRecord
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    laps = _laps(3)
+    out = fin.finalize(_samples(), manifest=_manifest(), laps=laps)
+    assert out is not None
+
+    import pyarrow.parquet as pq
+
+    table = pq.read_table(out / "laps.parquet")
+    rows = table.to_pylist()
+    assert len(rows) == len(laps)
+
+    for original, row in zip(laps, rows):
+        # Reconstruct the record from the parquet row; all fields must match.
+        reconstructed = LegacyLapRecord(**row)
+        assert reconstructed == original
+
+
+def test_laps_parquet_absent_when_no_laps_supplied(tmp_path: Path) -> None:
+    """No laps → no laps.parquet (avoid empty-file noise)."""
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(_samples(), manifest=_manifest(), laps=[])
+    assert out is not None
+    assert not (out / "laps.parquet").exists()
+
+
+def test_laps_parquet_not_written_on_legacy_path(tmp_path: Path) -> None:
+    """Legacy kwarg path skips v2 laps.parquet for backward compat."""
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(
+        _samples(),
+        started_at=STARTED,
+        ended_at=ENDED,
+        sim="iracing",
+        track="spa",
+        laps=_laps(),
+    )
+    assert out is not None
+    assert not (out / "laps.parquet").exists()
