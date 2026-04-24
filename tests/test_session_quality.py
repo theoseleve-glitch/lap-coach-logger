@@ -5,7 +5,7 @@ from __future__ import annotations
 from lap_coach_logger.config.models import QualityConfig
 from lap_coach_logger.core.schema import TelemetrySample
 from lap_coach_logger.core.session_quality import validate_session_quality
-from lap_coach_logger.writers.bundle_schema import LapRecord
+from lap_coach_logger.writers.bundle_schema import LegacyLapRecord as LapRecord
 
 
 def _sample(i: int) -> TelemetrySample:

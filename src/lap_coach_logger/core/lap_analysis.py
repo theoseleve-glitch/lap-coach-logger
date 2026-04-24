@@ -8,7 +8,9 @@ from statistics import median
 from typing import Any
 
 from lap_coach_logger.core.schema import TelemetrySample
-from lap_coach_logger.writers.bundle_schema import LapRecord
+from lap_coach_logger.writers.bundle_schema import (
+    LegacyLapRecord as LapRecord,
+)
 
 
 @dataclass

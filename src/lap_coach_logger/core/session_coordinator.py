@@ -39,7 +39,10 @@ from lap_coach_logger.core.lap_analysis import classify_laps
 from lap_coach_logger.core.schema import TelemetrySample
 from lap_coach_logger.core.session_state import SessionState, SessionStateMachine
 from lap_coach_logger.utils.shutdown import shutdown_requested
-from lap_coach_logger.writers.bundle_schema import LapRecord, SessionEvent
+from lap_coach_logger.writers.bundle_schema import (
+    LegacyLapRecord as LapRecord,
+    SessionEvent,
+)
 from lap_coach_logger.writers.finalizer import SessionFinalizer
 
 log = logging.getLogger(__name__)

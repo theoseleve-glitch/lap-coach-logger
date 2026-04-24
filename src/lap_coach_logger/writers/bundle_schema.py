@@ -15,13 +15,13 @@ import hashlib
 from dataclasses import dataclass, field
 from typing import Any
 
-# Shared v2 contract. Sprint T022 replaces the local ``SessionManifest``
-# dataclass with this Pydantic model so the desktop bundle pipeline
-# writes to the same shape every other consumer reads. The legacy
-# dataclass is retained as ``LegacySessionManifest`` for transitional
-# code paths until the T025-T034 SessionFinalizer rewrite adopts the
-# new shape throughout.
-from lap_schemas.v1 import SessionManifest  # noqa: F401
+# Shared v2 contract. Sprint T022/T023 replace the local ``SessionManifest``
+# and ``LapRecord`` dataclasses with these Pydantic models so the desktop
+# bundle pipeline writes to the same shape every other consumer reads.
+# The legacy dataclasses are retained as ``LegacySessionManifest`` /
+# ``LegacyLapRecord`` for transitional code paths until the T025-T034
+# SessionFinalizer rewrite adopts the new shape throughout.
+from lap_schemas.v1 import LapRecord, SessionManifest  # noqa: F401
 
 BUNDLE_SCHEMA_VERSION = "1.0.0"
 
@@ -31,8 +31,13 @@ BUNDLE_SCHEMA_VERSION = "1.0.0"
 # ------------------------------------------------------------------
 
 @dataclass
-class LapRecord:
-    """Timing and metadata for a single lap."""
+class LegacyLapRecord:
+    """Transitional v1-bundle lap record (pre-T023 shape).
+
+    Superseded by ``lap_schemas.v1.LapRecord`` (re-exported here as
+    ``LapRecord``). Retained until the SessionFinalizer rewrite in
+    T025-T034 adopts the shared tuple-based sector splits.
+    """
     lap_number: int
     start_session_time_s: float
     end_session_time_s: float | None = None

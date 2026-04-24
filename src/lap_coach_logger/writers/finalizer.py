@@ -37,7 +37,7 @@ from lap_coach_logger.core.sync_queue import SyncQueueManager
 from lap_coach_logger.writers.bundle_schema import (
     BUNDLE_SCHEMA_VERSION,
     ChannelDef,
-    LapRecord,
+    LegacyLapRecord as LapRecord,
     SessionEvent,
     compute_file_sha256,
 )

@@ -18,7 +18,7 @@ from lap_coach_logger.core.schema import TelemetrySample
 from lap_coach_logger.normalization.mapper import TELEMETRY_SCHEMA_VERSION
 from lap_coach_logger.writers.bundle_schema import (
     BUNDLE_SCHEMA_VERSION,
-    LapRecord,
+    LegacyLapRecord as LapRecord,
     LegacySessionManifest,
     SessionEvent,
     compute_file_sha256,
