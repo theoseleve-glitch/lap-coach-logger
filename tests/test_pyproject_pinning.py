@@ -52,4 +52,6 @@ def test_pytest_config_is_in_pyproject() -> None:
     data = _load_pyproject()
     pytest_cfg = data["tool"]["pytest"]["ini_options"]
     assert pytest_cfg["testpaths"] == ["tests"]
-    assert pytest_cfg["pythonpath"] == ["src"]
+    # "src" must always lead so the package itself is importable; sibling
+    # monorepo paths (e.g. lap-schemas, T021) may be appended.
+    assert pytest_cfg["pythonpath"][0] == "src"
