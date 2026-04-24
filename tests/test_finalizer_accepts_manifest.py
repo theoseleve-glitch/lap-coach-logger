@@ -682,3 +682,96 @@ def test_data_quality_score_within_schema_bounds(tmp_path: Path) -> None:
     assert 0 <= written["channel_completeness"] <= 100
     assert isinstance(written["warnings"], list) and written["warnings"]
     assert isinstance(written["recommendations"], list) and written["recommendations"]
+
+
+# -- T036: integration test — CSV fallback bundle end-to-end ----------------
+
+def test_integration_csv_fallback_bundle_is_complete(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """T036: forcing parquet writer to fail still produces a complete v2 bundle.
+
+    Simulates ``no pyarrow`` for the telemetry path (the internal
+    ``ParquetWriter`` raises). The finalizer must fall back to CSV and
+    still produce every v2 artifact: manifest.json (with checksums),
+    laps.json, events.json, channels.json, quality_report, telemetry.csv.
+    """
+    import hashlib
+    import json
+
+    from lap_coach_logger.writers import finalizer as finalizer_mod
+
+    class _BrokenParquetWriter:
+        def __init__(self, *_a, **_kw) -> None:
+            pass
+
+        def open(self, *_a, **_kw) -> None:
+            raise RuntimeError("simulated: pyarrow/parquet unavailable")
+
+        def write_samples(self, *_a, **_kw) -> None:
+            raise RuntimeError("unreachable")
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(finalizer_mod, "ParquetWriter", _BrokenParquetWriter)
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(
+        _samples(n=120), manifest=_manifest(), laps=_laps(5), events=_events()
+    )
+    assert out is not None, "CSV fallback must still produce a bundle"
+
+    # Every v2 artifact present.
+    assert (out / "manifest.json").exists()
+    assert (out / "telemetry.csv").exists()
+    assert not (out / "telemetry.parquet").exists()
+    assert (out / "laps.json").exists()
+    assert (out / "events.json").exists()
+    assert (out / "channels.json").exists()
+
+    # Manifest checksums cover telemetry.csv (not telemetry.parquet).
+    data = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    checksums = data["telemetry_checksums"]
+    assert "telemetry.csv" in checksums
+    assert "telemetry.parquet" not in checksums
+
+    # Each listed digest matches a fresh hash of the actual file.
+    for fname, digest in checksums.items():
+        path = out / fname
+        assert path.exists()
+        expected = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        assert digest == expected, f"checksum mismatch for {fname}"
+
+
+def test_integration_csv_fallback_telemetry_has_one_row_per_sample(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """T036: telemetry.csv row count (minus header) equals sample count."""
+    from lap_coach_logger.writers import finalizer as finalizer_mod
+
+    class _BrokenParquetWriter:
+        def __init__(self, *_a, **_kw) -> None:
+            pass
+
+        def open(self, *_a, **_kw) -> None:
+            raise RuntimeError("force CSV fallback")
+
+        def write_samples(self, *_a, **_kw) -> None:
+            raise RuntimeError("unreachable")
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(finalizer_mod, "ParquetWriter", _BrokenParquetWriter)
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    N = 75
+    out = fin.finalize(_samples(n=N), manifest=_manifest())
+    assert out is not None
+
+    lines = (out / "telemetry.csv").read_text(encoding="utf-8").splitlines()
+    # Header + one row per sample.
+    assert len(lines) == N + 1, (
+        f"expected {N + 1} lines (header + {N} rows), got {len(lines)}"
+    )
