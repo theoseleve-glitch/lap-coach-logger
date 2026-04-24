@@ -775,3 +775,80 @@ def test_integration_csv_fallback_telemetry_has_one_row_per_sample(
     assert len(lines) == N + 1, (
         f"expected {N + 1} lines (header + {N} rows), got {len(lines)}"
     )
+
+
+# -- T037: integration — interrupted finalize leaves prior bundles intact ----
+
+def _snapshot_bundle(folder: Path) -> dict[str, tuple[int, bytes]]:
+    """Return ``{relative_path: (size_bytes, sha_prefix)}`` for every file."""
+    import hashlib
+
+    snap: dict[str, tuple[int, bytes]] = {}
+    for path in sorted(folder.rglob("*")):
+        if not path.is_file():
+            continue
+        data = path.read_bytes()
+        snap[str(path.relative_to(folder))] = (
+            len(data),
+            hashlib.sha256(data).digest(),
+        )
+    return snap
+
+
+def test_interrupted_finalize_does_not_corrupt_prior_bundle(tmp_path: Path) -> None:
+    """T037: a prior successful bundle survives a subsequent failed finalize."""
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+
+    # First finalize: succeed → bundle A committed.
+    manifest_a = _manifest(session_id="019dc062-29f9-71fd-b4b3-882c4401ea01")
+    out_a = fin.finalize(_samples(n=60), manifest=manifest_a, laps=_laps())
+    assert out_a is not None and out_a.is_dir()
+
+    before = _snapshot_bundle(out_a)
+    assert before, "bundle A must contain files to snapshot"
+
+    # Second finalize: interrupt mid-stream by monkey-patching the instance.
+    def _explode(*_a, **_kw):  # type: ignore[no-untyped-def]
+        raise RuntimeError("simulated mid-finalize interrupt")
+
+    fin._write_events = _explode  # type: ignore[method-assign]
+
+    # Different manifest + lap count — still the same output root.
+    manifest_b = _manifest(session_id="019dc062-29f9-71fd-b4b3-882c4401eb02")
+    out_b = fin.finalize(_samples(n=30), manifest=manifest_b, laps=_laps(2))
+    assert out_b is None, "interrupted finalize must return None"
+
+    # Bundle A must be unchanged byte-for-byte.
+    after = _snapshot_bundle(out_a)
+    assert after == before, (
+        "bundle A files were modified by the failed second finalize"
+    )
+
+
+def test_interrupted_finalize_leaves_only_tmp_scaffold_for_new_bundle(
+    tmp_path: Path,
+) -> None:
+    """T037: failed second finalize → new final dir absent, orphan ``_tmp_`` only."""
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+
+    out_a = fin.finalize(_samples(), manifest=_manifest())
+    assert out_a is not None
+    bundle_a_name = out_a.name
+
+    # Force the second finalize to fail deep in the pipeline.
+    def _explode(*_a, **_kw):  # type: ignore[no-untyped-def]
+        raise RuntimeError("simulated")
+
+    fin._write_events = _explode  # type: ignore[method-assign]
+
+    # Use a distinct manifest to try to produce a different final folder.
+    manifest_b = _manifest(session_id="019dc062-29f9-71fd-b4b3-882c4401eb03")
+    assert fin.finalize(_samples(), manifest=manifest_b) is None
+
+    dirs = sorted(p.name for p in tmp_path.iterdir() if p.is_dir())
+    final_dirs = [d for d in dirs if not d.startswith("_tmp_")]
+    # Only bundle A's final dir remains.
+    assert bundle_a_name in final_dirs
+    assert len(final_dirs) == 1, (
+        f"unexpected extra final dirs after interrupt: {final_dirs}"
+    )
