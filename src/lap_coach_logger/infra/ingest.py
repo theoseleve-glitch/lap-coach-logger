@@ -111,6 +111,12 @@ class IngestClient:
             "Content-Length": str(len(body)),
         }
 
+        # T043: Idempotency-Key = session UUIDv7 so the backend can
+        # short-circuit duplicate uploads of the same session.
+        idempotency_key = _session_idempotency_key(manifest_bytes)
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
+
         try:
             req = Request(url, data=body, headers=headers, method="POST")
             with urlopen(req, timeout=self._timeout_s) as resp:
@@ -172,6 +178,25 @@ def _build_multipart_body(
         )
     parts.append(f"--{boundary}--\r\n".encode("utf-8"))
     return b"\r\n".join(parts)
+
+
+def _session_idempotency_key(manifest_bytes: bytes) -> str | None:
+    """Return the manifest's ``session_id`` for use as Idempotency-Key.
+
+    The Bundle v2 contract guarantees ``session_id`` is a UUID7; we
+    return it as-is without re-validating so the client stays a thin
+    transport. Returns ``None`` only if the manifest can't be parsed
+    or omits the field — in which case the header is dropped and the
+    server will fall back to request-scoped idempotency.
+    """
+    try:
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    session_id = manifest.get("session_id")
+    if not isinstance(session_id, str) or not session_id:
+        return None
+    return session_id
 
 
 def _form_part(

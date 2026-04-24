@@ -155,3 +155,68 @@ def test_upload_returns_failure_when_manifest_missing(tmp_path: Path) -> None:
 
     assert result.success is False
     assert result.error_code == "no_manifest"
+
+
+def test_upload_sets_idempotency_key_from_manifest_session_id(
+    tmp_path: Path,
+    mock_ingest_server: tuple[str, type[_MockIngestHandler]],
+) -> None:
+    """T043: Idempotency-Key header must equal manifest.session_id (UUID7).
+
+    The backend uses this header to deduplicate retries — every attempt
+    for the same session must present the same key so server-side
+    idempotency short-circuits after a successful ingest.
+    """
+    from lap_coach_logger.infra.ingest import IngestClient
+
+    session_uuid7 = "01900000-0000-7000-8000-000000000abc"
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+    (bundle_dir / "manifest.json").write_text(
+        json.dumps({"session_id": session_uuid7}),
+        encoding="utf-8",
+    )
+    (bundle_dir / "telemetry.parquet").write_bytes(b"\x00" * 64)
+
+    base_url, handler = mock_ingest_server
+    client = IngestClient(base_url=base_url, auth_token="t")
+
+    client.upload(bundle_dir=bundle_dir)
+
+    assert (
+        (handler.last_headers or {}).get("Idempotency-Key") == session_uuid7
+    )
+
+
+def test_upload_idempotency_key_is_stable_across_retries(
+    tmp_path: Path,
+    mock_ingest_server: tuple[str, type[_MockIngestHandler]],
+) -> None:
+    """T043: Two calls with the same bundle must send the same key.
+
+    Guards against the client ever minting a per-call UUID — the key
+    is anchored to the session, not the attempt, so server-side
+    deduplication works.
+    """
+    from lap_coach_logger.infra.ingest import IngestClient
+
+    session_uuid7 = "01900000-0000-7000-8000-0000000000ff"
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+    (bundle_dir / "manifest.json").write_text(
+        json.dumps({"session_id": session_uuid7}),
+        encoding="utf-8",
+    )
+    (bundle_dir / "telemetry.parquet").write_bytes(b"\x00" * 32)
+
+    base_url, handler = mock_ingest_server
+    client = IngestClient(base_url=base_url, auth_token="t")
+
+    client.upload(bundle_dir=bundle_dir)
+    first = (handler.last_headers or {}).get("Idempotency-Key")
+
+    client.upload(bundle_dir=bundle_dir)
+    second = (handler.last_headers or {}).get("Idempotency-Key")
+
+    assert first == session_uuid7
+    assert first == second
