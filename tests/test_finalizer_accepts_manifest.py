@@ -402,3 +402,81 @@ def test_events_json_is_empty_list_when_no_events(tmp_path: Path) -> None:
     assert out is not None
     data = json.loads((out / "events.json").read_text(encoding="utf-8"))
     assert data == []
+
+
+# -- T030 --------------------------------------------------------------------
+
+def test_manifest_populates_telemetry_checksums_from_disk(tmp_path: Path) -> None:
+    """T030: manifest.json lists every bundle file with its sha256 digest."""
+    import hashlib
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(
+        _samples(), manifest=_manifest(), laps=_laps(), events=_events()
+    )
+    assert out is not None
+
+    data = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    checksums = data.get("telemetry_checksums")
+    assert isinstance(checksums, dict) and checksums, (
+        "manifest.json must populate telemetry_checksums after finalize"
+    )
+
+    # Every listed file must exist and its sha256 must match the digest.
+    for fname, digest in checksums.items():
+        path = out / fname
+        assert path.exists(), f"checksum entry for missing file: {fname}"
+        assert isinstance(digest, str) and digest.startswith("sha256:"), (
+            f"checksum for {fname} is not sha256:... format"
+        )
+        expected = (
+            "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        )
+        assert digest == expected, f"checksum mismatch for {fname}"
+
+
+def test_manifest_checksums_cover_core_bundle_files(tmp_path: Path) -> None:
+    """T030: the core bundle files (telemetry, laps, events) are all listed."""
+    import json
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(
+        _samples(), manifest=_manifest(), laps=_laps(), events=_events()
+    )
+    assert out is not None
+
+    data = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    checksums = data["telemetry_checksums"]
+    expected_files = {
+        "telemetry.parquet",
+        "laps.parquet",
+        "laps.json",
+        "events.json",
+    }
+    missing = expected_files - set(checksums.keys())
+    assert not missing, f"manifest.json missing checksums for: {missing}"
+
+
+def test_manifest_checksum_matches_on_re_read(tmp_path: Path) -> None:
+    """T030 (re-read contract): validate + verify checksums round-trip."""
+    import hashlib
+    import json
+
+    from lap_schemas.v1 import SessionManifest
+
+    fin = SessionFinalizer(tmp_path, quality_config=QualityConfig())
+    out = fin.finalize(_samples(), manifest=_manifest(), laps=_laps())
+    assert out is not None
+
+    data = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    # SessionManifest.model_validate proves the shape is still valid after
+    # the finalizer updates telemetry_checksums.
+    parsed = SessionManifest.model_validate(data)
+    assert parsed.telemetry_checksums
+
+    for fname, digest in parsed.telemetry_checksums.items():
+        path = out / fname
+        assert digest == (
+            "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        )

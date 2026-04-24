@@ -327,14 +327,21 @@ class SessionFinalizer:
                 quality_report=quality_report.to_dict() if quality_report else None,
             )
 
-            # ── manifest.json (Bundle v2 contract, T026) ──
+            # ── manifest.json (Bundle v2 contract, T026/T030) ──
             # When a shared SessionManifest is supplied, emit the canonical
             # v2 manifest.json alongside the legacy session.json. Downstream
             # tooling reads manifest.json as the source of truth; the legacy
             # file stays for backward compat until T039 removes it.
+            #
+            # T030: populate ``telemetry_checksums`` with sha256 digests of
+            # every bundle file we emitted so consumers can verify integrity.
             if manifest is not None:
+                checksums = self._compute_bundle_checksums(tmp_dir)
+                finalized_manifest = manifest.model_copy(
+                    update={"telemetry_checksums": checksums}
+                )
                 (tmp_dir / "manifest.json").write_text(
-                    manifest.model_dump_json(indent=2),
+                    finalized_manifest.model_dump_json(indent=2),
                     encoding="utf-8",
                 )
 
@@ -412,6 +419,24 @@ class SessionFinalizer:
         (folder / "laps.json").write_text(
             json.dumps(payload, indent=2), encoding="utf-8"
         )
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _compute_bundle_checksums(folder: Path) -> dict[str, str]:
+        """Return ``{filename: "sha256:HEX"}`` for every regular file in ``folder``.
+
+        T030: consumers of the v2 bundle use these to verify integrity
+        after transfer. ``manifest.json`` itself is excluded because it
+        embeds the digests (would be a chicken-and-egg problem).
+        """
+        checksums: dict[str, str] = {}
+        for path in sorted(folder.iterdir()):
+            if not path.is_file() or path.name == "manifest.json":
+                continue
+            checksums[path.name] = (
+                "sha256:" + compute_file_sha256(path)
+            )
+        return checksums
 
     # ------------------------------------------------------------------
     @staticmethod
