@@ -46,9 +46,9 @@ Rectangle {
                 border.width: 1; border.color: Qt.rgba(root.condColor.r, root.condColor.g, root.condColor.b, 0.3)
                 Text {
                     id: condLabel; anchors.centerIn: parent
-                    text: root.condition.toUpperCase()
+                    text: root.degraded ? "--" : root.condition.toUpperCase()
                     font { family: Theme.Typography.monoFamily; pixelSize: Math.round(8 * root.fontScale); weight: Font.Bold; letterSpacing: 1 }
-                    color: root.condColor
+                    color: root.degraded ? Theme.Tokens.steel : root.condColor
                 }
             }
         }
@@ -58,7 +58,7 @@ Rectangle {
             Layout.fillWidth: true; height: 8; radius: 4
             color: Qt.rgba(Theme.Tokens.chalk.r, Theme.Tokens.chalk.g, Theme.Tokens.chalk.b, 0.06)
             Rectangle {
-                width: parent.width * Math.max(0, Math.min(1, root.gripPct / 100))
+                width: root.degraded ? 0 : parent.width * Math.max(0, Math.min(1, root.gripPct / 100))
                 height: parent.height; radius: 4
                 color: root.condColor
                 Behavior on width { NumberAnimation { duration: 300 } }
@@ -117,9 +117,9 @@ Rectangle {
                         }
                         Item { width: 1 }
                         Text {
-                            text: modelData.temp > 0 ? Math.round(modelData.temp) + "\u00B0" : "--"
+                            text: root.degraded ? "--" : (modelData.temp > 0 ? Math.round(modelData.temp) + "\u00B0" : "--")
                             font { family: Theme.Typography.monoFamily; pixelSize: Math.round(11 * root.fontScale); weight: Font.Bold }
-                            color: modelData.temp > 100 ? Theme.Tokens.safetyRed : modelData.temp > 75 ? Theme.Tokens.acidGreen : Theme.Tokens.racingPurple
+                            color: root.degraded ? Theme.Tokens.steel : (modelData.temp > 100 ? Theme.Tokens.safetyRed : modelData.temp > 75 ? Theme.Tokens.acidGreen : Theme.Tokens.racingPurple)
                             anchors.verticalCenter: parent.verticalCenter
                         }
                     }
