@@ -29,7 +29,9 @@ as the desktop's canonical outbound entry point for session ingestion.
 from __future__ import annotations
 
 import json
+import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -39,6 +41,8 @@ _INGEST_ENDPOINT = "/api/v1/sessions/ingest"
 _MANIFEST_FILENAME = "manifest.json"
 _DEFAULT_CHUNK_SIZE_BYTES = 5 * 1024 * 1024  # T044: 5 MiB per ADR-012
 _CURSOR_FILENAME = ".ingest_cursor.json"  # T045: session-completion marker
+# T048: HTTP statuses we treat as transient (retry-eligible).
+_TRANSIENT_HTTP_STATUSES = frozenset({502, 503, 504})
 
 
 @dataclass(frozen=True)
@@ -70,13 +74,21 @@ class IngestClient:
         auth_token: str,
         timeout_s: float = 60.0,
         chunk_size_bytes: int = _DEFAULT_CHUNK_SIZE_BYTES,
+        max_retries: int = 3,
+        base_backoff_s: float = 1.0,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         if chunk_size_bytes <= 0:
             raise ValueError("chunk_size_bytes must be positive")
+        if max_retries < 0:
+            raise ValueError("max_retries must be non-negative")
         self._base_url = base_url.rstrip("/")
         self._auth_token = auth_token
         self._timeout_s = timeout_s
         self._chunk_size_bytes = chunk_size_bytes
+        self._max_retries = max_retries
+        self._base_backoff_s = base_backoff_s
+        self._sleep = sleep
 
     @property
     def base_url(self) -> str:
@@ -137,33 +149,46 @@ class IngestClient:
         if idempotency_key:
             headers["Idempotency-Key"] = idempotency_key
 
-        try:
-            req = Request(url, data=body, headers=headers, method="POST")
-            with urlopen(req, timeout=self._timeout_s) as resp:
-                raw = resp.read().decode("utf-8", errors="replace")
-                payload = json.loads(raw) if raw else {}
-                result = IngestResult(
-                    success=True,
-                    session_id=payload.get("session_id"),
-                    ingest_job_id=payload.get("ingest_job_id"),
-                    status_stream_url=payload.get("status_stream"),
-                    http_status=resp.status,
+        last_failure: IngestResult | None = None
+        # T048: total attempts = 1 initial + max_retries. Sleep between
+        # attempts only — never after the final attempt.
+        for attempt in range(self._max_retries + 1):
+            try:
+                req = Request(url, data=body, headers=headers, method="POST")
+                with urlopen(req, timeout=self._timeout_s) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    payload = json.loads(raw) if raw else {}
+                    result = IngestResult(
+                        success=True,
+                        session_id=payload.get("session_id"),
+                        ingest_job_id=payload.get("ingest_job_id"),
+                        status_stream_url=payload.get("status_stream"),
+                        http_status=resp.status,
+                    )
+                    _persist_completion_cursor(bundle_dir, result)
+                    return result
+            except HTTPError as exc:
+                last_failure = IngestResult(
+                    success=False,
+                    http_status=exc.code,
+                    error_code=f"http_{exc.code}",
+                    error_message=str(exc),
                 )
-                _persist_completion_cursor(bundle_dir, result)
-                return result
-        except HTTPError as exc:
-            return IngestResult(
-                success=False,
-                http_status=exc.code,
-                error_code=f"http_{exc.code}",
-                error_message=str(exc),
-            )
-        except (URLError, OSError) as exc:
-            return IngestResult(
-                success=False,
-                error_code="connection_error",
-                error_message=str(exc),
-            )
+                if exc.code not in _TRANSIENT_HTTP_STATUSES:
+                    return last_failure
+            except (URLError, OSError) as exc:
+                last_failure = IngestResult(
+                    success=False,
+                    error_code="connection_error",
+                    error_message=str(exc),
+                )
+
+            if attempt < self._max_retries:
+                self._sleep(self._base_backoff_s * (2 ** attempt))
+
+        # ``last_failure`` is always set when the loop exits without returning.
+        assert last_failure is not None
+        return last_failure
 
 
 def _build_multipart_body(
