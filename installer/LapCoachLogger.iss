@@ -5,7 +5,12 @@
 	#define AppExeName "LapCoachLogger.exe"
 #endif
 #ifndef AppVersion
-	#define AppVersion "1.1.0"
+	; T182: fallback must stay in sync with pyproject.toml `version`
+	; and src/lap_coach_logger/app_identity.py `VERSION`. This
+	; default is only used if `iscc` is invoked directly without
+	; the `/DAppVersion=...` override that `build_installer.bat`
+	; supplies from `app_identity.VERSION`.
+	#define AppVersion "2.0.0"
 #endif
 #ifndef AppPublisher
 	#define AppPublisher "Lap Coach"
