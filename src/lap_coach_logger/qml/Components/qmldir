@@ -18,3 +18,4 @@ ModeBanner 1.0 ModeBanner.qml
 DemoBadge 1.0 DemoBadge.qml
 DemoControls 1.0 DemoControls.qml
 CoachingCard 1.0 CoachingCard.qml
+CoachingFallbackCard 1.0 CoachingFallbackCard.qml
