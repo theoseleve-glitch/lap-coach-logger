@@ -173,6 +173,12 @@ class OverlayViewModel(QObject):
         # Fires only on the disarmed → armed transition (not on
         # disarm, not on stable-armed snapshots).
         self._pit_arm_audio_player = None
+        # T143: when the user manually arms or disarms via the
+        # overlay button, the choice latches and the auto-arm
+        # threshold (T140) stops mutating the field. The user
+        # has to call clearPitArmedOverride() to release control
+        # back to auto.
+        self._pit_armed_user_overridden: bool = False
         self._strategy_total_laps: int = 0
         self._strategy_fuel_capacity: float = 65.0
         self._strategy_pit_time: float = 25.0
@@ -912,20 +918,61 @@ class OverlayViewModel(QObject):
         T142: on the disarmed → armed transition, fire the
         configured audio cue if any. Player exceptions are
         swallowed so a misbehaving audio backend can't break
-        the per-lap recalc."""
+        the per-lap recalc.
+
+        T143: skip the auto update when the user has overridden
+        the field manually — their intent outranks the
+        threshold until they explicitly release control."""
+        if self._pit_armed_user_overridden:
+            return
         new_armed = self._strategy_service.update_armed_state(
             current_lap=self._lap_number,
             current_fuel=self._fuel_level,
         )
-        if new_armed != self._pit_armed:
-            transitioned_to_armed = new_armed and not self._pit_armed
-            self._pit_armed = new_armed
-            self.pitArmedChanged.emit()
-            if transitioned_to_armed and self._pit_arm_audio_player is not None:
-                try:
-                    self._pit_arm_audio_player()
-                except Exception:  # noqa: BLE001 — audio is opt-in
-                    pass
+        self._set_pit_armed(new_armed)
+
+    def _set_pit_armed(self, new_armed: bool) -> None:
+        """Apply a new pit-armed value. Centralises the
+        transition logic shared between auto-recalc and the
+        T143 manual slots: emit the change signal only on a
+        real value change, fire the audio cue only on a
+        disarmed → armed transition."""
+        if new_armed == self._pit_armed:
+            return
+        transitioned_to_armed = new_armed and not self._pit_armed
+        self._pit_armed = new_armed
+        self.pitArmedChanged.emit()
+        if transitioned_to_armed and self._pit_arm_audio_player is not None:
+            try:
+                self._pit_arm_audio_player()
+            except Exception:  # noqa: BLE001 — audio is opt-in
+                pass
+
+    @safe_slot()
+    @Slot()
+    def armPit(self) -> None:  # noqa: N802
+        """T143: user manually arms the pit. Latches the
+        override so subsequent auto-recalcs respect the user's
+        choice."""
+        self._pit_armed_user_overridden = True
+        self._set_pit_armed(True)
+
+    @safe_slot()
+    @Slot()
+    def disarmPit(self) -> None:  # noqa: N802
+        """T143: user manually disarms the pit. Latches the
+        override even when the value is already False — the
+        user's "stay out" intent must survive the next critical
+        recalc."""
+        self._pit_armed_user_overridden = True
+        self._set_pit_armed(False)
+
+    @safe_slot()
+    @Slot()
+    def clearPitArmedOverride(self) -> None:  # noqa: N802
+        """T143: release control back to auto-arming. The next
+        recalc will re-evaluate from telemetry as usual."""
+        self._pit_armed_user_overridden = False
 
     def _apply_strategy(self, strat: RaceStrategy) -> None:
         """Push strategy results into QML-bindable properties."""
