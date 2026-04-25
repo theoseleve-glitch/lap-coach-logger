@@ -83,6 +83,16 @@ def run(*, debug_override: bool = False) -> None:
     log.info("Lap Coach Logger v%s (%s) starting up", __version__, BUILD_KIND)
     log.info("Output dir: %s", config.output_path)
 
+    # T056: initialize Sentry early so any failure later in bootstrap
+    # (or during the run) is captured. Reads DSN from SENTRY_DSN env
+    # var; no DSN -> no-op (so dev builds stay silent). T058 will add
+    # release tagging; T065 will plug the user opt-out flag here.
+    from lap_coach_logger.utils.sentry_init import init_sentry
+    sentry_active = init_sentry()
+    log.info(
+        "Error telemetry: %s", "enabled (Sentry)" if sentry_active else "disabled"
+    )
+
     # 4. Validate config
     errors = config.validate()
     if errors:
