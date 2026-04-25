@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
@@ -41,6 +41,14 @@ class RuleBundleFetchError(RuntimeError):
     Distinct from :class:`RuleBundleParseError` so callers can
     decide between "fall back to cache" (fetch error) and "cache
     is now corrupted" (parse error)."""
+
+
+class RuleBundleCacheError(RuntimeError):
+    """Raised when a cache load fails *signature verification*
+    on a payload that was otherwise fresh & parseable — i.e.,
+    a tampering signal worth escalating, not just "fall back to
+    network". Missing / corrupt / TTL-expired all collapse to
+    ``None`` instead so callers cold-start by re-fetching."""
 
 
 @dataclass(frozen=True)
@@ -229,28 +237,49 @@ class RuleBundleCache:
 
     Persists the **raw** server payload verbatim so T078 can
     signature-verify against it byte-for-byte. Re-parses on load.
-    Missing / corrupt files collapse to ``None`` so callers can
-    cold-start (typically: re-fetch from the server) without
-    user intervention.
+
+    Missing / corrupt / TTL-expired loads collapse to ``None`` so
+    callers cold-start (typically: re-fetch from the server)
+    without user intervention. Signature mismatch on an otherwise
+    valid+fresh cache raises :class:`RuleBundleCacheError` because
+    that's a tampering signal worth escalating, not a routine miss.
     """
 
     def __init__(self, *, path: Path) -> None:
         self._path = Path(path)
 
-    def save(self, raw_payload: str) -> None:
-        """Persist ``raw_payload`` to disk with a ``cached_at``
-        timestamp. Creates parent directories as needed."""
+    def save(self, raw_payload: str, *, signature: str = "") -> None:
+        """Persist ``raw_payload`` (and ``signature``, if provided)
+        to disk with a ``cached_at`` timestamp. Creates parent
+        directories as needed."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
         envelope = {
             "cached_at": datetime.now(timezone.utc).isoformat(),
             "payload": raw_payload,
+            "signature": signature,
         }
         self._path.write_text(json.dumps(envelope), encoding="utf-8")
 
-    def load(self) -> CachedBundle | None:
-        """Return the cached bundle, or ``None`` for any reason
-        the cache can't satisfy the request (missing, corrupt,
-        old shape, payload no longer parseable)."""
+    def load(
+        self,
+        *,
+        max_age: timedelta | None = None,
+        now: Callable[[], datetime] | None = None,
+        verifier: Callable[[str, str], bool] | None = None,
+    ) -> CachedBundle | None:
+        """Return the cached bundle, or ``None`` if the cache
+        can't satisfy the request (missing, corrupt, old shape,
+        payload no longer parseable, TTL expired).
+
+        :param max_age: TTL window. ``None`` skips the age check
+            (T077 callers that haven't migrated).
+        :param now: Clock injection point for tests; defaults to
+            ``datetime.now(timezone.utc)``.
+        :param verifier: ``(payload, signature) -> bool`` callback
+            for signature verification. ``None`` skips the check.
+            A mismatched signature raises
+            :class:`RuleBundleCacheError`.
+        """
         if not self._path.exists():
             return None
         try:
@@ -263,6 +292,27 @@ class RuleBundleCache:
         cached_at = envelope.get("cached_at")
         if not isinstance(raw_payload, str) or not isinstance(cached_at, str):
             return None
+
+        if max_age is not None:
+            current_time = (now or _utc_now)()
+            try:
+                cached_dt = datetime.fromisoformat(cached_at)
+            except ValueError:
+                return None
+            if current_time - cached_dt > max_age:
+                return None
+
+        if verifier is not None:
+            signature = envelope.get("signature")
+            if not isinstance(signature, str) or not signature:
+                raise RuleBundleCacheError(
+                    "cache entry has no signature but verification was requested"
+                )
+            if not verifier(raw_payload, signature):
+                raise RuleBundleCacheError(
+                    "cache signature did not verify — possible tampering"
+                )
+
         try:
             bundle = load_bundle(raw_payload)
         except RuleBundleParseError:
@@ -272,11 +322,16 @@ class RuleBundleCache:
         )
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 __all__ = [
     "CachedBundle",
     "Rule",
     "RuleBundle",
     "RuleBundleCache",
+    "RuleBundleCacheError",
     "RuleBundleFetchError",
     "RuleBundleHttpClient",
     "RuleBundleParseError",
