@@ -339,7 +339,7 @@ Item {
                     // laps + best + DQ; this row keeps only the
                     // Consistency dimension. Median Lap / Clean Laps /
                     // Data Size dropped (full breakdown lives in
-                    // lap-webapp per Q95; T072 adds the CTA).
+                    // lap-webapp per Q95; T072 adds the CTA below).
                     RowLayout {
                         width: parent.width
                         spacing: Theme.Tokens.md
@@ -349,6 +349,41 @@ Item {
                             label: "Consistency"
                             value: reviewVM.data.consistency || "\u2014"
                             subtitle: reviewVM.data.consistency_sigma || ""
+                        }
+                    }
+
+                    // T072: primary CTA \u2014 pushes the user to the
+                    // webapp for full analysis (telemetry traces,
+                    // setup notes, engineering exports). The desktop
+                    // intentionally stops at the compact summary per
+                    // Q95 / ADR-002. Pit-orange fill + white text
+                    // makes this the visual focal point of the
+                    // Overview section.
+                    Rectangle {
+                        id: webappCta
+                        width: parent.width
+                        height: 56
+                        radius: Theme.Tokens.radiusMd
+                        color: webappCtaArea.containsMouse
+                               ? Qt.darker(Theme.Tokens.pitOrange, 1.10)
+                               : Theme.Tokens.pitOrange
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "See full analysis in webapp \u2192"
+                            font.family: Theme.Typography.bodyFamily
+                            font.pixelSize: Theme.Typography.bodySize
+                            font.weight: Font.DemiBold
+                            color: "#ffffff"
+                        }
+
+                        MouseArea {
+                            id: webappCtaArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: serviceVM.viewSessionInWebapp(
+                                (reviewVM.data && reviewVM.data.session_id) || "")
                         }
                     }
 
