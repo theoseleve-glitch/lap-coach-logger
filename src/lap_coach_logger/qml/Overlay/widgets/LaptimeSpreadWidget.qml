@@ -19,16 +19,23 @@ Rectangle {
     property real slowestTime: 0.0
     property real currentTime: 0.0
     property real averageTime: 0.0
+    // T170: degraded state — telemetry stalled but cached lap
+    // times are still in place. When true hasData reports false
+    // (canvas markers stop drawing) and formatTime short-circuits
+    // to "-:---.---" so all DataRow values + the header spread
+    // flip simultaneously.
+    property bool degraded: false
 
     // -- derived ----------------------------------------------------------
     readonly property real spread: {
         var s = slowestTime - fastestTime
         return (s > 0 && isFinite(s)) ? s : 0
     }
-    readonly property bool hasData: fastestTime > 0 && slowestTime > 0
+    readonly property bool hasData: !root.degraded && fastestTime > 0 && slowestTime > 0
 
     // -- helpers ----------------------------------------------------------
     function formatTime(s) {
+        if (root.degraded) return "-:---.---"
         if (!isFinite(s) || s <= 0) return "-:---.---"
         var mins = Math.floor(s / 60)
         var secs = s - mins * 60
