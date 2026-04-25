@@ -120,6 +120,31 @@ def run(*, debug_override: bool = False) -> None:
         "enabled (PostHog)" if posthog_active else "disabled",
     )
 
+    # T060: wire the analytics dispatcher and fire desktop_app_started.
+    # The distinct_id is a stable per-installation UUID so longitudinal
+    # funnels work even before the user pairs (post-pairing wiring can
+    # call analytics.configure() again with the user's email).
+    # analytics.track() is safe-noop when posthog_active is False.
+    from lap_coach_logger import analytics
+    from lap_coach_logger.utils.paths import config_dir
+    posthog_module: object | None = None
+    if posthog_active:
+        import posthog as posthog_module  # type: ignore[no-redef]
+    install_id = analytics.get_or_create_install_id(config_dir() / "install_id.json")
+    analytics.configure(
+        posthog_module=posthog_module,
+        distinct_id=install_id,
+        enabled=posthog_active,
+    )
+    import platform as _platform
+    analytics.track(
+        "desktop_app_started",
+        version=__version__,
+        build_kind=BUILD_KIND,
+        platform=_platform.system(),
+        platform_release=_platform.release(),
+    )
+
     # 4. Validate config
     errors = config.validate()
     if errors:
