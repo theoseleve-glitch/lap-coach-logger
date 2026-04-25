@@ -264,6 +264,18 @@ class OverlayManagerService:
         self._document.updated_at_utc = utc_now_iso()
         self._runtime.set_instance_visibility(instance, visible=instance.enabled)
         self._persist("runtime_changed", overlay_id=instance.overlay_id, instance_id=instance.instance_id, preset_id=instance.preset_id, message="Overlay visibility updated")
+
+        # T062: emit overlay_toggled with the *stable* overlay_id as
+        # widget_id; the random instance_id is per-user and useless
+        # for cross-user funnels. analytics.track is safe-noop when
+        # PostHog isn't wired.
+        from lap_coach_logger import analytics
+        analytics.track(
+            "overlay_toggled",
+            widget_id=instance.overlay_id,
+            enabled=instance.enabled,
+        )
+
         return instance
 
     def remove_instance(self, instance_id: str) -> None:
