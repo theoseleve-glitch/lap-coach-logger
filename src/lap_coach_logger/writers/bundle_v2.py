@@ -18,8 +18,10 @@ from pathlib import Path
 from typing import Any
 
 from lap_coach_logger import __version__
+from lap_coach_logger.core.race_strategy import RaceStrategy
 from lap_coach_logger.normalization.resolver import CanonicalResolver
 from lap_coach_logger.writers.analysis_writer import build_analysis
+from lap_coach_logger.writers.strategy_serializer import serialize_race_strategy
 from lap_schemas.v1 import SessionManifest as SharedSessionManifest
 
 log = logging.getLogger(__name__)
@@ -63,12 +65,18 @@ def write_bundle_v2(
     quality_report: dict[str, Any] | None = None,
     resolver: CanonicalResolver | None = None,
     environment_tag: str = "",
+    race_strategy: RaceStrategy | None = None,
 ) -> dict[str, Any]:
     """Write session.json v2 + analysis.json into ``session_dir``.
 
     Returns the completed manifest dict (session.json contents).
     Assumes v1 files (telemetry.parquet, laps.json, events.json,
     channels.json) are already present in ``session_dir``.
+
+    T144: when ``race_strategy`` is provided, the serialised plan
+    lands under a top-level ``race_strategy`` key in the manifest.
+    Omitting it leaves the key absent so older sessions stay
+    backwards-compatible (no noisy ``null`` field).
     """
     sim_id = SIM_ID_MAP.get(sim_name, sim_name.lower().replace(" ", "_"))
     resolver = resolver or CanonicalResolver()
@@ -198,6 +206,12 @@ def write_bundle_v2(
         },
         "bundle_files": sorted(file_entries, key=lambda f: f["name"]),
     }
+
+    # T144: post-attach the race_strategy section only when a plan
+    # was provided. Keeps the manifest lean for non-strategy
+    # sessions (no noisy `null` field).
+    if race_strategy is not None:
+        manifest["race_strategy"] = serialize_race_strategy(race_strategy)
 
     session_json_bytes = json.dumps(manifest, indent=2).encode("utf-8")
 
