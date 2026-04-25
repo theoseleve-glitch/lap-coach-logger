@@ -48,6 +48,7 @@ class RaceStrategyService:
 
     def __init__(self) -> None:
         self._current: RaceStrategy | None = None
+        self._armed: bool = False
 
     @property
     def current(self) -> RaceStrategy | None:
@@ -56,6 +57,25 @@ class RaceStrategyService:
         with no pit stops (which is a real :class:`RaceStrategy`
         instance with ``num_stops == 0``)."""
         return self._current
+
+    @property
+    def armed(self) -> bool:
+        """T139: pit-armed state. ``True`` when crossing pit
+        entry on the next lap should land in the box.
+
+        T140 will set this automatically based on fuel-window /
+        tire-life thresholds; T143 lets the user override it
+        manually. Default ``False`` — caller must opt in."""
+        return self._armed
+
+    def arm(self) -> None:
+        """Set :attr:`armed` to ``True``. Idempotent — repeated
+        calls are a no-op."""
+        self._armed = True
+
+    def disarm(self) -> None:
+        """Clear :attr:`armed` back to ``False``. Idempotent."""
+        self._armed = False
 
     def compute_pre_race(
         self,
