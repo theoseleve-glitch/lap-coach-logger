@@ -34,11 +34,49 @@ Rectangle {
     border.width: 1
     border.color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.4)
 
+    // T097: Dismiss button — top-right corner. Tapping advances
+    // to the next pending insight (T091 dismiss slot), or clears
+    // to empty if nothing's queued.
+    Rectangle {
+        id: dismissButton
+        anchors {
+            top: parent.top
+            right: parent.right
+            margins: Theme.Tokens.sm
+        }
+        implicitWidth: 28
+        implicitHeight: 28
+        radius: implicitWidth / 2
+        color: dismissArea.containsMouse
+               ? Theme.Tokens.subtle(Theme.Tokens.chalk, 0.15)
+               : "transparent"
+
+        Behavior on color {
+            ColorAnimation { duration: Theme.Motion.hoverDuration }
+        }
+
+        Text {
+            anchors.centerIn: parent
+            text: "✕"
+            font.family: Theme.Typography.bodyFamily
+            font.pixelSize: 14
+            color: Theme.Tokens.steel
+        }
+
+        MouseArea {
+            id: dismissArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: coachingCardVM.dismiss()
+        }
+    }
+
     Column {
         id: contentColumn
         anchors {
             left: parent.left
-            right: parent.right
+            right: dismissButton.left
             top: parent.top
             margins: Theme.Tokens.xl
         }
