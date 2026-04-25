@@ -48,9 +48,15 @@ class CoachingCardViewModel(QObject):
         skill_level: str = "intermediate",
         audio_player: Callable[[CoachingInsight], None] | None = None,
         flag_callback: Callable[[CoachingInsight, str], None] | None = None,
+        enabled: bool = True,
     ) -> None:
         super().__init__()
         self._queue = queue
+        # T103: feature flag. False ⇒ poll drains queue but
+        # surfaces nothing; dismiss / flag are safe no-ops.
+        # Read at session start; mid-session toggling is out
+        # of scope (matches T093 / T096 / T098 decision).
+        self._enabled = enabled
         # T092: optional cooldown filter. None = no cooldown
         # (T091 tests; production wiring passes a 30s filter).
         self._cooldown_filter = cooldown_filter
@@ -119,8 +125,15 @@ class CoachingCardViewModel(QObject):
           shown queue up behind it (FIFO).
 
         Empty drain ⇒ no signal emit (avoid pointless QML
-        rebinds on every timer tick)."""
+        rebinds on every timer tick).
+
+        T103: when the VM is disabled, drain the queue but
+        surface nothing — keeps the queue from growing
+        unboundedly while honouring the user's "off" setting.
+        """
         new_insights = self._queue.drain()
+        if not self._enabled:
+            return  # drained but discarded
         if self._cooldown_filter is not None:
             new_insights = self._cooldown_filter.filter(new_insights)
         if not new_insights:
