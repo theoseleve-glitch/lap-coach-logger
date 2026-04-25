@@ -18,6 +18,11 @@ Rectangle {
     property string elapsed: "0:00:00"
     property string sessionType: "Practice"
     property string timeRemaining: ""
+    // T168: degraded state — session telemetry stalled. When
+    // true the hero elapsed readout flips to "—:——:——" in
+    // steel, distinguishing "no data" from "session paused at
+    // 0:00:00".
+    property bool degraded: false
 
     // -- derived ----------------------------------------------------------
     readonly property string _safeType: (typeof sessionType === "string" && sessionType.length > 0)
@@ -130,11 +135,11 @@ Rectangle {
 
         // -- Row 2: Elapsed time (hero) -----------------------------------
         Text {
-            text: root.elapsed
+            text: root.degraded ? "—:——:——" : root.elapsed
             font.family: Theme.Typography.monoFamily
             font.pixelSize: Math.round(26 * root.fontScale)
             font.weight: Font.Bold
-            color: Theme.Tokens.chalk
+            color: root.degraded ? Theme.Tokens.steel : Theme.Tokens.chalk
             Layout.topMargin: 4
         }
 
