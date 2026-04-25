@@ -109,6 +109,17 @@ def run(*, debug_override: bool = False) -> None:
         from lap_coach_logger.utils.sentry_qt import install_qt_message_handler
         install_qt_message_handler(sentry_capture=sentry_sdk.capture_message)
 
+    # T059: initialize PostHog so T060+ events can fire. Reads API key
+    # from POSTHOG_API_KEY (and optionally POSTHOG_HOST for self-
+    # hosted instances). No key -> no-op so dev runs stay silent.
+    # T065 will plug the user opt-out flag here alongside Sentry.
+    from lap_coach_logger.utils.posthog_init import init_posthog
+    posthog_active = init_posthog()
+    log.info(
+        "Product analytics: %s",
+        "enabled (PostHog)" if posthog_active else "disabled",
+    )
+
     # 4. Validate config
     errors = config.validate()
     if errors:
