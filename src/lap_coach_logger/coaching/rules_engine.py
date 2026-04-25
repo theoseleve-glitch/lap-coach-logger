@@ -19,12 +19,13 @@ them in T076 would force a Block-F rework when those land.
 
 from __future__ import annotations
 
+import enum
 import json
 import queue
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -349,6 +350,87 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class BundleSource(enum.Enum):
+    """Where the bundle came from on this load — drives the UI's
+    "rules out of date" banner."""
+
+    FRESH_SERVER = "fresh_server"
+    FRESH_CACHE = "fresh_cache"
+    STALE_CACHE = "stale_cache"
+    NO_BUNDLE = "no_bundle"
+
+    @property
+    def should_show_stale_banner(self) -> bool:
+        """``True`` only when coaching is running on an out-of-TTL
+        cache. NO_BUNDLE has its own empty-state UX (not a banner)."""
+        return self is BundleSource.STALE_CACHE
+
+
+@dataclass(frozen=True)
+class BundleResolution:
+    """Result of :func:`load_bundle_with_fallback`. ``bundle`` is
+    ``None`` only when ``source is BundleSource.NO_BUNDLE``."""
+
+    bundle: RuleBundle | None
+    source: BundleSource
+
+
+class _BundleClient(Protocol):
+    """Structural shape of :class:`RuleBundleHttpClient` — just
+    enough for the orchestrator to typecheck without coupling to
+    the concrete client."""
+
+    def fetch(self, *, auth_token: str) -> tuple[RuleBundle, str]: ...
+
+
+def load_bundle_with_fallback(
+    *,
+    client: _BundleClient,
+    cache: "RuleBundleCache",
+    auth_token: str,
+    max_age: timedelta,
+    now: Callable[[], datetime] | None = None,
+) -> BundleResolution:
+    """Resolve a bundle, falling back to cache when the server is
+    unreachable.
+
+    Resolution order (first hit wins):
+    1. ``FRESH_SERVER`` — fetch succeeds; cache is updated.
+    2. ``FRESH_CACHE``  — fetch fails, cache within ``max_age``.
+    3. ``STALE_CACHE``  — fetch fails, cache outside ``max_age``.
+       Returned anyway so coaching keeps working (per ADR-010
+       graceful-degradation intent), with the source flag set so
+       the UI can banner.
+    4. ``NO_BUNDLE``    — fetch fails, no cache at all.
+
+    Tries the server EVEN WITH a fresh cache because the server
+    may ship rule updates between TTL ticks; the cache should
+    never lock the user out of newer rules.
+    """
+    try:
+        bundle, raw_payload = client.fetch(auth_token=auth_token)
+    except RuleBundleFetchError:
+        bundle = None
+        raw_payload = None
+    if bundle is not None and raw_payload is not None:
+        cache.save(raw_payload)
+        return BundleResolution(bundle=bundle, source=BundleSource.FRESH_SERVER)
+
+    fresh = cache.load(max_age=max_age, now=now)
+    if fresh is not None:
+        return BundleResolution(
+            bundle=fresh.bundle, source=BundleSource.FRESH_CACHE
+        )
+
+    stale = cache.load()  # no max_age → don't filter on TTL
+    if stale is not None:
+        return BundleResolution(
+            bundle=stale.bundle, source=BundleSource.STALE_CACHE
+        )
+
+    return BundleResolution(bundle=None, source=BundleSource.NO_BUNDLE)
+
+
 _COMPARISONS: dict[str, Callable[[float, float], bool]] = {
     "lt": lambda a, b: a < b,
     "lte": lambda a, b: a <= b,
@@ -550,6 +632,8 @@ def evaluate_bundle(
 
 
 __all__ = [
+    "BundleResolution",
+    "BundleSource",
     "CachedBundle",
     "CoachingInsight",
     "CorroborationGate",
@@ -565,4 +649,5 @@ __all__ = [
     "evaluate_bundle",
     "evaluate_condition",
     "load_bundle",
+    "load_bundle_with_fallback",
 ]
