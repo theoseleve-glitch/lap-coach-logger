@@ -32,9 +32,24 @@ class ModeViewModel(QObject):
 
     @Slot(str)
     def setMode(self, mode: str) -> None:
-        if mode in MODES:
-            self._active_mode = mode
-            self.modeChanged.emit()
+        if mode not in MODES:
+            return
+        if mode == self._active_mode:
+            # No-op selection — don't pollute analytics funnels with
+            # phantom transitions when the user clicks the active mode.
+            return
+        previous = self._active_mode
+        self._active_mode = mode
+        self.modeChanged.emit()
+
+        # T063: stub seam for the future mode engine. Emits one event
+        # per real transition; from_mode + mode lets PostHog show
+        # transition matrices. analytics.track is safe-noop when
+        # PostHog isn't wired.
+        from lap_coach_logger import analytics
+        analytics.track(
+            "mode_switched", mode=self._active_mode, from_mode=previous
+        )
 
     @Slot()
     def dismissBanner(self) -> None:
