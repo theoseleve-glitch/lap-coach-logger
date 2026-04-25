@@ -170,6 +170,20 @@ def _build_rule(entry: Any, *, index: int) -> Rule:
 
 
 @dataclass(frozen=True)
+class CoachingInsight:
+    """One rule firing — the unit T091's overlay VM consumes.
+
+    ``payload`` is the rule's verbatim ``insight`` dict (opaque
+    to the engine, owned by the renderer). Frozen + plain-types
+    by design so the live processor (T083) can hand-off across
+    threads via ``Queue`` without locking.
+    """
+
+    rule_id: str
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class CachedBundle:
     """A bundle loaded back from the on-disk cache, paired with
     the verbatim raw payload so T078 can sig-verify it without
@@ -419,8 +433,31 @@ def _require_children(condition: dict[str, Any]) -> list[dict[str, Any]]:
     return children
 
 
+def evaluate_bundle(
+    bundle: RuleBundle, *, features: dict[str, Any]
+) -> list[CoachingInsight]:
+    """Evaluate every rule in the bundle against ``features`` and
+    return a list of :class:`CoachingInsight` for the rules that
+    fired.
+
+    Order preserves bundle order so T091's priority queue sees a
+    deterministic stream. T088 will gate emission on N corroborating
+    laps; T080 fires once per evaluation regardless.
+
+    Per the live-processor invariant (T083), this runs at lap-end
+    on the sample thread — keep it allocation-light. The output
+    list is the only allocation per call.
+    """
+    return [
+        CoachingInsight(rule_id=rule.id, payload=rule.insight)
+        for rule in bundle.rules
+        if evaluate_condition(rule.condition, features=features)
+    ]
+
+
 __all__ = [
     "CachedBundle",
+    "CoachingInsight",
     "Rule",
     "RuleBundle",
     "RuleBundleCache",
@@ -429,6 +466,7 @@ __all__ = [
     "RuleBundleHttpClient",
     "RuleBundleParseError",
     "RuleConditionError",
+    "evaluate_bundle",
     "evaluate_condition",
     "load_bundle",
 ]
