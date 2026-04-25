@@ -55,6 +55,39 @@ def _v2_get(manifest: dict[str, Any], *paths: str, default: Any = None) -> Any:
     return default
 
 
+_QUALITY_GRADE_BY_CLASSIFICATION: dict[str, str] = {
+    "accepted": "A",
+    "accepted_with_warnings": "B+",
+    "rejected": "C",
+}
+
+
+def _quality_grade_for_classification(classification: object) -> str:
+    """Map ``quality_classification`` → review-page badge grade.
+
+    Review page QML colour logic keys off ``A`` / ``A+`` (acidGreen)
+    and ``B+`` (marshalYellow); anything else falls through to steel.
+    Unknown / missing / ``"-"`` collapse to ``""`` so the badge hides.
+    """
+    if not isinstance(classification, str):
+        return ""
+    return _QUALITY_GRADE_BY_CLASSIFICATION.get(classification, "")
+
+
+def _format_best_lap(seconds: object) -> str:
+    """Format ``best_lap_time_s`` → ``M:SS.mmm`` for the review header.
+
+    Mirrors ``dashboard_live_processor._format_lap_time``. Zero or
+    negative ⇒ ``""`` (sentinel for "no timed lap" — the QML shows
+    its em-dash fallback).
+    """
+    if not isinstance(seconds, (int, float)) or seconds <= 0:
+        return ""
+    minutes = int(seconds) // 60
+    remainder = seconds - minutes * 60
+    return f"{minutes}:{remainder:06.3f}"
+
+
 def load_session_review(folder: str | Path) -> dict[str, Any]:
     path = Path(folder)
     manifest = _read_json(path / "session.json")
@@ -98,6 +131,7 @@ def load_session_review(folder: str | Path) -> dict[str, Any]:
         "review_status": review_status,
         "review_updated_at_utc": manifest.get("review_updated_at_utc"),
         "quality_classification": quality_class,
+        "quality_grade": _quality_grade_for_classification(quality_class),
         "quality_score": (
             readiness.get("quality_score")
             or manifest.get("quality_score")
@@ -133,6 +167,7 @@ def load_session_review(folder: str | Path) -> dict[str, Any]:
         "valid_laps": manifest.get("valid_laps") or 0,
         "clean_laps": manifest.get("clean_laps") or 0,
         "best_lap_time_s": manifest.get("best_lap_time_s"),
+        "best_lap_formatted": _format_best_lap(manifest.get("best_lap_time_s")),
         "best_clean_lap_time_s": manifest.get("best_clean_lap_time_s"),
         "warnings": warnings,
         "errors": errors,
