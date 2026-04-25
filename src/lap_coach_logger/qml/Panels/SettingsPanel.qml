@@ -179,6 +179,122 @@ Flickable {
             }
         }
 
+        // ── OVERLAY PRESET (T127) ────────────────────────
+        // Picker for the active built-in preset (race-minimal /
+        // practice / endurance / streamer). Persists via the
+        // existing settingsVM bridge under the "overlay_preset"
+        // key. Source list comes from settingsVM.availablePresetOptions()
+        // so adding a future preset propagates without a QML edit.
+        Text {
+            text: "OVERLAY PRESET"
+            font.family: Theme.Typography.bodyFamily
+            font.pixelSize: Theme.Typography.microSize
+            font.weight: Theme.Typography.microWeight
+            font.letterSpacing: 2
+            color: Theme.Tokens.pitOrange
+            Layout.topMargin: Theme.Tokens.sm
+            Layout.bottomMargin: -2
+        }
+
+        ColumnLayout {
+            spacing: 6
+            Layout.fillWidth: true
+
+            Text {
+                text: "Active preset"
+                font.family: Theme.Typography.bodyFamily
+                font.pixelSize: Theme.Typography.captionSize
+                color: Theme.Tokens.steel
+            }
+
+            Rectangle {
+                id: presetPicker
+                Layout.fillWidth: true
+                height: 36
+                radius: Theme.Tokens.radiusSm
+                color: presetPickerArea.containsMouse
+                       ? Theme.Tokens.subtle(Theme.Tokens.chalk, 0.04)
+                       : Theme.Tokens.raised
+                border.width: 1
+                border.color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.10)
+
+                RowLayout {
+                    anchors {
+                        fill: parent
+                        leftMargin: Theme.Tokens.md
+                        rightMargin: Theme.Tokens.md
+                    }
+                    spacing: Theme.Tokens.sm
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: settingsVM
+                              ? (settingsVM.getString("overlay_preset") || "race-minimal").replace("-", " ").replace("_", " ")
+                              : "race-minimal"
+                        font.family: Theme.Typography.bodyFamily
+                        font.pixelSize: Theme.Typography.captionSize
+                        color: Theme.Tokens.chalk
+                    }
+
+                    Text {
+                        text: "▾"
+                        font.pixelSize: 12
+                        color: Theme.Tokens.steel
+                    }
+                }
+
+                MouseArea {
+                    id: presetPickerArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: presetMenu.open()
+                }
+
+                Menu {
+                    id: presetMenu
+                    y: parent.height + 2
+
+                    MenuItem {
+                        text: "Race Minimal"
+                        onTriggered: {
+                            if (settingsVM) {
+                                settingsVM.setValue("overlay_preset", "race-minimal")
+                                settingsVM.save()
+                            }
+                        }
+                    }
+                    MenuItem {
+                        text: "Practice"
+                        onTriggered: {
+                            if (settingsVM) {
+                                settingsVM.setValue("overlay_preset", "practice")
+                                settingsVM.save()
+                            }
+                        }
+                    }
+                    MenuItem {
+                        text: "Endurance"
+                        onTriggered: {
+                            if (settingsVM) {
+                                settingsVM.setValue("overlay_preset", "endurance")
+                                settingsVM.save()
+                            }
+                        }
+                    }
+                    MenuItem {
+                        text: "Streamer"
+                        onTriggered: {
+                            if (settingsVM) {
+                                settingsVM.setValue("overlay_preset", "streamer")
+                                settingsVM.save()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // ── RECORDING ────────────────────────────────────
         Text {
             text: "RECORDING"

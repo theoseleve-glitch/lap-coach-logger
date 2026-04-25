@@ -90,6 +90,28 @@ class SettingsViewModel(QObject):
         """Emit ``saveRequested`` with a copy of the current values dict."""
         self.saveRequested.emit(dict(self._values))
 
+    @Slot(result="QVariantList")
+    def availablePresetOptions(self) -> list[dict]:  # noqa: N802
+        """T127: Built-in overlay-preset options for the Settings
+        picker. Each entry: ``{"id": <preset_id>, "label": <name>}``.
+
+        Sourced from the ``builtin_presets`` registry so adding a
+        future preset propagates here without an extra edit.
+        Labels are title-cased preset_ids with hyphens turned to
+        spaces (e.g., ``"race-minimal"`` → ``"Race Minimal"``).
+        """
+        from lap_coach_logger.core.modes.builtin_presets import (
+            _BUILTIN_PRESETS,
+        )
+
+        return [
+            {
+                "id": preset_id,
+                "label": preset_id.replace("-", " ").replace("_", " ").title(),
+            }
+            for preset_id in _BUILTIN_PRESETS
+        ]
+
     # -- public API ------------------------------------------------------------
 
     def load(self, values: dict) -> None:
