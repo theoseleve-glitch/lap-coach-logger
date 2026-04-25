@@ -27,6 +27,11 @@ GlassSurface {
     property int    totalLaps: 0
     property real   lapProgress: 0          // 0–100
     property var    sectors: []             // [{id, delta, status}]
+    // T157: degraded state — telemetry stalled or unavailable.
+    // When true the delta and lap-time render an explicit "—"
+    // placeholder in steel (neutral/gray) rather than the
+    // misleading "+0.000 in steel" the default zero produces.
+    property bool   degraded: false
 
     // ── Atmosphere tint (green when gaining, red when losing) ──
     Rectangle {
@@ -110,9 +115,9 @@ GlassSurface {
                     lineHeight: 1
                 }
                 Text {
-                    text: root.lapTime || "—:——.———"
+                    text: root.degraded ? "—:——.———" : (root.lapTime || "—:——.———")
                     font { family: Theme.Typography.monoFamily; pixelSize: Math.round(16 * root.fontScale); weight: Font.Bold }
-                    color: Theme.Tokens.chalk
+                    color: root.degraded ? Theme.Tokens.steel : Theme.Tokens.chalk
                     lineHeight: 1.3
                     Behavior on text { SequentialAnimation {
                         NumberAnimation { target: lapTimeText; property: "opacity"; to: 0.6; duration: 60 }
@@ -136,9 +141,9 @@ GlassSurface {
                     lineHeight: 1
                 }
                 Text {
-                    text: formatDelta(root.delta)
+                    text: root.degraded ? "—.———" : formatDelta(root.delta)
                     font { family: Theme.Typography.monoFamily; pixelSize: Math.round(20 * root.fontScale); weight: Font.Bold; letterSpacing: -0.5 }
-                    color: deltaColor(root.delta)
+                    color: root.degraded ? Theme.Tokens.steel : deltaColor(root.delta)
                     horizontalAlignment: Text.AlignRight
                     Layout.fillWidth: true
                     lineHeight: 1.1
