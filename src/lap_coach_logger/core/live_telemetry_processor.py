@@ -13,17 +13,23 @@ Reproduce import audit (sprint T001) with
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Callable
 
 from lap_coach_logger.coaching.corner_insights import (
     CornerInsight,
     analyze_corner_comparisons,
+)
+from lap_coach_logger.coaching.rules_engine import (
+    InsightQueue,
+    RuleBundle,
+    evaluate_bundle,
 )
 from lap_coach_logger.core.coaching_live_processor import CoachingLiveProcessor
 from lap_coach_logger.core.dashboard_live_processor import DashboardLiveProcessor
 from lap_coach_logger.core.input_diagnostics_processor import (
     InputDiagnosticsProcessor,
 )
+from lap_coach_logger.core.live_lap_compare import LapProfile
 from lap_coach_logger.core.schema import TelemetrySample
 from lap_coach_logger.core.telemetry_utils import to_float as _float
 
@@ -70,7 +76,13 @@ class LiveTelemetryProcessor:
     _WHEELSPIN_LAT_G_MIN: float = 0.3
     _WHEELSPIN_SPEED_MIN_KPH: float = 20.0
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        rule_bundle: RuleBundle | None = None,
+        insight_queue: InsightQueue | None = None,
+        feature_extractor: Callable[[LapProfile], dict[str, Any]] | None = None,
+    ) -> None:
         self._coaching = CoachingLiveProcessor()
         self._dashboard = DashboardLiveProcessor()
         self._input = InputDiagnosticsProcessor()
@@ -78,6 +90,11 @@ class LiveTelemetryProcessor:
         # transitions without re-running the analyser every snapshot.
         self._last_insights_lap: int | None = None
         self._last_insights: list[CornerInsight] = []
+        # T083: rules-engine wiring. All three optional — when any
+        # is None, emit_lap_insights is a no-op (backwards compat).
+        self._rule_bundle = rule_bundle
+        self._insight_queue = insight_queue
+        self._feature_extractor = feature_extractor
 
     def process(self, live_dict: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
         """Process a raw snapshot, return aggregated overlay state."""
@@ -99,6 +116,7 @@ class LiveTelemetryProcessor:
         if last_profile is not None and last_profile.lap_number != self._last_insights_lap:
             self._last_insights = analyze_corner_comparisons(last_profile, best_profile)
             self._last_insights_lap = last_profile.lap_number
+            self.emit_lap_insights(last_profile)
 
         return {
             "live_delta_s": dash["live_delta_s"],
@@ -118,6 +136,27 @@ class LiveTelemetryProcessor:
             "corner_insights": list(self._last_insights),
             "corner_insights_lap": self._last_insights_lap,
         }
+
+    # -- rules-engine emission (T083) ------------------------------------------
+
+    def emit_lap_insights(self, profile: LapProfile) -> None:
+        """Run the rules engine against the just-completed lap and
+        publish any fired insights to the VM thread.
+
+        No-op when any of the three rules-engine deps was unwired
+        at construction — keeps backwards compat for callers that
+        don't use coaching, and prevents half-wired deployments
+        from queueing insights nothing will consume.
+        """
+        if (
+            self._rule_bundle is None
+            or self._insight_queue is None
+            or self._feature_extractor is None
+        ):
+            return
+        features = self._feature_extractor(profile)
+        insights = evaluate_bundle(self._rule_bundle, features=features)
+        self._insight_queue.publish(insights)
 
     # -- heuristic helpers -----------------------------------------------------
 
