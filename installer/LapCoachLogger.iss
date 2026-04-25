@@ -26,6 +26,14 @@
 	#define SetupIconFile "..\\assets\\icon.ico"
 #endif
 
+; T179: Code signing — register the signtool command at
+; compile time before invoking iscc. The cert path and
+; password are environment-specific and never checked in.
+;
+; Example for an alpha build with a self-signed cert
+; (replace "$qcert.pfx$q" / "$qpwd$q" with real values):
+;     iscc /Ssigntool="signtool.exe sign /f $qcert.pfx$q /p $qpwd$q /fd sha256 /tr http://timestamp.digicert.com /td sha256 $f" LapCoachLogger.iss
+;
 [Setup]
 AppId={#AppId}
 AppName={#AppName}
@@ -49,6 +57,12 @@ UsePreviousTasks=yes
 OutputDir=..
 OutputBaseFilename=LapCoachLogger-Setup-{#AppVersion}
 SetupIconFile={#SetupIconFile}
+; T179: invoke the registered signtool command on both the
+; installer and the uninstaller so users get a consistent
+; signed-publisher SmartScreen experience for install and
+; uninstall.
+SignTool=signtool
+SignedUninstaller=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
