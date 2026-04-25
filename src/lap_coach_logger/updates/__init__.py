@@ -10,9 +10,23 @@ from lap_coach_logger.updates.checker import (
     UpdateCheckResult,
     check_for_updates,
 )
+from lap_coach_logger.updates.downloader import (
+    PendingUpdate,
+    clear_pending_update,
+    download_update,
+    mark_update_pending,
+    read_pending_update,
+    verify_signature,
+)
 
 __all__ = [
     "DEFAULT_MANIFEST_URL",
+    "PendingUpdate",
     "UpdateCheckResult",
     "check_for_updates",
+    "clear_pending_update",
+    "download_update",
+    "mark_update_pending",
+    "read_pending_update",
+    "verify_signature",
 ]
