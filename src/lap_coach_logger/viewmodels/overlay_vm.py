@@ -67,6 +67,7 @@ class OverlayViewModel(QObject):
     strategyChanged = Signal()
     pitArmedChanged = Signal()
     strategyGuidanceChanged = Signal()
+    decisionPromptChanged = Signal()
     tireChanged = Signal()
 
     # -- widget category mapping -----------------------------------------------
@@ -185,6 +186,10 @@ class OverlayViewModel(QObject):
         # per-lap recalc. Stored separately so QML signals only
         # fire on transition (avoids per-lap rebinds).
         self._strategy_guidance: str = ""
+        # T151: directive prompt from compute_decision_prompt —
+        # one of "" / "PIT" / "SAVE FUEL" / "COOL TIRES" / "PUSH".
+        # Same transition-only signalling as strategy_guidance.
+        self._decision_prompt: str = ""
         self._strategy_total_laps: int = 0
         self._strategy_fuel_capacity: float = 65.0
         self._strategy_pit_time: float = 25.0
@@ -576,6 +581,18 @@ class OverlayViewModel(QObject):
         live recalc. Empty string hides the label."""
         return self._strategy_guidance
 
+    @Property(str, notify=decisionPromptChanged)
+    def decisionPrompt(self) -> str:  # noqa: N802
+        """T151: directive driver prompt — one of ``""`` /
+        ``"PIT"`` / ``"SAVE FUEL"`` / ``"COOL TIRES"`` / ``"PUSH"``.
+
+        Sharper than :attr:`strategyGuidance` (which is just
+        PUSH/MANAGE pace mode); the prompt names the specific
+        action. Refreshed from
+        :meth:`RaceStrategyService.compute_decision_prompt`
+        after each live recalc."""
+        return self._decision_prompt
+
     # -- Redesign v2: derived widget state -------------------------------------
 
     @Property(int, notify=strategyChanged)
@@ -925,6 +942,7 @@ class OverlayViewModel(QObject):
         self._apply_strategy(new_strategy)
         self._refresh_pit_armed()
         self._refresh_strategy_guidance()
+        self._refresh_decision_prompt()
 
     def _refresh_strategy_guidance(self) -> None:
         """T148: re-evaluate the PUSH/MANAGE label from the
@@ -940,6 +958,22 @@ class OverlayViewModel(QObject):
             return
         self._strategy_guidance = new_guidance
         self.strategyGuidanceChanged.emit()
+
+    def _refresh_decision_prompt(self) -> None:
+        """T151: re-evaluate the directive prompt from the
+        service. Reads ``service.armed`` so MUST run *after*
+        :meth:`_refresh_pit_armed` — the order in
+        :meth:`recalculateLiveStrategy` enforces this. Same
+        transition-only emit pattern as
+        :meth:`_refresh_strategy_guidance`."""
+        new_prompt = self._strategy_service.compute_decision_prompt(
+            current_lap=self._lap_number,
+            current_fuel=self._fuel_level,
+        )
+        if new_prompt == self._decision_prompt:
+            return
+        self._decision_prompt = new_prompt
+        self.decisionPromptChanged.emit()
 
     def _refresh_pit_armed(self) -> None:
         """T141: ask the service to re-evaluate auto-arming and

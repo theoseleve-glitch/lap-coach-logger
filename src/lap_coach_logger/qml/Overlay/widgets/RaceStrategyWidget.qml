@@ -25,6 +25,7 @@ Rectangle {
     property string weatherAlert: ""
     property bool pitArmed: false  // T141: VM-driven armed-for-pit indicator
     property string guidance: ""   // T148: VM-driven PUSH/MANAGE label
+    property string decisionPrompt: ""  // T151: VM-driven directive (PIT / SAVE FUEL / COOL TIRES / PUSH)
 
     // -- helpers --
     function safeFix(v, d) { return isFinite(v) ? v.toFixed(d) : "--" }
@@ -160,6 +161,37 @@ Rectangle {
                     font.weight: Font.Bold
                     font.letterSpacing: 0.8
                     color: parent.guidanceColor
+                }
+            }
+
+            // T151: directive driver prompt — PIT / SAVE FUEL /
+            // COOL TIRES / PUSH. Sharper than the T148 guidance
+            // pill (it tells the driver what to *do*, not just
+            // their pace mode). Colour-coded by urgency.
+            Rectangle {
+                id: decisionPromptBadge
+                visible: root.decisionPrompt !== ""
+                implicitWidth: decisionPromptLabel.implicitWidth + 10
+                implicitHeight: 14
+                radius: 3
+                readonly property color promptColor:
+                    root.decisionPrompt === "PIT" ? Theme.Tokens.safetyRed
+                    : root.decisionPrompt === "SAVE FUEL" ? Theme.Tokens.pitOrange
+                    : root.decisionPrompt === "COOL TIRES" ? Theme.Tokens.pitOrange
+                    : Theme.Tokens.acidGreen
+                color: Theme.Tokens.subtle(promptColor, 0.12)
+                border.width: 1
+                border.color: Theme.Tokens.subtle(promptColor, 0.25)
+
+                Text {
+                    id: decisionPromptLabel
+                    anchors.centerIn: parent
+                    text: root.decisionPrompt
+                    font.family: Theme.Typography.monoFamily
+                    font.pixelSize: Math.round(7 * root.fontScale)
+                    font.weight: Font.Bold
+                    font.letterSpacing: 0.8
+                    color: parent.promptColor
                 }
             }
 

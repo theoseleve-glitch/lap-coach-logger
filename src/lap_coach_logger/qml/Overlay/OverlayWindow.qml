@@ -355,6 +355,7 @@ Item {
             currentLap: overlayVM ? overlayVM.lapNumber : 0
             pitArmed: overlayVM ? overlayVM.pitArmed : false
             guidance: overlayVM ? overlayVM.strategyGuidance : ""
+            decisionPrompt: overlayVM ? overlayVM.decisionPrompt : ""
         }
     }
 

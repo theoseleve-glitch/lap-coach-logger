@@ -271,6 +271,61 @@ class RaceStrategyService:
         self._full_course_yellow_events.append(current_lap)
         return new_strategy
 
+    def compute_decision_prompt(
+        self,
+        *,
+        current_lap: int,
+        current_fuel: float,
+    ) -> str:
+        """T151: directive for the driver — ``""``, ``"PIT"``,
+        ``"SAVE FUEL"``, ``"COOL TIRES"``, or ``"PUSH"``.
+
+        Sharper than T148's PUSH/MANAGE guidance: states the
+        specific action rather than the generic pace mode.
+        Priority (first match wins):
+
+        1. Empty when no plan or race is over.
+        2. ``"PIT"`` when the service is armed (T140 threshold
+           or T143 manual). Pit entry overrides every other
+           directive — refuel resolves fuel margin, fresh tires
+           resolve wear.
+        3. ``"SAVE FUEL"`` when fuel-laps in tank
+           < :data:`_FUEL_GUIDANCE_CRITICAL_LAPS`. Running dry
+           is unrecoverable; this beats tire prompts.
+        4. ``"COOL TIRES"`` when tire stint past
+           :data:`_TIRE_GUIDANCE_WEAR_PCT` of life (with the
+           same most-recent-pit reset as
+           :meth:`update_armed_state`).
+        5. ``"PUSH"`` otherwise.
+        """
+        baseline = self._current
+        if baseline is None:
+            return ""
+
+        laps_remaining = baseline.total_laps - current_lap
+        if laps_remaining <= 0:
+            return ""
+
+        if self._armed:
+            return "PIT"
+
+        fpl = max(baseline.fuel_per_lap, 1e-6)
+        if current_fuel / fpl < _FUEL_GUIDANCE_CRITICAL_LAPS:
+            return "SAVE FUEL"
+
+        stint_start_lap = 0
+        for stop in baseline.pit_stops:
+            if stop.lap <= current_lap and stop.lap > stint_start_lap:
+                stint_start_lap = stop.lap
+        laps_into_stint = max(0, current_lap - stint_start_lap)
+        tire_wear_pct = (
+            laps_into_stint / max(baseline.tire_life_laps, 1)
+        )
+        if tire_wear_pct > _TIRE_GUIDANCE_WEAR_PCT:
+            return "COOL TIRES"
+
+        return "PUSH"
+
     def compute_guidance(
         self,
         *,
