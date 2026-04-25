@@ -18,6 +18,11 @@ Rectangle {
     // [{pos: int, name: string, gap: string, lastLap: string,
     //   classColor: color, isPlayer: bool}]
     property var standings: []
+    // T166: degraded state — telemetry stalled but cached
+    // standings are still in the array. When true the list
+    // hides and the placeholder shows "STANDINGS STALE" so
+    // frozen positions don't pass for live data.
+    property bool degraded: false
 
     // -- null-safe list length -------------------------------------------
     readonly property int _count: {
@@ -86,23 +91,23 @@ Rectangle {
             color: Theme.Tokens.subtle(Theme.Tokens.chalk)
         }
 
-        // -- Empty state -------------------------------------------------
+        // -- Empty state / STANDINGS STALE placeholder -------------------
         Text {
-            visible: root._count === 0
+            visible: root._count === 0 || root.degraded
             Layout.fillWidth:  true
             Layout.fillHeight: true
-            text: "No standings yet\u2026"
+            text: root.degraded ? "STANDINGS STALE" : "No standings yet\u2026"
             font.family:    Theme.Typography.bodyFamily
             font.pixelSize: Theme.Typography.captionSize
-            color:   Theme.Tokens.steel
-            opacity: 0.4
+            color:   root.degraded ? Theme.Tokens.marshalYellow : Theme.Tokens.steel
+            opacity: root.degraded ? 0.85 : 0.4
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment:   Text.AlignVCenter
         }
 
         // -- List --------------------------------------------------------
         ListView {
-            visible: root._count > 0
+            visible: root._count > 0 && !root.degraded
             Layout.fillWidth:  true
             Layout.fillHeight: true
             clip:    true
