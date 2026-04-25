@@ -383,6 +383,28 @@ class _BundleClient(Protocol):
     def fetch(self, *, auth_token: str) -> tuple[RuleBundle, str]: ...
 
 
+def is_bundle_newer_than_cache(
+    server_bundle: RuleBundle, *, cache: "RuleBundleCache"
+) -> bool:
+    """``True`` if the server's bundle should replace what's in
+    cache, ``False`` if the cached version is current or newer.
+
+    "Newer" is decided by ``compiled_at`` (ISO 8601 string from
+    the server's compilation step). String comparison works
+    because ISO 8601 sorts lexicographically when zones are
+    consistent — and the server stamps everything in UTC.
+
+    A missing/corrupt cache counts as "older than anything", so
+    cold-start always upgrades. A server roll-back (server is
+    older than cache) returns ``False`` so the upgrade path
+    doesn't downgrade the user.
+    """
+    cached = cache.load()
+    if cached is None:
+        return True
+    return server_bundle.compiled_at > cached.bundle.compiled_at
+
+
 def load_bundle_with_fallback(
     *,
     client: _BundleClient,
@@ -648,6 +670,7 @@ __all__ = [
     "RuleConditionError",
     "evaluate_bundle",
     "evaluate_condition",
+    "is_bundle_newer_than_cache",
     "load_bundle",
     "load_bundle_with_fallback",
 ]
