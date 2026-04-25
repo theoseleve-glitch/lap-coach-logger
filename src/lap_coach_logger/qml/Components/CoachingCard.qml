@@ -34,6 +34,46 @@ Rectangle {
     border.width: 1
     border.color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.4)
 
+    // T098: Flag-as-wrong button — top-right corner, beside
+    // dismiss. Tapping fires flag_as_wrong("user_flagged_from_card")
+    // which forwards to the optional flag_callback (T098) and
+    // dismisses the card.
+    Rectangle {
+        id: flagButton
+        anchors {
+            top: parent.top
+            right: dismissButton.left
+            rightMargin: Theme.Tokens.xs
+            topMargin: Theme.Tokens.sm
+        }
+        implicitWidth: 28
+        implicitHeight: 28
+        radius: implicitWidth / 2
+        color: flagArea.containsMouse
+               ? Theme.Tokens.subtle(Theme.Tokens.marshalYellow, 0.15)
+               : "transparent"
+
+        Behavior on color {
+            ColorAnimation { duration: Theme.Motion.hoverDuration }
+        }
+
+        Text {
+            anchors.centerIn: parent
+            text: "⚑"
+            font.family: Theme.Typography.bodyFamily
+            font.pixelSize: 14
+            color: Theme.Tokens.steel
+        }
+
+        MouseArea {
+            id: flagArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: coachingCardVM.flag_as_wrong("user_flagged_from_card")
+        }
+    }
+
     // T097: Dismiss button — top-right corner. Tapping advances
     // to the next pending insight (T091 dismiss slot), or clears
     // to empty if nothing's queued.
@@ -76,7 +116,7 @@ Rectangle {
         id: contentColumn
         anchors {
             left: parent.left
-            right: dismissButton.left
+            right: flagButton.left
             top: parent.top
             margins: Theme.Tokens.xl
         }

@@ -47,6 +47,7 @@ class CoachingCardViewModel(QObject):
         cooldown_filter: InsightCooldownFilter | None = None,
         skill_level: str = "intermediate",
         audio_player: Callable[[CoachingInsight], None] | None = None,
+        flag_callback: Callable[[CoachingInsight, str], None] | None = None,
     ) -> None:
         super().__init__()
         self._queue = queue
@@ -64,6 +65,12 @@ class CoachingCardViewModel(QObject):
         # cues" setting — bootstrap reads the setting and
         # passes either a real player or None.
         self._audio_player = audio_player
+        # T098: optional flag-as-wrong callback. None = local
+        # only (dismiss but don't ship to backend). Callback
+        # signature is ``(insight, reason)`` — production wiring
+        # composes a real HTTP-POST closure; tests inject a
+        # capturing list-append.
+        self._flag_callback = flag_callback
         self._current: CoachingInsight | None = None
         self._pending: deque[CoachingInsight] = deque()
 
@@ -136,6 +143,24 @@ class CoachingCardViewModel(QObject):
         if self._current is not None:
             self._maybe_play_audio_cue()
         self.insightChanged.emit()
+
+    @Slot(str)
+    def flag_as_wrong(self, reason: str) -> None:  # noqa: N802
+        """User flagged the current insight as wrong / not
+        applicable. Forwards ``(insight, reason)`` to the
+        configured callback (if any) and dismisses the card.
+
+        No-op when nothing's currently shown — guards against
+        a stale QML rebind firing flag during a fade-out. The
+        backend POST + the dismiss are independent: a None
+        callback still dismisses so the local UX stays
+        responsive.
+        """
+        if self._current is None:
+            return
+        if self._flag_callback is not None:
+            self._flag_callback(self._current, reason)
+        self.dismiss()
 
     # -- internals -------------------------------------------------------------
 
