@@ -23,6 +23,11 @@ GlassSurface {
     property string pitWindow: ""
     property int    totalLaps: 0
     property int    currentLap: 0
+    // T158: degraded state — fuel telemetry stalled or
+    // unavailable. When true the widget renders all data-
+    // bearing fields with `--` placeholders in steel colour,
+    // distinguishing "no fuel data" from "0 L in green".
+    property bool   degraded: false
 
     // ── state color mapping ─────────────────────────────────────────
     readonly property color stateColor: {
@@ -195,12 +200,14 @@ GlassSurface {
                     Layout.alignment: Qt.AlignHCenter
                 }
                 Text {
-                    text: (root.lapsLeft !== undefined && !isNaN(root.lapsLeft))
-                          ? root.lapsLeft.toFixed(1) : "--.-"
+                    text: root.degraded
+                          ? "--.-"
+                          : ((root.lapsLeft !== undefined && !isNaN(root.lapsLeft))
+                             ? root.lapsLeft.toFixed(1) : "--.-")
                     font.family: Theme.Typography.monoFamily
                     font.pixelSize: Math.round(20 * root.fontScale)
                     font.weight: Font.Bold
-                    color: root.stateColor
+                    color: root.degraded ? Theme.Tokens.steel : root.stateColor
                     horizontalAlignment: Text.AlignHCenter
                     Layout.alignment: Qt.AlignHCenter
                     Behavior on color { ColorAnimation { duration: 200 } }
@@ -257,14 +264,20 @@ GlassSurface {
 
             DataRow {
                 label: "REMAINING"
-                value: (root.remaining !== undefined && !isNaN(root.remaining))
-                       ? root.remaining.toFixed(1) + " L" : "-- L"
+                value: root.degraded
+                       ? "-- L"
+                       : ((root.remaining !== undefined && !isNaN(root.remaining))
+                          ? root.remaining.toFixed(1) + " L" : "-- L")
+                valueColor: root.degraded ? Theme.Tokens.steel : Theme.Tokens.chalk
             }
 
             DataRow {
                 label: "FUEL/LAP"
-                value: (root.fuelPerLap !== undefined && !isNaN(root.fuelPerLap))
-                       ? root.fuelPerLap.toFixed(2) + " L" : "-- L"
+                value: root.degraded
+                       ? "-- L"
+                       : ((root.fuelPerLap !== undefined && !isNaN(root.fuelPerLap))
+                          ? root.fuelPerLap.toFixed(2) + " L" : "-- L")
+                valueColor: root.degraded ? Theme.Tokens.steel : Theme.Tokens.chalk
             }
         }
 
