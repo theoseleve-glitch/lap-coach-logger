@@ -9,12 +9,24 @@ from __future__ import annotations
 
 import datetime
 import logging
+import webbrowser
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
+from lap_coach_logger.utils.webapp_links import (
+    view_session_url,
+    view_sessions_url,
+)
+
 if TYPE_CHECKING:
     from lap_coach_logger.ui.desktop.service import DesktopService
+
+
+# T070: indirected so tests can monkeypatch ``_open_url`` to a recorder
+# instead of launching a real browser. Production wiring is
+# ``webbrowser.open`` which respects the user's default browser.
+_open_url = webbrowser.open
 
 log = logging.getLogger(__name__)
 
@@ -179,6 +191,28 @@ class ServiceViewModel(QObject):
             return
         self._service.delete_review_session(path)
         self.sessionDeleted.emit(path)
+
+    @Slot(str)
+    def viewSessionInWebapp(self, session_id: str) -> None:  # noqa: N802
+        """T070: open the webapp's per-session detail page.
+
+        Replaces the desktop-side "Export CSV" CTA per Q95: export
+        and deep-analysis flows live in lap-webapp. A blank
+        ``session_id`` falls back to the sessions list (the
+        ``view_session_url`` helper handles the fallback so QML
+        callers can pass whatever the review data exposes without
+        an extra null-check).
+        """
+        _open_url(view_session_url(session_id))
+
+    @Slot()
+    def viewSessionsInWebapp(self) -> None:  # noqa: N802
+        """T070: open the webapp's sessions list.
+
+        Used by the History-page context menu, where there's no
+        single review-bound session_id in scope.
+        """
+        _open_url(view_sessions_url())
 
     # -- internal handlers -------------------------------------------------
 

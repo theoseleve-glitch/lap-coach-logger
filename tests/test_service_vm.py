@@ -305,6 +305,60 @@ class TestSlotDelegation:
 
         assert vm.sessionDeleted.call_count == 0
 
+    # T070 — View in webapp wiring ----------------------------------------
+
+    def test_view_session_in_webapp_opens_session_url(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """``viewSessionInWebapp(session_id)`` must open a webapp URL
+        scoped to that session via the injected url_opener."""
+        from lap_coach_logger.viewmodels import service_vm as vm_module
+
+        monkeypatch.delenv("LAP_COACH_WEBAPP_URL", raising=False)
+        opened: list[str] = []
+        monkeypatch.setattr(vm_module, "_open_url", opened.append)
+
+        svc = _make_service_mock()
+        vm = ServiceViewModel(svc)
+        vm.viewSessionInWebapp("01900000-0000-7000-8000-00000000a070")
+
+        assert opened == [
+            "https://app.lap-coach.racing/sessions/01900000-0000-7000-8000-00000000a070"
+        ]
+
+    def test_view_session_in_webapp_blank_id_opens_session_list(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A blank session_id from QML lands the user on the list
+        view rather than a 404'ing /sessions/ URL."""
+        from lap_coach_logger.viewmodels import service_vm as vm_module
+
+        monkeypatch.delenv("LAP_COACH_WEBAPP_URL", raising=False)
+        opened: list[str] = []
+        monkeypatch.setattr(vm_module, "_open_url", opened.append)
+
+        svc = _make_service_mock()
+        vm = ServiceViewModel(svc)
+        vm.viewSessionInWebapp("")
+
+        assert opened == ["https://app.lap-coach.racing/sessions"]
+
+    def test_view_sessions_in_webapp_opens_list(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """No-arg slot for the History page menu item."""
+        from lap_coach_logger.viewmodels import service_vm as vm_module
+
+        monkeypatch.delenv("LAP_COACH_WEBAPP_URL", raising=False)
+        opened: list[str] = []
+        monkeypatch.setattr(vm_module, "_open_url", opened.append)
+
+        svc = _make_service_mock()
+        vm = ServiceViewModel(svc)
+        vm.viewSessionsInWebapp()
+
+        assert opened == ["https://app.lap-coach.racing/sessions"]
+
 
 # ---------------------------------------------------------------------------
 # Greeting logic

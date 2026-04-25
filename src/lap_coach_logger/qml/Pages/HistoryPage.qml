@@ -223,8 +223,11 @@ Item {
         property int sessionIndex: -1
 
         MenuItem {
-            text: "Export CSV"
-            // T070: replace with "View in webapp" link (push user to webapp per Q95)
+            // T070: per Q95, export/deep-analysis lives in lap-webapp;
+            // this menu item now opens the webapp instead of doing a
+            // local CSV export.
+            text: "View in webapp"
+            onTriggered: serviceVM.viewSessionsInWebapp()
         }
         MenuItem {
             text: "Copy Session ID"

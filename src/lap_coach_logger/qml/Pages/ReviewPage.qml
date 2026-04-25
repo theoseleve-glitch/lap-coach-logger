@@ -109,12 +109,14 @@ Item {
                 Item { Layout.fillWidth: true }
 
                 // Action buttons
+                // T070: "Export CSV" replaced with "View in webapp"
+                // (export + deep-analysis flows live in lap-webapp per Q95).
                 Repeater {
                     model: [
-                        { label: "Open Folder", style: "subtle", danger: false },
-                        { label: "Export CSV",   style: "subtle", danger: false },
-                        { label: "Reprocess",    style: "subtle", danger: false },
-                        { label: "Delete",       style: "danger", danger: true }
+                        { label: "Open Folder",     style: "subtle", danger: false },
+                        { label: "View in webapp",  style: "subtle", danger: false },
+                        { label: "Reprocess",       style: "subtle", danger: false },
+                        { label: "Delete",          style: "danger", danger: true }
                     ]
 
                     Rectangle {
@@ -150,8 +152,10 @@ Item {
                                     serviceVM.openOutputFolder()
                                 else if (modelData.label === "Delete")
                                     deleteConfirmDialog.open()
+                                else if (modelData.label === "View in webapp")
+                                    serviceVM.viewSessionInWebapp(
+                                        (reviewVM.data && reviewVM.data.session_id) || "")
                                 // T067: wire "Reprocess" → backend /sessions/:id/reprocess
-                                // T070: replace "Export CSV" with "View in webapp" link
                             }
                         }
                     }
