@@ -16,6 +16,11 @@ GlassSurface {
 
     // ── public API ──────────────────────────────────────────────────
     property var lapTimes: []   // list of {lap: int, time_s: float}
+    // T163: degraded state — telemetry has stalled but old
+    // lapTimes are still cached. When true the chart hides and
+    // the placeholder shows "TRACE STALE" so frozen bars don't
+    // pass for live data.
+    property bool degraded: false
 
     // ── derived ─────────────────────────────────────────────────────
     readonly property bool hasData: (root.lapTimes && root.lapTimes.length > 0)
@@ -42,29 +47,33 @@ GlassSurface {
             color: Theme.Tokens.steel
         }
 
-        // ── Empty state ────────────────────────────────────────────
+        // ── Empty state / TRACE STALE placeholder ─────────────────
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: !root.hasData
+            visible: !root.hasData || root.degraded
 
             ColumnLayout {
                 anchors.centerIn: parent
                 spacing: 4
 
                 Text {
-                    text: "NO DATA"
+                    text: root.degraded ? "TRACE STALE" : "NO DATA"
                     font.family: Theme.Typography.monoFamily
                     font.pixelSize: Math.round(11 * root.fontScale)
                     font.weight: Font.Bold
                     font.letterSpacing: 1.0
-                    color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.25)
+                    color: root.degraded
+                           ? Theme.Tokens.marshalYellow
+                           : Theme.Tokens.subtle(Theme.Tokens.chalk, 0.25)
                     horizontalAlignment: Text.AlignHCenter
                     Layout.alignment: Qt.AlignHCenter
                 }
 
                 Text {
-                    text: "Complete a lap to see times"
+                    text: root.degraded
+                          ? "Telemetry has stalled"
+                          : "Complete a lap to see times"
                     font.family: Theme.Typography.bodyFamily
                     font.pixelSize: Math.round(10 * root.fontScale)
                     color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.15)
@@ -79,7 +88,7 @@ GlassSurface {
             id: chartCanvas
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: root.hasData
+            visible: root.hasData && !root.degraded
 
             onWidthChanged: requestPaint()
             onHeightChanged: requestPaint()
