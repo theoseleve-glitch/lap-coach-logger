@@ -85,15 +85,18 @@ def run(*, debug_override: bool = False) -> None:
 
     # T056: initialize Sentry early so any failure later in bootstrap
     # (or during the run) is captured. Reads DSN from SENTRY_DSN env
-    # var; no DSN -> no-op (so dev builds stay silent). T065 will plug
-    # the user opt-out flag here.
+    # var; no DSN -> no-op (so dev builds stay silent).
     # T058: pass release=lap-coach-logger@<__version__> so Sentry's
     # "Releases" page groups events by build, and the environment tag
     # distinguishes packaged release builds from `python -m` dev runs.
+    # T065: respect the user's telemetry opt-out — when
+    # ``config.telemetry_enabled`` is False, init_sentry returns False
+    # and no DSN is read (and no events are sent).
     from lap_coach_logger.utils.sentry_init import init_sentry, sentry_release_tag
     sentry_active = init_sentry(
         release=sentry_release_tag(),
         environment="production" if IS_FROZEN else "development",
+        enabled=config.telemetry_enabled,
     )
     log.info(
         "Error telemetry: %s", "enabled (Sentry)" if sentry_active else "disabled"
@@ -112,9 +115,10 @@ def run(*, debug_override: bool = False) -> None:
     # T059: initialize PostHog so T060+ events can fire. Reads API key
     # from POSTHOG_API_KEY (and optionally POSTHOG_HOST for self-
     # hosted instances). No key -> no-op so dev runs stay silent.
-    # T065 will plug the user opt-out flag here alongside Sentry.
+    # T065: same opt-out switch as Sentry — disabled config keeps the
+    # SDK uninitialized regardless of env-var configuration.
     from lap_coach_logger.utils.posthog_init import init_posthog
-    posthog_active = init_posthog()
+    posthog_active = init_posthog(enabled=config.telemetry_enabled)
     log.info(
         "Product analytics: %s",
         "enabled (PostHog)" if posthog_active else "disabled",

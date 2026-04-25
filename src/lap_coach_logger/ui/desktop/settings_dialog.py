@@ -175,6 +175,15 @@ class SettingsDialog(QDialog):
         self.debug_csv.setChecked(bool(values["debug_csv"]))
         form.addRow("Debug", self.debug_csv)
 
+        # T065: master opt-out for Sentry + PostHog. On by default;
+        # unchecking it disables BOTH error reporting and product
+        # analytics — bootstrap re-reads this on every launch.
+        self.telemetry_enabled = QCheckBox(
+            "Send anonymous usage data to improve the app"
+        )
+        self.telemetry_enabled.setChecked(bool(values.get("telemetry_enabled", True)))
+        form.addRow("Telemetry", self.telemetry_enabled)
+
         root.addLayout(form)
 
         self.enable_iracing.toggled.connect(self._update_iracing_controls)
@@ -314,4 +323,5 @@ class SettingsDialog(QDialog):
             "sync_api_url": self.sync_api_url.text().strip(),
             "sync_device_token": self.sync_device_token.text().strip(),
             "debug_csv": self.debug_csv.isChecked(),
+            "telemetry_enabled": self.telemetry_enabled.isChecked(),
         }

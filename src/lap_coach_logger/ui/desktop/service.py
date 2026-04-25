@@ -654,6 +654,10 @@ class DesktopService(QObject):
             self._config.writer.debug_csv_export = bool(values["debug_csv"])
             self._config.start_with_windows = bool(values["start_with_windows"])
             self._config.low_resource_mode = bool(values["low_resource_mode"])
+            # T065: master opt-out — bootstrap re-reads this next launch.
+            self._config.telemetry_enabled = bool(
+                values.get("telemetry_enabled", True)
+            )
 
             errs = self._config.validate()
             if errs:
@@ -1237,4 +1241,5 @@ class DesktopService(QObject):
             "sync_api_url": self._config.sync.api_url,
             "sync_device_token": self._config.sync.device_token,
             "debug_csv": self._config.writer.debug_csv_export,
+            "telemetry_enabled": self._config.telemetry_enabled,
         }

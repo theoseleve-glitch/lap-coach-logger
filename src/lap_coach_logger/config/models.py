@@ -166,6 +166,11 @@ class AppConfig:
     start_with_windows: bool = False
     low_resource_mode: bool = False
     driver_name: str = ""
+    # T065: master switch for Sentry + PostHog + analytics events.
+    # Defaults to True (telemetry on) — users opt OUT, not in. Old
+    # config files that predate this field load as True via
+    # ``from_dict``, so the upgrade is silent.
+    telemetry_enabled: bool = True
     iracing: IRacingConfig = field(default_factory=IRacingConfig)
     assetto_corsa: AssettoCorsaConfig = field(default_factory=AssettoCorsaConfig)
     acc: ACCConfig = field(default_factory=ACCConfig)
