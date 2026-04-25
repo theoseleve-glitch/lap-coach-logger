@@ -26,6 +26,7 @@ Rectangle {
     property bool pitArmed: false  // T141: VM-driven armed-for-pit indicator
     property string guidance: ""   // T148: VM-driven PUSH/MANAGE label
     property string decisionPrompt: ""  // T151: VM-driven directive (PIT / SAVE FUEL / COOL TIRES / PUSH)
+    property string cornerPrompt: ""    // T152: VM-driven worst-corner one-liner ("losing X at Tn — action")
 
     // -- helpers --
     function safeFix(v, d) { return isFinite(v) ? v.toFixed(d) : "--" }
@@ -324,6 +325,22 @@ Rectangle {
                 font.pixelSize: Math.round(7 * root.fontScale)
                 color: Theme.Tokens.subtle(Theme.Tokens.steel, 0.6)
             }
+        }
+
+        // T152: corner-specific prompt — "losing X at Tn — action".
+        // Empty string ⇒ hidden. Rendered as a small text line at
+        // the bottom of the strategy widget, separate from the
+        // pace pills in the header.
+        Text {
+            visible: root.cornerPrompt !== ""
+            text: root.cornerPrompt
+            Layout.fillWidth: true
+            Layout.topMargin: 4
+            elide: Text.ElideRight
+            font.family: Theme.Typography.monoFamily
+            font.pixelSize: Math.round(9 * root.fontScale)
+            font.weight: Font.Bold
+            color: Theme.Tokens.racingPurple
         }
 
         Item { Layout.fillHeight: true }

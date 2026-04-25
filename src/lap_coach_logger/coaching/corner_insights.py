@@ -482,6 +482,74 @@ def _generic_statement(
 
 
 # ---------------------------------------------------------------------------
+# T152: concise corner prompt (one-line directive)
+# ---------------------------------------------------------------------------
+
+
+def _corner_prompt_action(insight: CornerInsight) -> str:
+    """Pick the best one-phrase action for a corner insight.
+
+    Action vocabulary intentionally mirrors :func:`_entry_statement`,
+    :func:`_apex_statement` and :func:`_exit_statement` so a driver
+    sees consistent language across the live overlay (T152) and the
+    post-session summary.
+    """
+    zone = insight.loss_zone
+    if zone == "entry":
+        brake_delta = insight.brake_onset_delta_pct
+        if brake_delta is not None and brake_delta > 0.003:
+            return "brake earlier"
+        if brake_delta is not None and brake_delta < -0.003:
+            return "brake later"
+        if (
+            insight.entry_speed_delta_kph is not None
+            and insight.entry_speed_delta_kph < -2
+        ):
+            return "carry more speed at entry"
+        return "rebuild the brake reference"
+    if zone == "mid":
+        min_delta = insight.min_speed_delta_kph
+        if min_delta is not None and min_delta < -2:
+            return "carry more speed"
+        if min_delta is not None and min_delta > 2:
+            return "slow earlier"
+        return "rebuild the apex line"
+    if zone == "exit":
+        throttle_delta = insight.throttle_pickup_delta_pct
+        if throttle_delta is not None and throttle_delta > 0.003:
+            return "throttle earlier"
+        exit_delta = insight.exit_speed_delta_kph
+        if exit_delta is not None and exit_delta < -2:
+            return "open throttle sooner"
+        return "unwind sooner"
+    return "rebuild the corner"
+
+
+def format_corner_prompt(insight: CornerInsight) -> str | None:
+    """Format a :class:`CornerInsight` as the T152 one-liner.
+
+    Output: ``"losing {X}s at {corner} — {action}"`` (e.g.
+    ``"losing 0.3s at T1 — brake later"``). Returns ``None``
+    when there's nothing meaningful to say — same significance
+    gate as :func:`build_technique_statement` so the live and
+    post-session prompt paths agree on which corners are worth
+    surfacing.
+
+    Loss is rendered to one decimal of seconds — corner-level
+    deltas rarely exceed a second, and a tighter precision
+    encourages noisier prompts.
+    """
+    if (
+        insight.time_loss_s is None
+        or abs(insight.time_loss_s) < _MIN_SIGNIFICANT_LOSS_S
+    ):
+        return None
+    loss = abs(insight.time_loss_s)
+    action = _corner_prompt_action(insight)
+    return f"losing {loss:.1f}s at {insight.corner_name} — {action}"
+
+
+# ---------------------------------------------------------------------------
 # Aggregation helpers (Part 4 + Part 5)
 # ---------------------------------------------------------------------------
 

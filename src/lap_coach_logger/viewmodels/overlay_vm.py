@@ -10,6 +10,10 @@ import logging
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
+from lap_coach_logger.coaching.corner_insights import (
+    CornerInsight,
+    format_corner_prompt,
+)
 from lap_coach_logger.coaching.policy_config import RACE_OVERLAY_POLICY
 from lap_coach_logger.coaching.presentation import CoachingMessage
 from lap_coach_logger.coaching.surface_policy import (
@@ -68,6 +72,7 @@ class OverlayViewModel(QObject):
     pitArmedChanged = Signal()
     strategyGuidanceChanged = Signal()
     decisionPromptChanged = Signal()
+    cornerPromptChanged = Signal()
     tireChanged = Signal()
 
     # -- widget category mapping -----------------------------------------------
@@ -206,6 +211,10 @@ class OverlayViewModel(QObject):
         # we forwarded to the strategy VM so we push exactly once per lap
         # finalisation.
         self._technique_last_pushed_lap: int | None = None
+        # T152: concise corner prompt ("losing X at T1 — brake later")
+        # for the highest-time-loss insight in the latest lap, refreshed
+        # in lockstep with the strategy-VM push above.
+        self._corner_prompt: str = ""
 
         # Coaching surface state — updated per snapshot via the policy
         # engine. Kept as a single dataclass so tests can introspect it
@@ -593,6 +602,15 @@ class OverlayViewModel(QObject):
         after each live recalc."""
         return self._decision_prompt
 
+    @Property(str, notify=cornerPromptChanged)
+    def cornerPrompt(self) -> str:  # noqa: N802
+        """T152: concise corner-specific prompt for the worst
+        corner of the most recent lap — e.g. ``"losing 0.3s at
+        T1 — brake earlier"``. Empty string when no significant
+        loss to surface. Refreshed in lockstep with the
+        per-lap insight push to :attr:`_strategy_vm`."""
+        return self._corner_prompt
+
     # -- Redesign v2: derived widget state -------------------------------------
 
     @Property(int, notify=strategyChanged)
@@ -974,6 +992,31 @@ class OverlayViewModel(QObject):
             return
         self._decision_prompt = new_prompt
         self.decisionPromptChanged.emit()
+
+    def _refresh_corner_prompt(self, insights: list[CornerInsight]) -> None:
+        """T152: pick the highest-time-loss insight from the
+        latest lap and surface it as a one-line directive.
+
+        Empty input list (or every entry below the significance
+        threshold) clears the prompt. Same transition-only
+        emit pattern as :meth:`_refresh_decision_prompt` so
+        QML doesn't rebind on stable laps."""
+        new_prompt = ""
+        if insights:
+            ranked = sorted(
+                (i for i in insights if i.time_loss_s is not None),
+                key=lambda i: abs(i.time_loss_s or 0.0),
+                reverse=True,
+            )
+            for insight in ranked:
+                formatted = format_corner_prompt(insight)
+                if formatted is not None:
+                    new_prompt = formatted
+                    break
+        if new_prompt == self._corner_prompt:
+            return
+        self._corner_prompt = new_prompt
+        self.cornerPromptChanged.emit()
 
     def _refresh_pit_armed(self) -> None:
         """T141: ask the service to re-evaluate auto-arming and
@@ -1707,12 +1750,17 @@ class OverlayViewModel(QObject):
         if (
             insights_lap is not None
             and insights_lap != self._technique_last_pushed_lap
-            and self._strategy_vm is not None
         ):
-            try:
-                self._strategy_vm.push_corner_insights(result.get("corner_insights") or [])
-            except Exception:
-                log.debug("push_corner_insights failed", exc_info=True)
+            insights = result.get("corner_insights") or []
+            # T152: surface the worst-corner prompt independently
+            # of the strategy-VM forward (works in tests and any
+            # configuration without a strategy_vm wired in).
+            self._refresh_corner_prompt(insights)
+            if self._strategy_vm is not None:
+                try:
+                    self._strategy_vm.push_corner_insights(insights)
+                except Exception:
+                    log.debug("push_corner_insights failed", exc_info=True)
             self._technique_last_pushed_lap = insights_lap
 
         # Advance the pit-call state machine — deterministic source for
