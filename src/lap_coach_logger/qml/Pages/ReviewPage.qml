@@ -16,7 +16,8 @@ Item {
     // Overview + Laps remain as desktop-side review surfaces.
     readonly property var sectionIndexMap: ({
         "overview": 0,
-        "laps": 1
+        "laps": 1,
+        "strategy": 2
     })
 
     // T069: confirm dialog for the destructive Delete action.
@@ -301,7 +302,8 @@ Item {
                 }
                 model: [
                     { id: "overview", label: "Overview" },
-                    { id: "laps",     label: "Laps" }
+                    { id: "laps",     label: "Laps" },
+                    { id: "strategy", label: "Strategy" }
                 ]
                 currentSection: reviewVM.section
                 onSectionRequested: function(sectionId) {
@@ -556,6 +558,152 @@ Item {
                                         return Theme.Tokens.steel
                                     }
                                     Layout.preferredWidth: 80
+                                    horizontalAlignment: Text.AlignRight
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- Strategy (T147) ---
+            // Compact summary of the Q102 trio: pre-race plan
+            // (T144) + actual pit events (T145) + plan-vs-actual
+            // delta (T146). Webapp owns the deep analysis per
+            // Q95 / ADR-002; this is the headline view so the
+            // driver sees "you planned X, actual was Y" without
+            // leaving the desktop.
+            ScrollView {
+                clip: true
+                contentWidth: availableWidth
+
+                Column {
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        top: parent.top
+                        margins: Theme.Tokens.xl
+                    }
+                    spacing: Theme.Tokens.lg
+
+                    // Empty state — most non-race sessions ship
+                    // without a strategy plan. Render an explicit
+                    // message rather than a blank pane so the
+                    // user knows the section is intentionally
+                    // empty.
+                    Text {
+                        visible: !reviewVM.data.race_strategy
+                                 && !reviewVM.data.plan_vs_actual
+                        text: "No strategy plan recorded for this session."
+                        font.family: Theme.Typography.bodyFamily
+                        font.pixelSize: Theme.Typography.bodySize
+                        color: Theme.Tokens.steel
+                        wrapMode: Text.Wrap
+                        width: parent.width
+                    }
+
+                    // Headline counts — planned vs actual stops.
+                    // Reads T146's plan_vs_actual.planned_stops /
+                    // actual_stops directly so the driver sees
+                    // the comparison without inspecting the full
+                    // per-stop list below.
+                    RowLayout {
+                        visible: reviewVM.data.plan_vs_actual !== undefined
+                                 && reviewVM.data.plan_vs_actual !== null
+                        width: parent.width
+                        spacing: Theme.Tokens.md
+
+                        Components.MetricCard {
+                            Layout.fillWidth: true
+                            label: "Planned stops"
+                            value: reviewVM.data.plan_vs_actual
+                                   ? String(reviewVM.data.plan_vs_actual.planned_stops)
+                                   : "—"
+                        }
+
+                        Components.MetricCard {
+                            Layout.fillWidth: true
+                            label: "Actual stops"
+                            value: reviewVM.data.plan_vs_actual
+                                   ? String(reviewVM.data.plan_vs_actual.actual_stops)
+                                   : "—"
+                        }
+                    }
+
+                    // Per-stop comparison rows. One row per entry
+                    // in plan_vs_actual.stops; each shows the
+                    // planned lap, the actual lap, and the lap-
+                    // delta sign so the driver can scan for late
+                    // / early / missed pits at a glance.
+                    Repeater {
+                        model: (reviewVM.data.plan_vs_actual
+                                && reviewVM.data.plan_vs_actual.stops)
+                               ? reviewVM.data.plan_vs_actual.stops : []
+
+                        Rectangle {
+                            required property var modelData
+                            required property int index
+
+                            width: parent.width
+                            height: 40
+                            color: "transparent"
+                            border.width: 1
+                            border.color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.10)
+                            radius: Theme.Tokens.radiusSm
+
+                            RowLayout {
+                                anchors {
+                                    fill: parent
+                                    leftMargin: Theme.Tokens.md
+                                    rightMargin: Theme.Tokens.md
+                                }
+                                spacing: Theme.Tokens.md
+
+                                Text {
+                                    text: "Stop " + (index + 1)
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.captionSize
+                                    color: Theme.Tokens.chalk
+                                    Layout.preferredWidth: 80
+                                }
+
+                                Text {
+                                    text: modelData.planned_lap !== null
+                                          ? "Planned " + modelData.planned_lap
+                                          : "(no plan)"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.microSize
+                                    color: Theme.Tokens.steel
+                                    Layout.preferredWidth: 110
+                                }
+
+                                Text {
+                                    text: modelData.actual_lap !== null
+                                          ? "Actual " + modelData.actual_lap
+                                          : "(missed)"
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.microSize
+                                    color: Theme.Tokens.chalk
+                                    Layout.preferredWidth: 110
+                                }
+
+                                Text {
+                                    text: modelData.lap_delta !== null
+                                          ? (modelData.lap_delta > 0 ? "+" : "")
+                                            + modelData.lap_delta + " laps"
+                                          : ""
+                                    font.family: Theme.Typography.monoFamily
+                                    font.pixelSize: Theme.Typography.captionSize
+                                    font.weight: Font.Bold
+                                    color: {
+                                        if (modelData.lap_delta === null
+                                            || modelData.lap_delta === 0)
+                                            return Theme.Tokens.steel
+                                        return modelData.lap_delta > 0
+                                               ? Theme.Tokens.marshalYellow
+                                               : Theme.Tokens.acidGreen
+                                    }
+                                    Layout.fillWidth: true
                                     horizontalAlignment: Text.AlignRight
                                 }
                             }
