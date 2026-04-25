@@ -187,10 +187,30 @@ def get_builtin_preset(preset_id: str) -> ModeOverlayPreset | None:
     return _BUILTIN_PRESETS.get(preset_id)
 
 
+# ---------------------------------------------------------------------------
+# T126 — First-install default
+# ---------------------------------------------------------------------------
+# race-minimal is the smallest validated preset (8 widgets); leans
+# *under-*cluttered rather than over-cluttered for users landing in
+# the desktop mid-session without any saved preference. Independent
+# of T117 (persistence) and T118 (auto-detect): bootstrap reads this
+# only when neither has produced a signal.
+_DEFAULT_PRESET_ID_ON_FIRST_INSTALL = "race-minimal"
+
+
+def default_preset_id_on_first_install() -> str:
+    """Return the preset id the desktop shows on a clean install.
+
+    Bootstrap calls this whenever there's no persisted preference
+    (T117) and no sim-hint auto-detect (T118) to consult."""
+    return _DEFAULT_PRESET_ID_ON_FIRST_INSTALL
+
+
 __all__ = [
     "ENDURANCE_PRESET",
     "PRACTICE_PRESET",
     "RACE_MINIMAL_PRESET",
     "STREAMER_PRESET",
+    "default_preset_id_on_first_install",
     "get_builtin_preset",
 ]
