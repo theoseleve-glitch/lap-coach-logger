@@ -45,12 +45,17 @@ class CoachingCardViewModel(QObject):
         *,
         queue: InsightQueue,
         cooldown_filter: InsightCooldownFilter | None = None,
+        skill_level: str = "intermediate",
     ) -> None:
         super().__init__()
         self._queue = queue
         # T092: optional cooldown filter. None = no cooldown
         # (T091 tests; production wiring passes a 30s filter).
         self._cooldown_filter = cooldown_filter
+        # T093: which skill_levels variant to surface as
+        # insight.text. Default mirrors the coaching library's
+        # authoring guidance — most users are intermediate.
+        self._skill_level = skill_level
         self._current: CoachingInsight | None = None
         self._pending: deque[CoachingInsight] = deque()
 
@@ -59,10 +64,27 @@ class CoachingCardViewModel(QObject):
     @Property("QVariant", notify=insightChanged)
     def insight(self) -> dict[str, Any]:
         """The currently-shown insight as a dict, or ``{}`` when
-        nothing is shown. QML reads ``vm.insight.title`` etc."""
+        nothing is shown. QML reads ``vm.insight.title``,
+        ``vm.insight.text``, etc.
+
+        T093: ``text`` is derived from the rule's
+        ``skill_levels`` dict using the VM's configured
+        ``skill_level``, falling back to ``title`` and finally
+        ``""``. Other payload fields pass through unchanged.
+        """
         if self._current is None:
             return {}
-        return {"rule_id": self._current.rule_id, **self._current.payload}
+        payload = self._current.payload
+        skill_levels = payload.get("skill_levels")
+        if isinstance(skill_levels, dict) and self._skill_level in skill_levels:
+            text = skill_levels[self._skill_level]
+        else:
+            text = payload.get("title", "")
+        return {
+            "rule_id": self._current.rule_id,
+            **payload,
+            "text": text,
+        }
 
     @Property(bool, notify=insightChanged)
     def has_insight(self) -> bool:
