@@ -78,6 +78,7 @@ class IngestClient:
         base_backoff_s: float = 1.0,
         sleep: Callable[[float], None] = time.sleep,
         auth_refresh: Callable[[], str] | None = None,
+        manifest_filename: str = _MANIFEST_FILENAME,
     ) -> None:
         if chunk_size_bytes <= 0:
             raise ValueError("chunk_size_bytes must be positive")
@@ -91,6 +92,10 @@ class IngestClient:
         self._base_backoff_s = base_backoff_s
         self._sleep = sleep
         self._auth_refresh = auth_refresh
+        # T055: lets callers point the client at finalizer outputs that
+        # use a different on-disk name (e.g. legacy "session.json").
+        # The multipart form-field name stays "manifest" per ADR-012.
+        self._manifest_filename = manifest_filename
 
     @property
     def base_url(self) -> str:
@@ -116,12 +121,12 @@ class IngestClient:
         T044 (5MB chunk streaming), T045 (resume-on-interrupt),
         T048 (retry with backoff), T054 (explicit 4xx/5xx coverage).
         """
-        manifest_path = bundle_dir / _MANIFEST_FILENAME
+        manifest_path = bundle_dir / self._manifest_filename
         if not manifest_path.exists():
             return IngestResult(
                 success=False,
                 error_code="no_manifest",
-                error_message=f"{_MANIFEST_FILENAME} not found in {bundle_dir}",
+                error_message=f"{self._manifest_filename} not found in {bundle_dir}",
             )
 
         manifest_bytes = manifest_path.read_bytes()
@@ -135,7 +140,11 @@ class IngestClient:
 
         boundary = uuid.uuid4().hex
         body = _build_multipart_body(
-            bundle_dir, manifest_bytes, boundary, self._chunk_size_bytes
+            bundle_dir,
+            manifest_bytes,
+            boundary,
+            self._chunk_size_bytes,
+            manifest_filename=self._manifest_filename,
         )
 
         url = f"{self._base_url}{_INGEST_ENDPOINT}"
@@ -235,6 +244,8 @@ def _build_multipart_body(
     manifest_bytes: bytes,
     boundary: str,
     chunk_size_bytes: int,
+    *,
+    manifest_filename: str = _MANIFEST_FILENAME,
 ) -> bytes:
     """Build a multipart/form-data body carrying the manifest + chunks.
 
@@ -248,13 +259,13 @@ def _build_multipart_body(
         _form_part(
             boundary,
             field_name="manifest",
-            filename=_MANIFEST_FILENAME,
+            filename=manifest_filename,
             content_type="application/json",
             data=manifest_bytes,
         )
     )
     for path in sorted(bundle_dir.iterdir()):
-        if not path.is_file() or path.name == _MANIFEST_FILENAME:
+        if not path.is_file() or path.name == manifest_filename:
             continue
         for filename, data in _chunked_parts(path, chunk_size_bytes):
             parts.append(
