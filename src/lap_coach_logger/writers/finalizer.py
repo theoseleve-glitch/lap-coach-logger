@@ -30,6 +30,10 @@ from pathlib import Path
 from typing import Any
 
 from lap_coach_logger import __version__
+from lap_coach_logger.coaching.rules_engine import (
+    CoachingInsight,
+    write_live_insights,
+)
 from lap_coach_logger.config.models import QualityConfig
 from lap_coach_logger.core.schema import TELEMETRY_SCHEMA_VERSION, TelemetrySample
 from lap_coach_logger.core.session_quality import validate_session_quality
@@ -172,6 +176,7 @@ class SessionFinalizer:
         raw_session_info: dict[str, Any] | None = None,
         raw_catalogs: dict[str, Any] | None = None,
         raw_var_schema: list[dict[str, Any]] | None = None,
+        live_insights: list[CoachingInsight] | None = None,
     ) -> Path | None:
         """Write session bundle and return the final folder path (or None on total failure).
 
@@ -308,6 +313,17 @@ class SessionFinalizer:
                 config=self._quality_config,
             )
             self._write_quality_report(tmp_dir, quality_report.to_dict())
+
+            # ── coaching_insights.json (T099) ──
+            # Live-generated insights from the rules engine —
+            # tagged ``source: "client"`` so the server can
+            # distinguish them from its own post-session
+            # insights. ``None`` means "not configured" (file
+            # absent); empty list means "ran clean" (file with
+            # ``[]``); the server's audit path needs both
+            # signals.
+            if live_insights is not None:
+                write_live_insights(tmp_dir, insights=live_insights)
 
             # ── session.json v2 + analysis.json (Phase 6: v2-only) ──
             # Extract car_name from extra before v2 writer consumes it.

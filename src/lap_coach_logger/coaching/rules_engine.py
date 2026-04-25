@@ -704,6 +704,36 @@ def evaluate_bundle(
     ]
 
 
+def write_live_insights(
+    folder: Path, *, insights: list[CoachingInsight]
+) -> None:
+    """Serialise live-generated coaching insights to
+    ``coaching_insights.json`` in the bundle ``folder``.
+
+    Each entry is tagged ``source: "client"`` so the server can
+    distinguish them from its own post-session insights (per
+    ADR-009 — server is authoritative; client coaching is
+    best-effort latency cover).
+
+    Empty insights list still writes the file (with ``[]``) —
+    the server's audit path needs to distinguish "client
+    coaching off" (file absent) from "client coaching ran
+    clean" (file empty).
+    """
+    payload = [
+        {
+            "rule_id": insight.rule_id,
+            "payload": insight.payload,
+            "source": "client",
+        }
+        for insight in insights
+    ]
+    (folder / "coaching_insights.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
 __all__ = [
     "BundleResolution",
     "BundleSource",
@@ -725,4 +755,5 @@ __all__ = [
     "is_bundle_newer_than_cache",
     "load_bundle",
     "load_bundle_with_fallback",
+    "write_live_insights",
 ]
