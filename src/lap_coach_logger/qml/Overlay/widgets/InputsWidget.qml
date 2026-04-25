@@ -26,6 +26,11 @@ GlassSurface {
     property bool lockup: false
     property bool wheelspin: false
     property real smoothness: 0.75  // 0–1
+    // T161: degraded state — input telemetry stalled (sim
+    // disconnected, paused). When true an overlay "SENSOR
+    // STALE" banner is shown so the user knows pedal-bars at
+    // 0% mean "no data" not "foot off".
+    property bool degraded: false
 
     // G-force trail (ring buffer)
     property var _trail: []
@@ -340,6 +345,29 @@ GlassSurface {
                 font { family: Theme.Typography.monoFamily; pixelSize: Math.round(9 * root.fontScale); weight: Font.Bold }
                 color: Theme.Tokens.steel
             }
+        }
+    }
+
+    // ── T161: SENSOR STALE overlay banner ─────────────────────────────
+    Rectangle {
+        visible: root.degraded
+        anchors.centerIn: parent
+        width: staleText.implicitWidth + 16
+        height: staleText.implicitHeight + 8
+        radius: 4
+        color: Qt.rgba(Theme.Tokens.marshalYellow.r, Theme.Tokens.marshalYellow.g, Theme.Tokens.marshalYellow.b, 0.15)
+        border.width: 1
+        border.color: Theme.Tokens.marshalYellow
+
+        Text {
+            id: staleText
+            anchors.centerIn: parent
+            text: "SENSOR STALE"
+            font.family: Theme.Typography.monoFamily
+            font.pixelSize: Math.round(10 * root.fontScale)
+            font.weight: Font.Bold
+            font.letterSpacing: 1.2
+            color: Theme.Tokens.marshalYellow
         }
     }
 }

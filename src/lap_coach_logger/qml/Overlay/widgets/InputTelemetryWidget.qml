@@ -26,6 +26,11 @@ Rectangle {
     property int  gear: 0
     property real rpm: 0.0
     property real maxRpm: 8000.0
+    // T161: degraded state — input telemetry stalled (sim
+    // disconnected, paused). When true an overlay "SENSOR
+    // STALE" banner is shown so the user knows pedal-bars at
+    // 0% mean "no data" not "foot off".
+    property bool degraded: false
 
     // ── Null-safe clampers ──────────────────────────────────────────
     function clamp01(v) { return Math.max(0, Math.min(1, v || 0)) }
@@ -293,6 +298,29 @@ Rectangle {
                     }
                 }
             }
+        }
+    }
+
+    // ── T161: SENSOR STALE overlay banner ─────────────────────────────
+    Rectangle {
+        visible: root.degraded
+        anchors.centerIn: parent
+        width: staleText.implicitWidth + 16
+        height: staleText.implicitHeight + 8
+        radius: 4
+        color: Qt.rgba(Theme.Tokens.marshalYellow.r, Theme.Tokens.marshalYellow.g, Theme.Tokens.marshalYellow.b, 0.15)
+        border.width: 1
+        border.color: Theme.Tokens.marshalYellow
+
+        Text {
+            id: staleText
+            anchors.centerIn: parent
+            text: "SENSOR STALE"
+            font.family: Theme.Typography.monoFamily
+            font.pixelSize: Math.round(10 * root.fontScale)
+            font.weight: Font.Bold
+            font.letterSpacing: 1.2
+            color: Theme.Tokens.marshalYellow
         }
     }
 }
