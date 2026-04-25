@@ -46,6 +46,26 @@ _DEFAULT_FUEL_PER_LAP = 3.0
 _FUEL_ARM_THRESHOLD_LAPS = 1.5
 _TIRE_ARM_THRESHOLD_LAPS = 2.0
 
+# T148 push-vs-manage thresholds.
+#
+# Three orthogonal MANAGE triggers — fuel is multi-faceted:
+#
+# - **Margin tight**: buffer over the remaining race is < 1 lap
+#   AND the tank can't accept enough refuel to recover (room
+#   < 2 laps). With a 65 L tank already at 60 L the next pit only
+#   adds ~5 L; you can't push through that. With a 65 L tank at
+#   50 L (5 laps room) the next pit refills enough to absorb a
+#   negative buffer — that's PUSH.
+# - **Fuel critical**: laps-of-fuel-in-tank < 3, regardless of
+#   tank room. Even with a planned refill in 2 laps, you might
+#   coast empty before reaching it.
+# - **Tire wear**: stint has consumed > 70% of life. Matches
+#   T140's pit-arm intuition.
+_FUEL_GUIDANCE_BUFFER_LAPS = 1.0
+_FUEL_GUIDANCE_TANK_ROOM_LAPS = 2.0
+_FUEL_GUIDANCE_CRITICAL_LAPS = 3.0
+_TIRE_GUIDANCE_WEAR_PCT = 0.70
+
 
 class RaceStrategyService:
     """Stateful orchestrator for race-strategy planning.
@@ -134,6 +154,66 @@ class RaceStrategyService:
         )
         self._armed = should_arm
         return self._armed
+
+    def compute_guidance(
+        self,
+        *,
+        current_lap: int,
+        current_fuel: float,
+    ) -> str:
+        """T148: ``"PUSH"`` / ``"MANAGE"`` / ``""`` advisory label.
+
+        Same stint-reset logic as :meth:`update_armed_state` so
+        the auto-arm trigger and the guidance label can't disagree
+        on which stint is active. Decision rule:
+
+        - Empty (``""``) when no baseline strategy exists yet,
+          or the race is over (``current_lap >= total_laps``).
+          Avoids surfacing stale advice.
+        - ``"MANAGE"`` when the tire stint has used more than
+          :data:`_TIRE_GUIDANCE_WEAR_PCT` of its life, OR
+          fuel margin is tight (buffer < 1 lap over remaining
+          race) AND the tank can't accept enough refuel to fix
+          the deficit. With room in the tank, a low buffer is
+          PUSH because the next planned pit absorbs it.
+        - ``"PUSH"`` otherwise.
+
+        Stricter than the T140 auto-arm thresholds: guidance flips
+        to MANAGE *before* the pit indicator arms, so the driver
+        starts conserving before the cliff.
+        """
+        baseline = self._current
+        if baseline is None:
+            return ""
+
+        laps_remaining = baseline.total_laps - current_lap
+        if laps_remaining <= 0:
+            return ""
+
+        fpl = max(baseline.fuel_per_lap, 1e-6)
+        fuel_laps = current_fuel / fpl
+        fuel_buffer_laps = fuel_laps - laps_remaining
+        tank_room_laps = (baseline.fuel_capacity - current_fuel) / fpl
+        margin_tight = (
+            fuel_buffer_laps < _FUEL_GUIDANCE_BUFFER_LAPS
+            and tank_room_laps < _FUEL_GUIDANCE_TANK_ROOM_LAPS
+        )
+        fuel_critical = fuel_laps < _FUEL_GUIDANCE_CRITICAL_LAPS
+        fuel_tight = margin_tight or fuel_critical
+
+        # Tire stint resets at most-recent crossed planned pit
+        # stop — same convention as T140 update_armed_state.
+        stint_start_lap = 0
+        for stop in baseline.pit_stops:
+            if stop.lap <= current_lap and stop.lap > stint_start_lap:
+                stint_start_lap = stop.lap
+        laps_into_stint = max(0, current_lap - stint_start_lap)
+        tire_wear_pct = (
+            laps_into_stint / max(baseline.tire_life_laps, 1)
+        )
+
+        manage = fuel_tight or tire_wear_pct > _TIRE_GUIDANCE_WEAR_PCT
+        return "MANAGE" if manage else "PUSH"
 
     def compute_pre_race(
         self,

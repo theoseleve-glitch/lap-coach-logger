@@ -66,6 +66,7 @@ class OverlayViewModel(QObject):
     accentChanged = Signal()
     strategyChanged = Signal()
     pitArmedChanged = Signal()
+    strategyGuidanceChanged = Signal()
     tireChanged = Signal()
 
     # -- widget category mapping -----------------------------------------------
@@ -179,6 +180,11 @@ class OverlayViewModel(QObject):
         # has to call clearPitArmedOverride() to release control
         # back to auto.
         self._pit_armed_user_overridden: bool = False
+        # T148: PUSH/MANAGE/"" advisory string from
+        # RaceStrategyService.compute_guidance, refreshed each
+        # per-lap recalc. Stored separately so QML signals only
+        # fire on transition (avoids per-lap rebinds).
+        self._strategy_guidance: str = ""
         self._strategy_total_laps: int = 0
         self._strategy_fuel_capacity: float = 65.0
         self._strategy_pit_time: float = 25.0
@@ -560,6 +566,16 @@ class OverlayViewModel(QObject):
         from the service after each live recalc."""
         return self._pit_armed
 
+    @Property(str, notify=strategyGuidanceChanged)
+    def strategyGuidance(self) -> str:  # noqa: N802
+        """T148: ``"PUSH"`` / ``"MANAGE"`` / ``""`` advisory.
+
+        QML strategy widget binds the visible label against this
+        property; the VM refreshes it from
+        :meth:`RaceStrategyService.compute_guidance` after each
+        live recalc. Empty string hides the label."""
+        return self._strategy_guidance
+
     # -- Redesign v2: derived widget state -------------------------------------
 
     @Property(int, notify=strategyChanged)
@@ -908,6 +924,22 @@ class OverlayViewModel(QObject):
         self._strategy = new_strategy
         self._apply_strategy(new_strategy)
         self._refresh_pit_armed()
+        self._refresh_strategy_guidance()
+
+    def _refresh_strategy_guidance(self) -> None:
+        """T148: re-evaluate the PUSH/MANAGE label from the
+        service and emit :attr:`strategyGuidanceChanged` only on
+        transition. Idempotent: identical inputs → identical
+        guidance → no signal, so QML doesn't rebind on every
+        per-lap recalc when nothing has changed."""
+        new_guidance = self._strategy_service.compute_guidance(
+            current_lap=self._lap_number,
+            current_fuel=self._fuel_level,
+        )
+        if new_guidance == self._strategy_guidance:
+            return
+        self._strategy_guidance = new_guidance
+        self.strategyGuidanceChanged.emit()
 
     def _refresh_pit_armed(self) -> None:
         """T141: ask the service to re-evaluate auto-arming and

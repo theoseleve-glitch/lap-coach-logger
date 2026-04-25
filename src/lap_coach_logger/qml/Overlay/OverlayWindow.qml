@@ -354,6 +354,7 @@ Item {
             totalLaps: overlayVM ? overlayVM.strategyTotalLaps : 0
             currentLap: overlayVM ? overlayVM.lapNumber : 0
             pitArmed: overlayVM ? overlayVM.pitArmed : false
+            guidance: overlayVM ? overlayVM.strategyGuidance : ""
         }
     }
 

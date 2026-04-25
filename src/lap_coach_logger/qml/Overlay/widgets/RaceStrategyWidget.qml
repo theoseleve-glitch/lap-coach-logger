@@ -24,6 +24,7 @@ Rectangle {
     property int  currentLap: 0
     property string weatherAlert: ""
     property bool pitArmed: false  // T141: VM-driven armed-for-pit indicator
+    property string guidance: ""   // T148: VM-driven PUSH/MANAGE label
 
     // -- helpers --
     function safeFix(v, d) { return isFinite(v) ? v.toFixed(d) : "--" }
@@ -132,6 +133,33 @@ Rectangle {
                     loops: Animation.Infinite
                     NumberAnimation { from: 0.55; to: 1.0; duration: 600 }
                     NumberAnimation { from: 1.0; to: 0.55; duration: 600 }
+                }
+            }
+
+            // T148: PUSH/MANAGE advisory label. Empty string hides
+            // the pill so we don't render a blank chip in the header.
+            Rectangle {
+                id: guidanceBadge
+                visible: root.guidance !== ""
+                implicitWidth: guidanceLabel.implicitWidth + 10
+                implicitHeight: 14
+                radius: 3
+                readonly property color guidanceColor: root.guidance === "MANAGE"
+                    ? Theme.Tokens.pitOrange
+                    : Theme.Tokens.acidGreen
+                color: Theme.Tokens.subtle(guidanceColor, 0.12)
+                border.width: 1
+                border.color: Theme.Tokens.subtle(guidanceColor, 0.25)
+
+                Text {
+                    id: guidanceLabel
+                    anchors.centerIn: parent
+                    text: root.guidance
+                    font.family: Theme.Typography.monoFamily
+                    font.pixelSize: Math.round(7 * root.fontScale)
+                    font.weight: Font.Bold
+                    font.letterSpacing: 0.8
+                    color: parent.guidanceColor
                 }
             }
 
