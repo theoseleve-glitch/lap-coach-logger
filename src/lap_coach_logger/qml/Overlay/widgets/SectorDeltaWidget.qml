@@ -19,9 +19,15 @@ Rectangle {
     // -- public API -------------------------------------------------------
     // Array of deltas [s1, s2, s3] in seconds. Empty = no data.
     property var deltas: []
+    // T164: degraded state — telemetry stalled. When true
+    // every sector flips to "—" simultaneously (re-uses the
+    // existing null path), so the user can tell the whole
+    // pipeline died from individual missing-sector data.
+    property bool degraded: false
 
     // -- helpers ----------------------------------------------------------
     function deltaFor(idx) {
+        if (root.degraded) return null
         if (!deltas || deltas.length <= idx) return null
         var v = deltas[idx]
         return isFinite(v) ? v : null
