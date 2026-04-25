@@ -224,7 +224,7 @@ Item {
 
         MenuItem {
             text: "Export CSV"
-            // Will be wired in later task
+            // T070: replace with "View in webapp" link (push user to webapp per Q95)
         }
         MenuItem {
             text: "Copy Session ID"

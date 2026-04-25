@@ -119,7 +119,9 @@ Item {
                             onClicked: {
                                 if (modelData.label === "Open Folder")
                                     serviceVM.openOutputFolder()
-                                // Other actions to be wired in later tasks
+                                // T067: wire "Reprocess" → backend /sessions/:id/reprocess
+                                // T069: wire "Delete" with confirm dialog
+                                // T070: replace "Export CSV" with "View in webapp" link
                             }
                         }
                     }
@@ -513,7 +515,7 @@ Item {
                 }
             }
 
-            // --- Telemetry (placeholder) ---
+            // --- Telemetry (placeholder, removed by T073) ---
             Item {
                 Column {
                     anchors.centerIn: parent
@@ -538,7 +540,7 @@ Item {
                 }
             }
 
-            // --- Setup (placeholder) ---
+            // --- Setup (placeholder, removed by T073) ---
             Item {
                 Column {
                     anchors.centerIn: parent
@@ -563,7 +565,7 @@ Item {
                 }
             }
 
-            // --- Engineering (placeholder) ---
+            // --- Engineering (placeholder, removed by T073) ---
             Item {
                 Column {
                     anchors.centerIn: parent
