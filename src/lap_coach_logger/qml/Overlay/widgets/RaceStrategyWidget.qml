@@ -23,6 +23,7 @@ Rectangle {
     property int  totalLaps: 0
     property int  currentLap: 0
     property string weatherAlert: ""
+    property bool pitArmed: false  // T141: VM-driven armed-for-pit indicator
 
     // -- helpers --
     function safeFix(v, d) { return isFinite(v) ? v.toFixed(d) : "--" }
@@ -97,6 +98,40 @@ Rectangle {
                     font.weight: Font.Bold
                     font.letterSpacing: 0.8
                     color: Theme.Tokens.acidGreen
+                }
+            }
+
+            // T141: pit-armed indicator. Pulses in safetyRed when the
+            // service detects fuel-window or tire-life threshold; the
+            // colour change + text are the dual-cue spec deliverable.
+            Rectangle {
+                id: armedBadge
+                visible: root.pitArmed
+                implicitWidth: armedLabel.implicitWidth + 10
+                implicitHeight: 14
+                radius: 3
+                color: Theme.Tokens.subtle(Theme.Tokens.safetyRed, 0.20)
+                border.width: 1
+                border.color: Theme.Tokens.safetyRed
+
+                Text {
+                    id: armedLabel
+                    anchors.centerIn: parent
+                    text: "ARMED"
+                    font.family: Theme.Typography.monoFamily
+                    font.pixelSize: Math.round(7 * root.fontScale)
+                    font.weight: Font.Bold
+                    font.letterSpacing: 0.8
+                    color: Theme.Tokens.safetyRed
+                }
+
+                // Subtle attention-pulse so the indicator reads as
+                // 'live' rather than a static label.
+                SequentialAnimation on opacity {
+                    running: root.pitArmed
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 0.55; to: 1.0; duration: 600 }
+                    NumberAnimation { from: 1.0; to: 0.55; duration: 600 }
                 }
             }
 

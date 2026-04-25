@@ -65,6 +65,7 @@ class OverlayViewModel(QObject):
     settingsSaveRequested = Signal()
     accentChanged = Signal()
     strategyChanged = Signal()
+    pitArmedChanged = Signal()
     tireChanged = Signal()
 
     # -- widget category mapping -----------------------------------------------
@@ -165,6 +166,7 @@ class OverlayViewModel(QObject):
         self._strategy_vm: object | None = None  # StrategyViewModel reference
         self._strategy_service: RaceStrategyService = RaceStrategyService()
         self._strategy: RaceStrategy | None = None
+        self._pit_armed: bool = False  # T141: surface service.armed to QML
         self._strategy_total_laps: int = 0
         self._strategy_fuel_capacity: float = 65.0
         self._strategy_pit_time: float = 25.0
@@ -537,6 +539,15 @@ class OverlayViewModel(QObject):
         """One-line weather alert text from the strategy plan."""
         return self._strategy_weather_alert
 
+    @Property(bool, notify=pitArmedChanged)
+    def pitArmed(self) -> bool:  # noqa: N802
+        """T141: pit-armed state from :class:`RaceStrategyService`.
+
+        QML's strategy widget binds an ``ARMED`` indicator and
+        colour change against this property; the VM updates it
+        from the service after each live recalc."""
+        return self._pit_armed
+
     # -- Redesign v2: derived widget state -------------------------------------
 
     @Property(int, notify=strategyChanged)
@@ -884,6 +895,20 @@ class OverlayViewModel(QObject):
             return
         self._strategy = new_strategy
         self._apply_strategy(new_strategy)
+        self._refresh_pit_armed()
+
+    def _refresh_pit_armed(self) -> None:
+        """T141: ask the service to re-evaluate auto-arming and
+        mirror the result onto :attr:`pitArmed`. Emits
+        :attr:`pitArmedChanged` only on transition so QML doesn't
+        rebind unnecessarily."""
+        new_armed = self._strategy_service.update_armed_state(
+            current_lap=self._lap_number,
+            current_fuel=self._fuel_level,
+        )
+        if new_armed != self._pit_armed:
+            self._pit_armed = new_armed
+            self.pitArmedChanged.emit()
 
     def _apply_strategy(self, strat: RaceStrategy) -> None:
         """Push strategy results into QML-bindable properties."""

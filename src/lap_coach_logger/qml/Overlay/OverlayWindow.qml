@@ -353,6 +353,7 @@ Item {
             fuelAtFinish: overlayVM ? overlayVM.strategyFuelAtFinish : 0
             totalLaps: overlayVM ? overlayVM.strategyTotalLaps : 0
             currentLap: overlayVM ? overlayVM.lapNumber : 0
+            pitArmed: overlayVM ? overlayVM.pitArmed : false
         }
     }
 
