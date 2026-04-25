@@ -158,6 +158,21 @@ class CoachingCardViewModel(QObject):
         self.insightChanged.emit()
 
     @Slot(str)
+    def set_verbosity(self, level: str) -> None:  # noqa: N802
+        """T113: react to a mode-driven coaching cadence change.
+
+        Maps coaching_verbosity → enabled flag:
+        - ``"off"`` ⇒ disabled (drains queue, surfaces nothing)
+        - ``"minimal"`` / ``"verbose"`` ⇒ enabled
+
+        The verbose-vs-minimal distinction within "live" is a
+        future tuning concern — T092's cooldown filter is
+        configurable but T113 doesn't yet swap it; verbose just
+        means "card stays live", same as minimal at this layer.
+        """
+        self._enabled = level != "off"
+
+    @Slot(str)
     def flag_as_wrong(self, reason: str) -> None:  # noqa: N802
         """User flagged the current insight as wrong / not
         applicable. Forwards ``(insight, reason)`` to the
