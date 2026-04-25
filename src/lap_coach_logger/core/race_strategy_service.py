@@ -71,6 +71,15 @@ _TIRE_GUIDANCE_WEAR_PCT = 0.70
 # slow a single corner and don't trigger a strategy divergence.
 _SAFETY_CAR_FLAGS = frozenset({"caution", "caution_waving"})
 
+# T150: identifiers that signal a full-course yellow phase
+# without (necessarily) a safety car deployment. LMU emits
+# ``"full_course_yellow"`` from its session-status enum
+# (game phase 6, the Code 60-style FCY phase). Adapters that
+# distinguish FCY from SC call ``on_full_course_yellow_detected``
+# rather than the safety-car path so the bundle can show which
+# kind of caution drove each plan divergence.
+_FULL_COURSE_YELLOW_FLAGS = frozenset({"full_course_yellow"})
+
 
 def is_safety_car_flag(flag_state: str) -> bool:
     """T149: classify an iRacing flag string as safety-car.
@@ -81,6 +90,17 @@ def is_safety_car_flag(flag_state: str) -> bool:
     flags — local yellows do not divert the plan.
     """
     return flag_state in _SAFETY_CAR_FLAGS
+
+
+def is_full_course_yellow_flag(flag_state: str) -> bool:
+    """T150: classify a session-status string as full-course
+    yellow. Distinct from :func:`is_safety_car_flag` so iRacing's
+    caution flags drive the SC path while LMU's
+    ``"full_course_yellow"`` drives the FCY path — adapters
+    forward whichever identifier their telemetry produces, no
+    double-counting because the strings don't overlap.
+    """
+    return flag_state in _FULL_COURSE_YELLOW_FLAGS
 
 
 class RaceStrategyService:
@@ -98,6 +118,11 @@ class RaceStrategyService:
         # bundle (T146 plan-vs-actual) reads this to explain
         # divergence from the baseline plan.
         self._safety_car_events: list[int] = []
+        # T150: laps on which a full-course yellow phase was
+        # detected. Tracked separately from safety-car events
+        # so the bundle can show "1 SC + 2 FCY" rather than
+        # conflating them as a single caution count.
+        self._full_course_yellow_events: list[int] = []
 
     @property
     def current(self) -> RaceStrategy | None:
@@ -113,6 +138,13 @@ class RaceStrategyService:
         Returns a *copy* so callers can't mutate the internal
         event log."""
         return list(self._safety_car_events)
+
+    @property
+    def full_course_yellow_events(self) -> list[int]:
+        """T150: laps at which a full-course yellow triggered
+        recalcs. Copy-on-read for the same reason as
+        :attr:`safety_car_events`."""
+        return list(self._full_course_yellow_events)
 
     @property
     def armed(self) -> bool:
@@ -211,6 +243,32 @@ class RaceStrategyService:
         if new_strategy is None:
             return None
         self._safety_car_events.append(current_lap)
+        return new_strategy
+
+    def on_full_course_yellow_detected(
+        self,
+        *,
+        current_lap: int,
+        current_fuel: float,
+        fuel_per_lap: float | None,
+    ) -> RaceStrategy | None:
+        """T150: handle a full-course-yellow trigger.
+
+        Same shape as :meth:`on_safety_car_detected` — recalcs
+        from current telemetry and records ``current_lap`` in
+        :attr:`full_course_yellow_events`. Tracked separately
+        from SC events because endurance racing distinguishes
+        Code 60-style FCY phases from full SC deployments and
+        the post-race bundle should reflect that.
+        """
+        new_strategy = self.recalculate_from_telemetry(
+            current_lap=current_lap,
+            current_fuel=current_fuel,
+            fuel_per_lap=fuel_per_lap,
+        )
+        if new_strategy is None:
+            return None
+        self._full_course_yellow_events.append(current_lap)
         return new_strategy
 
     def compute_guidance(
@@ -347,4 +405,8 @@ class RaceStrategyService:
         return self._current
 
 
-__all__ = ["RaceStrategyService", "is_safety_car_flag"]
+__all__ = [
+    "RaceStrategyService",
+    "is_safety_car_flag",
+    "is_full_course_yellow_flag",
+]
