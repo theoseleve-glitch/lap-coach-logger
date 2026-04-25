@@ -77,6 +77,7 @@ class IngestClient:
         max_retries: int = 3,
         base_backoff_s: float = 1.0,
         sleep: Callable[[float], None] = time.sleep,
+        auth_refresh: Callable[[], str] | None = None,
     ) -> None:
         if chunk_size_bytes <= 0:
             raise ValueError("chunk_size_bytes must be positive")
@@ -89,6 +90,7 @@ class IngestClient:
         self._max_retries = max_retries
         self._base_backoff_s = base_backoff_s
         self._sleep = sleep
+        self._auth_refresh = auth_refresh
 
     @property
     def base_url(self) -> str:
@@ -137,51 +139,73 @@ class IngestClient:
         )
 
         url = f"{self._base_url}{_INGEST_ENDPOINT}"
-        headers = {
-            "Content-Type": f"multipart/form-data; boundary={boundary}",
-            "Authorization": f"Bearer {self._auth_token}",
-            "Content-Length": str(len(body)),
-        }
-
         # T043: Idempotency-Key = session UUIDv7 so the backend can
         # short-circuit duplicate uploads of the same session.
         idempotency_key = _session_idempotency_key(manifest_bytes)
-        if idempotency_key:
-            headers["Idempotency-Key"] = idempotency_key
 
         last_failure: IngestResult | None = None
+        refreshed = False  # T049: refresh runs at most once per upload call.
         # T048: total attempts = 1 initial + max_retries. Sleep between
         # attempts only — never after the final attempt.
         for attempt in range(self._max_retries + 1):
-            try:
-                req = Request(url, data=body, headers=headers, method="POST")
-                with urlopen(req, timeout=self._timeout_s) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    payload = json.loads(raw) if raw else {}
-                    result = IngestResult(
-                        success=True,
-                        session_id=payload.get("session_id"),
-                        ingest_job_id=payload.get("ingest_job_id"),
-                        status_stream_url=payload.get("status_stream"),
-                        http_status=resp.status,
+            while True:  # T049 inner loop: 401 refresh-retry is free.
+                headers = {
+                    "Content-Type": f"multipart/form-data; boundary={boundary}",
+                    "Authorization": f"Bearer {self._auth_token}",
+                    "Content-Length": str(len(body)),
+                }
+                if idempotency_key:
+                    headers["Idempotency-Key"] = idempotency_key
+                try:
+                    req = Request(url, data=body, headers=headers, method="POST")
+                    with urlopen(req, timeout=self._timeout_s) as resp:
+                        raw = resp.read().decode("utf-8", errors="replace")
+                        payload = json.loads(raw) if raw else {}
+                        result = IngestResult(
+                            success=True,
+                            session_id=payload.get("session_id"),
+                            ingest_job_id=payload.get("ingest_job_id"),
+                            status_stream_url=payload.get("status_stream"),
+                            http_status=resp.status,
+                        )
+                        _persist_completion_cursor(bundle_dir, result)
+                        return result
+                except HTTPError as exc:
+                    # T049: silent token refresh on 401. Run at most once
+                    # per upload — if the refreshed token is also rejected,
+                    # surface the second 401 instead of looping.
+                    if (
+                        exc.code == 401
+                        and self._auth_refresh is not None
+                        and not refreshed
+                    ):
+                        refreshed = True
+                        try:
+                            self._auth_token = self._auth_refresh()
+                        except Exception:
+                            return IngestResult(
+                                success=False,
+                                http_status=exc.code,
+                                error_code=f"http_{exc.code}",
+                                error_message=str(exc),
+                            )
+                        continue  # inner while: re-issue with the new token.
+                    last_failure = IngestResult(
+                        success=False,
+                        http_status=exc.code,
+                        error_code=f"http_{exc.code}",
+                        error_message=str(exc),
                     )
-                    _persist_completion_cursor(bundle_dir, result)
-                    return result
-            except HTTPError as exc:
-                last_failure = IngestResult(
-                    success=False,
-                    http_status=exc.code,
-                    error_code=f"http_{exc.code}",
-                    error_message=str(exc),
-                )
-                if exc.code not in _TRANSIENT_HTTP_STATUSES:
-                    return last_failure
-            except (URLError, OSError) as exc:
-                last_failure = IngestResult(
-                    success=False,
-                    error_code="connection_error",
-                    error_message=str(exc),
-                )
+                    if exc.code not in _TRANSIENT_HTTP_STATUSES:
+                        return last_failure
+                    break  # outer for: count this attempt against the budget.
+                except (URLError, OSError) as exc:
+                    last_failure = IngestResult(
+                        success=False,
+                        error_code="connection_error",
+                        error_message=str(exc),
+                    )
+                    break  # outer for: transient connection failure.
 
             if attempt < self._max_retries:
                 self._sleep(self._base_backoff_s * (2 ** attempt))
