@@ -11,13 +11,12 @@ Item {
 
     signal backRequested()
 
-    // Map section id to StackLayout index
+    // T073: deep-analysis tabs (telemetry / setup / engineering)
+    // removed; full analysis lives in lap-webapp per Q95. Only
+    // Overview + Laps remain as desktop-side review surfaces.
     readonly property var sectionIndexMap: ({
         "overview": 0,
-        "laps": 1,
-        "telemetry": 2,
-        "setup": 3,
-        "engineering": 4
+        "laps": 1
     })
 
     // T069: confirm dialog for the destructive Delete action.
@@ -301,11 +300,8 @@ Item {
                     leftMargin: Theme.Tokens.xl
                 }
                 model: [
-                    { id: "overview",    label: "Overview" },
-                    { id: "laps",        label: "Laps" },
-                    { id: "telemetry",   label: "Telemetry" },
-                    { id: "setup",       label: "Setup" },
-                    { id: "engineering", label: "Engineering" }
+                    { id: "overview", label: "Overview" },
+                    { id: "laps",     label: "Laps" }
                 ]
                 currentSection: reviewVM.section
                 onSectionRequested: function(sectionId) {
@@ -564,81 +560,6 @@ Item {
                                 }
                             }
                         }
-                    }
-                }
-            }
-
-            // --- Telemetry (placeholder, removed by T073) ---
-            Item {
-                Column {
-                    anchors.centerIn: parent
-                    spacing: Theme.Tokens.md
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "Telemetry"
-                        font.family: Theme.Typography.bodyFamily
-                        font.pixelSize: Theme.Typography.headingSize
-                        font.weight: Theme.Typography.headingWeight
-                        color: Theme.Tokens.chalk
-                    }
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "Coming from legacy migration"
-                        font.family: Theme.Typography.bodyFamily
-                        font.pixelSize: Theme.Typography.bodySize
-                        color: Theme.Tokens.steel
-                    }
-                }
-            }
-
-            // --- Setup (placeholder, removed by T073) ---
-            Item {
-                Column {
-                    anchors.centerIn: parent
-                    spacing: Theme.Tokens.md
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "Setup"
-                        font.family: Theme.Typography.bodyFamily
-                        font.pixelSize: Theme.Typography.headingSize
-                        font.weight: Theme.Typography.headingWeight
-                        color: Theme.Tokens.chalk
-                    }
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "Coming from legacy migration"
-                        font.family: Theme.Typography.bodyFamily
-                        font.pixelSize: Theme.Typography.bodySize
-                        color: Theme.Tokens.steel
-                    }
-                }
-            }
-
-            // --- Engineering (placeholder, removed by T073) ---
-            Item {
-                Column {
-                    anchors.centerIn: parent
-                    spacing: Theme.Tokens.md
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "Engineering"
-                        font.family: Theme.Typography.bodyFamily
-                        font.pixelSize: Theme.Typography.headingSize
-                        font.weight: Theme.Typography.headingWeight
-                        color: Theme.Tokens.chalk
-                    }
-
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: "Coming from legacy migration"
-                        font.family: Theme.Typography.bodyFamily
-                        font.pixelSize: Theme.Typography.bodySize
-                        color: Theme.Tokens.steel
                     }
                 }
             }
