@@ -146,6 +146,75 @@ def search_widgets(query: str, *, show_advanced: bool) -> tuple[str, ...]:
     )
 
 
+# ---------------------------------------------------------------------------
+# T131 — Per-widget thumbnail glyph + tier-keyed color role
+# ---------------------------------------------------------------------------
+# Glyphs stay in the BMP (≤ U+FFFF) so they render with the default
+# Theme.Typography font — emoji require a font that isn't guaranteed
+# on Windows headless / CI builds. The manager UI renders glyph in a
+# Theme.Tokens-coloured rectangle, same trick the NavBar brand mark uses.
+_WIDGET_GLYPHS: dict[str, str] = {
+    # Race tier
+    "lap_delta": "Δ",
+    "fuel": "F",
+    "tires": "○",
+    "coach": "C",
+    "position": "P",
+    "flags": "⚑",
+    "sector_color": "▮",
+    "gap": "↔",
+    # Practice tier
+    "inputs": "I",
+    "pedal_trace": "≈",
+    # Endurance tier
+    "stint_timer": "⏱",
+    "tire_life": "T",
+    "long_run_pace": "~",
+    # Streamer tier
+    "driver_name": "@",
+    "session_clock": "⌚",
+    "weather": "☀",
+    "track_map": "M",
+    # Advanced tier
+    "g_g": "✚",
+    "live_trace": "↯",
+    "gear": "G",
+    "speedometer": "S",
+}
+
+_GLYPH_FALLBACK = "•"
+
+
+# Tier → Theme.Tokens role name. Five distinct colour roles so the
+# tier badge stays glanceable across the manager UI.
+_TIER_TO_COLOR_ROLE: dict[str, str] = {
+    "Race": "pitOrange",
+    "Practice": "acidGreen",
+    "Endurance": "racingPurple",
+    "Streamer": "chalk",
+    "Advanced": "steel",
+}
+
+_COLOR_ROLE_FALLBACK = "steel"
+
+
+def widget_thumbnail_glyph(widget_id: str) -> str:
+    """One-grapheme glyph the manager UI renders as a thumbnail.
+    Unknown widgets fall back to a placeholder so the picker
+    never has to handle an empty cell."""
+    return _WIDGET_GLYPHS.get(widget_id, _GLYPH_FALLBACK)
+
+
+def widget_thumbnail_color_role(widget_id: str) -> str:
+    """Theme.Tokens role for the widget's tier badge. Same role
+    is returned for every widget in a tier — adding a future
+    widget inherits the colour automatically."""
+    category = _WIDGET_TO_CATEGORY.get(widget_id)
+    if category is None:
+        return _COLOR_ROLE_FALLBACK
+    return _TIER_TO_COLOR_ROLE.get(category, _COLOR_ROLE_FALLBACK)
+
+
 __all__ = [
     "WIDGET_CATEGORIES",
     "get_widget_category",
@@ -153,5 +222,7 @@ __all__ = [
     "search_widgets",
     "visible_widget_ids",
     "widget_matches_search",
+    "widget_thumbnail_color_role",
+    "widget_thumbnail_glyph",
     "widgets_in_category",
 ]
