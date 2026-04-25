@@ -33,6 +33,7 @@ from lap_coach_logger.viewmodels import (
 )
 from lap_coach_logger.demo.runner import DemoRunner
 from lap_coach_logger.viewmodels.demo_vm import DemoViewModel
+from lap_coach_logger.mode_preference import ModePreferenceStore
 from lap_coach_logger.viewmodels.mode_vm import ModeViewModel
 from lap_coach_logger.viewmodels.strategy_vm import StrategyViewModel
 from lap_coach_logger.viewmodels.tray_vm import TrayViewModel
@@ -104,7 +105,13 @@ def build_view_models(service: DesktopService) -> dict:
     overlay_vm.settingsSaveRequested.connect(_save_overlay_settings)
 
     # -- Mode VM ---------------------------------------------------------------
-    mode_vm = ModeViewModel()
+    # T117: persist the user's chosen mode under runtime_dir() so a
+    # quit-and-relaunch keeps them in their last mode rather than
+    # snapping back to "sprint" every cold start.
+    mode_preference_store = ModePreferenceStore(
+        state_path=runtime_dir() / "mode_preference.json"
+    )
+    mode_vm = ModeViewModel(preference_store=mode_preference_store)
     service._mode_vm = mode_vm
 
     # -- Strategy VM -----------------------------------------------------------
