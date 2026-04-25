@@ -78,9 +78,10 @@ class NativeBridgeController(QObject):
         setup_logging(debug=config.debug)
 
         # Debounced save scheduler — mirrors qml_bootstrap wiring.
+        # T173: 2.0s window — at most one disk write per 2 seconds.
         cfg_saver = SaveScheduler(
             writer=lambda: cfg_manager.save(config),
-            delay_s=0.5,
+            delay_s=2.0,
         )
 
         health = HealthMonitor()

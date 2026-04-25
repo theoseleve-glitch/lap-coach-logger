@@ -66,9 +66,11 @@ def run(*, debug_override: bool = False) -> None:
     # 2b. Debounced save scheduler. All runtime saves route through it so
     # UI bursts (overlay auto-arrange, slider drags) become one disk write.
     # Captures `config` by closure so the writer always reads latest state.
+    # T173: 2.0s window — at most one disk write per 2 seconds for the
+    # routine UI burst path.
     cfg_saver = SaveScheduler(
         writer=lambda: cfg_manager.save(config),
-        delay_s=0.5,
+        delay_s=2.0,
     )
 
     # 3. Logging (after config so we know debug flag)
