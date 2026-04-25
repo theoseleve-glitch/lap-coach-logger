@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import "../Theme" as Theme
 
@@ -201,26 +202,76 @@ Rectangle {
             }
         }
 
-        // === 6b. Mode badge ===
+        // === 6b. Mode dropdown (T116) ===
+        // Click the badge to open a menu with all 4 modes; selecting
+        // one calls modeVM.setMode(<id>). VM no-ops on re-selection
+        // of the active mode (see ModeViewModel.setMode), so it's
+        // safe to leave items always-enabled.
         Rectangle {
+            id: modeDropdown
             visible: typeof modeVM !== "undefined" && modeVM
-            implicitWidth: modeBadgeText.implicitWidth + 12
+            implicitWidth: modeBadgeText.implicitWidth + modeCaret.implicitWidth + 16
             height: 20
             radius: 4
-            color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.12)
+            color: modeDropdownArea.containsMouse
+                   ? Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.20)
+                   : Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.12)
             border.width: 1
             border.color: Theme.Tokens.subtle(Theme.Tokens.pitOrange, 0.25)
             Layout.alignment: Qt.AlignVCenter
 
-            Text {
-                id: modeBadgeText
+            Row {
                 anchors.centerIn: parent
-                text: (typeof modeVM !== "undefined" && modeVM ? modeVM.activeMode : "").toUpperCase()
-                font.family: Theme.Typography.monoFamily
-                font.pixelSize: 8
-                font.weight: Font.Bold
-                font.letterSpacing: 0.8
-                color: Theme.Tokens.pitOrange
+                spacing: 4
+
+                Text {
+                    id: modeBadgeText
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: (typeof modeVM !== "undefined" && modeVM ? modeVM.activeMode : "").toUpperCase()
+                    font.family: Theme.Typography.monoFamily
+                    font.pixelSize: 8
+                    font.weight: Font.Bold
+                    font.letterSpacing: 0.8
+                    color: Theme.Tokens.pitOrange
+                }
+
+                Text {
+                    id: modeCaret
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "▾"
+                    font.pixelSize: 8
+                    color: Theme.Tokens.pitOrange
+                }
+            }
+
+            MouseArea {
+                id: modeDropdownArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: modeMenu.open()
+            }
+
+            Menu {
+                id: modeMenu
+                y: parent.height + 4
+
+                MenuItem {
+                    text: "Sprint"
+                    onTriggered: modeVM.setMode("sprint")
+                }
+                MenuItem {
+                    text: "Endurance"
+                    onTriggered: modeVM.setMode("endurance")
+                }
+                MenuItem {
+                    text: "Coaching"
+                    onTriggered: modeVM.setMode("coaching")
+                }
+                MenuItem {
+                    text: "Data"
+                    onTriggered: modeVM.setMode("data")
+                }
             }
         }
 
