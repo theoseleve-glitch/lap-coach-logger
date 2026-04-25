@@ -438,4 +438,40 @@ Item {
             color: Theme.Tokens.safetyRed
         }
     }
+
+    // ── T172: Global "Offline — local only" banner ──────────────
+    // Renders when the network is unavailable (cloud sync, sharing,
+    // remote coaching). Wired to overlayVM.offline — falsy default
+    // keeps the banner hidden when the VM doesn't expose the
+    // property yet. Stacks below the T171 coaching banner so both
+    // can show simultaneously without overlap.
+    Rectangle {
+        id: offlineBanner
+        visible: overlayVM ? !!overlayVM.offline : false
+        anchors {
+            top: coachingDisabledBanner.visible
+                 ? coachingDisabledBanner.bottom
+                 : parent.top
+            horizontalCenter: parent.horizontalCenter
+            topMargin: coachingDisabledBanner.visible ? 6 : 12
+        }
+        width: offlineBannerText.implicitWidth + 24
+        height: offlineBannerText.implicitHeight + 12
+        radius: 6
+        color: Qt.rgba(Theme.Tokens.marshalYellow.r, Theme.Tokens.marshalYellow.g, Theme.Tokens.marshalYellow.b, 0.18)
+        border.width: 1
+        border.color: Theme.Tokens.marshalYellow
+        z: 1000
+
+        Text {
+            id: offlineBannerText
+            anchors.centerIn: parent
+            text: "Offline — local only"
+            font.family: Theme.Typography.monoFamily
+            font.pixelSize: 11
+            font.weight: Font.Bold
+            font.letterSpacing: 0.6
+            color: Theme.Tokens.marshalYellow
+        }
+    }
 }
