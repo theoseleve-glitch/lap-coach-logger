@@ -24,7 +24,7 @@ T095 / T096 / T097 / T098, downstream tasks.
 from __future__ import annotations
 
 from collections import deque
-from typing import Any
+from typing import Any, Callable
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
 
@@ -46,6 +46,7 @@ class CoachingCardViewModel(QObject):
         queue: InsightQueue,
         cooldown_filter: InsightCooldownFilter | None = None,
         skill_level: str = "intermediate",
+        audio_player: Callable[[CoachingInsight], None] | None = None,
     ) -> None:
         super().__init__()
         self._queue = queue
@@ -56,6 +57,13 @@ class CoachingCardViewModel(QObject):
         # insight.text. Default mirrors the coaching library's
         # authoring guidance — most users are intermediate.
         self._skill_level = skill_level
+        # T096: optional audio cue. None = silent. Callback
+        # receives the CoachingInsight when it becomes the
+        # current card (poll integrates it, or dismiss advances
+        # to it). Configurable via the user's "Enable voice
+        # cues" setting — bootstrap reads the setting and
+        # passes either a real player or None.
+        self._audio_player = audio_player
         self._current: CoachingInsight | None = None
         self._pending: deque[CoachingInsight] = deque()
 
@@ -112,8 +120,10 @@ class CoachingCardViewModel(QObject):
             return
 
         self._pending.extend(new_insights)
-        if self._current is None and self._pending:
+        was_empty = self._current is None
+        if was_empty and self._pending:
             self._current = self._pending.popleft()
+            self._maybe_play_audio_cue()
         self.insightChanged.emit()
 
     @Slot()
@@ -123,7 +133,18 @@ class CoachingCardViewModel(QObject):
         if self._current is None:
             return
         self._current = self._pending.popleft() if self._pending else None
+        if self._current is not None:
+            self._maybe_play_audio_cue()
         self.insightChanged.emit()
+
+    # -- internals -------------------------------------------------------------
+
+    def _maybe_play_audio_cue(self) -> None:
+        """Fire the configured audio cue for the current insight.
+        Always called when ``_current`` just became non-None."""
+        if self._audio_player is None or self._current is None:
+            return
+        self._audio_player(self._current)
 
 
 __all__ = ["CoachingCardViewModel"]
