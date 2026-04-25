@@ -18,6 +18,11 @@ Rectangle {
     property string flag: "none"    // green|yellow|red|blue|white|checkered|none
     property int    sector: 0
     property string message: ""
+    // T165: degraded state — marshal post stream stalled (sim
+    // disconnect). When true an overlay "TELEMETRY STALE"
+    // banner is shown so the user knows "CLEAR" might be a
+    // stale value.
+    property bool degraded: false
 
     // -- derived (null-safe) -------------------------------------------------
     readonly property string safeFlag: (flag || "none").toLowerCase()
@@ -201,5 +206,28 @@ Rectangle {
         }
 
         Item { Layout.fillHeight: true }
+    }
+
+    // -- T165: TELEMETRY STALE overlay banner -------------------------------
+    Rectangle {
+        visible: root.degraded
+        anchors.centerIn: parent
+        width: staleText.implicitWidth + 12
+        height: staleText.implicitHeight + 6
+        radius: 4
+        color: Qt.rgba(Theme.Tokens.marshalYellow.r, Theme.Tokens.marshalYellow.g, Theme.Tokens.marshalYellow.b, 0.20)
+        border.width: 1
+        border.color: Theme.Tokens.marshalYellow
+
+        Text {
+            id: staleText
+            anchors.centerIn: parent
+            text: "TELEMETRY STALE"
+            font.family: Theme.Typography.monoFamily
+            font.pixelSize: Math.round(8 * root.fontScale)
+            font.weight: Font.Bold
+            font.letterSpacing: 1.0
+            color: Theme.Tokens.marshalYellow
+        }
     }
 }
