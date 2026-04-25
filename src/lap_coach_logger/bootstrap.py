@@ -93,6 +93,16 @@ def run(*, debug_override: bool = False) -> None:
         "Error telemetry: %s", "enabled (Sentry)" if sentry_active else "disabled"
     )
 
+    # T057: forward QML / Qt critical+ messages to Sentry. QML throws
+    # surface as Qt log messages at QtCriticalMsg severity, never as
+    # Python exceptions, so Sentry's default sys.excepthook misses
+    # them entirely. Skip the install when Sentry is off — Qt's
+    # default stderr handler keeps working unmodified.
+    if sentry_active:
+        import sentry_sdk
+        from lap_coach_logger.utils.sentry_qt import install_qt_message_handler
+        install_qt_message_handler(sentry_capture=sentry_sdk.capture_message)
+
     # 4. Validate config
     errors = config.validate()
     if errors:
