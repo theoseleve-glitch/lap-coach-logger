@@ -21,7 +21,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 
 class RuleBundleParseError(ValueError):
@@ -29,6 +33,14 @@ class RuleBundleParseError(ValueError):
     :class:`RuleBundle` — invalid JSON, missing required fields,
     wrong types, etc. Wraps the underlying error so callers don't
     have to depend on the ``json`` module to pattern-match."""
+
+
+class RuleBundleFetchError(RuntimeError):
+    """Raised when the HTTP fetch for a bundle fails — network
+    error, non-2xx status, or malformed JSON in a 2xx response.
+    Distinct from :class:`RuleBundleParseError` so callers can
+    decide between "fall back to cache" (fetch error) and "cache
+    is now corrupted" (parse error)."""
 
 
 @dataclass(frozen=True)
@@ -141,4 +153,132 @@ def _build_rule(entry: Any, *, index: int) -> Rule:
     )
 
 
-__all__ = ["Rule", "RuleBundle", "RuleBundleParseError", "load_bundle"]
+@dataclass(frozen=True)
+class CachedBundle:
+    """A bundle loaded back from the on-disk cache, paired with
+    the verbatim raw payload so T078 can sig-verify it without
+    re-fetching from the server."""
+
+    bundle: RuleBundle
+    raw_payload: str
+    cached_at: str  # ISO 8601 UTC
+
+
+_RULES_BUNDLE_PATH = "/api/v1/coaching/rules-bundle"
+
+
+class RuleBundleHttpClient:
+    """HTTP client for the compiled rules-bundle endpoint.
+
+    Mirrors :class:`IngestClient`'s shape: ``base_url`` is the
+    server origin, transport is injectable for hermetic tests, and
+    auth is a Bearer token passed at call-time so the same client
+    instance survives token rotation.
+    """
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        path: str = _RULES_BUNDLE_PATH,
+        opener: Callable[[Request], Any] | None = None,
+    ) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._path = path
+        self._opener = opener if opener is not None else urlopen
+
+    def fetch(self, *, auth_token: str) -> tuple[RuleBundle, str]:
+        """Fetch the latest compiled bundle.
+
+        Returns ``(parsed_bundle, raw_payload)``; the raw payload
+        is what T078 sig-verifies against and what
+        :class:`RuleBundleCache` persists.
+        """
+        request = Request(
+            f"{self._base_url}{self._path}",
+            headers={"Authorization": f"Bearer {auth_token}"},
+            method="GET",
+        )
+        try:
+            with self._opener(request) as response:
+                raw_bytes = response.read()
+        except HTTPError as exc:
+            raise RuleBundleFetchError(
+                f"server returned HTTP {exc.code}"
+            ) from exc
+        except URLError as exc:
+            raise RuleBundleFetchError(f"network error: {exc.reason}") from exc
+
+        try:
+            raw_payload = raw_bytes.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise RuleBundleFetchError("response was not valid UTF-8") from exc
+
+        try:
+            bundle = load_bundle(raw_payload)
+        except RuleBundleParseError as exc:
+            raise RuleBundleFetchError(
+                f"server returned malformed bundle: {exc}"
+            ) from exc
+
+        return bundle, raw_payload
+
+
+class RuleBundleCache:
+    """Disk cache for the compiled rules bundle.
+
+    Persists the **raw** server payload verbatim so T078 can
+    signature-verify against it byte-for-byte. Re-parses on load.
+    Missing / corrupt files collapse to ``None`` so callers can
+    cold-start (typically: re-fetch from the server) without
+    user intervention.
+    """
+
+    def __init__(self, *, path: Path) -> None:
+        self._path = Path(path)
+
+    def save(self, raw_payload: str) -> None:
+        """Persist ``raw_payload`` to disk with a ``cached_at``
+        timestamp. Creates parent directories as needed."""
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        envelope = {
+            "cached_at": datetime.now(timezone.utc).isoformat(),
+            "payload": raw_payload,
+        }
+        self._path.write_text(json.dumps(envelope), encoding="utf-8")
+
+    def load(self) -> CachedBundle | None:
+        """Return the cached bundle, or ``None`` for any reason
+        the cache can't satisfy the request (missing, corrupt,
+        old shape, payload no longer parseable)."""
+        if not self._path.exists():
+            return None
+        try:
+            envelope = json.loads(self._path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+        if not isinstance(envelope, dict):
+            return None
+        raw_payload = envelope.get("payload")
+        cached_at = envelope.get("cached_at")
+        if not isinstance(raw_payload, str) or not isinstance(cached_at, str):
+            return None
+        try:
+            bundle = load_bundle(raw_payload)
+        except RuleBundleParseError:
+            return None
+        return CachedBundle(
+            bundle=bundle, raw_payload=raw_payload, cached_at=cached_at
+        )
+
+
+__all__ = [
+    "CachedBundle",
+    "Rule",
+    "RuleBundle",
+    "RuleBundleCache",
+    "RuleBundleFetchError",
+    "RuleBundleHttpClient",
+    "RuleBundleParseError",
+    "load_bundle",
+]
