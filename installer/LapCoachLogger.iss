@@ -81,5 +81,13 @@ Name: "{autodesktop}\\{#AppName}"; Filename: "{app}\\{#AppExeName}"; Tasks: desk
 [Run]
 Filename: "{app}\\{#AppExeName}"; Description: "Launch {#AppName}"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
 
+; T181: Track the runtime-written Windows autostart entry so the
+; uninstaller cleans it up. The app writes this value at runtime
+; via winreg when the user enables "start with Windows" — without
+; the uninsdeletevalue flag, uninstalling leaves Windows trying to
+; launch a missing exe at every login.
+[Registry]
+Root: HKCU; Subkey: "Software\\Microsoft\\Windows\\CurrentVersion\\Run"; ValueType: none; ValueName: "LapCoach.Logger"; Flags: dontcreatekey uninsdeletevalue
+
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
