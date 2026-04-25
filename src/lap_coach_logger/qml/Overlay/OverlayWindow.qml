@@ -406,4 +406,36 @@ Item {
             tempRR: overlayVM ? overlayVM.tireTempRR : 0
         }
     }
+
+    // ── T171: Global "Coaching disabled — check backend" banner ─
+    // Renders when the coaching backend is unavailable. Wired to
+    // overlayVM.coachingDisabled — falsy default keeps the banner
+    // hidden when the VM doesn't expose the property yet.
+    Rectangle {
+        id: coachingDisabledBanner
+        visible: overlayVM ? !!overlayVM.coachingDisabled : false
+        anchors {
+            top: parent.top
+            horizontalCenter: parent.horizontalCenter
+            topMargin: 12
+        }
+        width: bannerText.implicitWidth + 24
+        height: bannerText.implicitHeight + 12
+        radius: 6
+        color: Qt.rgba(Theme.Tokens.safetyRed.r, Theme.Tokens.safetyRed.g, Theme.Tokens.safetyRed.b, 0.18)
+        border.width: 1
+        border.color: Theme.Tokens.safetyRed
+        z: 1000
+
+        Text {
+            id: bannerText
+            anchors.centerIn: parent
+            text: "Coaching disabled — check backend"
+            font.family: Theme.Typography.monoFamily
+            font.pixelSize: 11
+            font.weight: Font.Bold
+            font.letterSpacing: 0.6
+            color: Theme.Tokens.safetyRed
+        }
+    }
 }
