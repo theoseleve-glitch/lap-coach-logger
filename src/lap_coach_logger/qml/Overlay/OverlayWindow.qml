@@ -16,6 +16,16 @@ Item {
         function onWidgetSettingsChanged() { root._rev++ }
     }
 
+    // T153: minimal-click acknowledgment for the corner prompt.
+    // Default key 'X'; any wheel-button bind that maps to that
+    // key (Logitech G HUB, Fanatec, gamepad → keyboard) flows
+    // through this single shortcut → VM slot seam.
+    Shortcut {
+        sequence: "X"
+        context: Qt.ApplicationShortcut
+        onActivated: { if (overlayVM) overlayVM.acknowledgeCornerPrompt() }
+    }
+
     function isOn(wid) {
         void(_rev)
         if (!overlayVM) return false

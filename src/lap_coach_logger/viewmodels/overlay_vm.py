@@ -993,6 +993,26 @@ class OverlayViewModel(QObject):
         self._decision_prompt = new_prompt
         self.decisionPromptChanged.emit()
 
+    @safe_slot()
+    @Slot()
+    def acknowledgeCornerPrompt(self) -> None:  # noqa: N802
+        """T153: minimal-click acknowledgment for the corner
+        prompt. Wired from a QML ``Shortcut`` so any keyboard
+        / wheel-button mapping can fire it.
+
+        Clears :attr:`cornerPrompt` to ``""`` and emits
+        :attr:`cornerPromptChanged` (transition-only — calling
+        on an already-empty prompt is a safe no-op so the
+        wheel-button hold doesn't churn QML).
+
+        Per-lap not per-session: the next per-lap insight
+        push (:meth:`_refresh_corner_prompt`) is free to
+        repopulate the prompt with a fresh corner."""
+        if self._corner_prompt == "":
+            return
+        self._corner_prompt = ""
+        self.cornerPromptChanged.emit()
+
     def _refresh_corner_prompt(self, insights: list[CornerInsight]) -> None:
         """T152: pick the highest-time-loss insight from the
         latest lap and surface it as a one-line directive.
