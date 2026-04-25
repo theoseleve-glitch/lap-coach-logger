@@ -151,6 +151,34 @@ def run(*, debug_override: bool = False) -> None:
         platform_release=_platform.release(),
     )
 
+    # T185: best-effort version check. Daemon thread so a slow
+    # / unreachable manifest URL never blocks startup. The
+    # checker captures all errors in the result so the thread
+    # can't crash the app on a network blip.
+    import threading
+    from lap_coach_logger.updates import check_for_updates
+
+    def _run_update_check() -> None:
+        result = check_for_updates(__version__)
+        if result.error:
+            log.info("Update check skipped: %s", result.error)
+        elif result.has_update:
+            log.info(
+                "Update available: v%s (currently v%s)",
+                result.latest_version, result.current_version,
+            )
+        else:
+            log.info(
+                "Update check: app is current (v%s)",
+                result.current_version,
+            )
+
+    threading.Thread(
+        target=_run_update_check,
+        daemon=True,
+        name="update-check",
+    ).start()
+
     # 4. Validate config
     errors = config.validate()
     if errors:
