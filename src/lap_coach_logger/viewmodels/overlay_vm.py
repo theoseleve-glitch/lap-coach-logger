@@ -167,6 +167,12 @@ class OverlayViewModel(QObject):
         self._strategy_service: RaceStrategyService = RaceStrategyService()
         self._strategy: RaceStrategy | None = None
         self._pit_armed: bool = False  # T141: surface service.armed to QML
+        # T142: optional pit-armed audio cue. ``None`` = silent.
+        # Bootstrap sets a real player closure when the user has
+        # ``Enable voice cues`` on; tests inject a list-append.
+        # Fires only on the disarmed → armed transition (not on
+        # disarm, not on stable-armed snapshots).
+        self._pit_arm_audio_player = None
         self._strategy_total_laps: int = 0
         self._strategy_fuel_capacity: float = 65.0
         self._strategy_pit_time: float = 25.0
@@ -901,14 +907,25 @@ class OverlayViewModel(QObject):
         """T141: ask the service to re-evaluate auto-arming and
         mirror the result onto :attr:`pitArmed`. Emits
         :attr:`pitArmedChanged` only on transition so QML doesn't
-        rebind unnecessarily."""
+        rebind unnecessarily.
+
+        T142: on the disarmed → armed transition, fire the
+        configured audio cue if any. Player exceptions are
+        swallowed so a misbehaving audio backend can't break
+        the per-lap recalc."""
         new_armed = self._strategy_service.update_armed_state(
             current_lap=self._lap_number,
             current_fuel=self._fuel_level,
         )
         if new_armed != self._pit_armed:
+            transitioned_to_armed = new_armed and not self._pit_armed
             self._pit_armed = new_armed
             self.pitArmedChanged.emit()
+            if transitioned_to_armed and self._pit_arm_audio_player is not None:
+                try:
+                    self._pit_arm_audio_player()
+                except Exception:  # noqa: BLE001 — audio is opt-in
+                    pass
 
     def _apply_strategy(self, strat: RaceStrategy) -> None:
         """Push strategy results into QML-bindable properties."""
