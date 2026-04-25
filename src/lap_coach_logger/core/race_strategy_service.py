@@ -38,6 +38,14 @@ from lap_coach_logger.core.race_strategy import (
 # in behaviour after the refactor.
 _DEFAULT_FUEL_PER_LAP = 3.0
 
+# T140 auto-arming thresholds. Arm the pit when the *smaller* of
+# (laps-of-fuel, laps-of-tire-stint) is at or below the
+# corresponding threshold. Tuned for typical road-course pit-
+# entry decision time — about a lap of buffer beats a hard
+# 0-lap cliff that fires too late.
+_FUEL_ARM_THRESHOLD_LAPS = 1.5
+_TIRE_ARM_THRESHOLD_LAPS = 2.0
+
 
 class RaceStrategyService:
     """Stateful orchestrator for race-strategy planning.
@@ -76,6 +84,56 @@ class RaceStrategyService:
     def disarm(self) -> None:
         """Clear :attr:`armed` back to ``False``. Idempotent."""
         self._armed = False
+
+    def update_armed_state(
+        self,
+        *,
+        current_lap: int,
+        current_fuel: float,
+    ) -> bool:
+        """T140: re-evaluate :attr:`armed` from current telemetry.
+
+        Arms when *either* the fuel window or the tire-stint
+        window reaches the pit-entry threshold:
+
+        - laps-of-fuel = ``current_fuel / strategy.fuel_per_lap``
+        - laps-of-tire = ``strategy.tire_life_laps - laps_into_stint``,
+          where ``laps_into_stint`` resets at every planned pit
+          stop the lap cursor has crossed.
+
+        Disarms when neither trigger is met — the result reflects
+        current telemetry, not a latched 'once armed always armed'
+        state. Manual override (T143) will compose around this.
+
+        With no cached strategy the call is a no-op (no reference
+        to threshold against): :attr:`armed` is unchanged and the
+        current value is returned.
+        """
+        baseline = self._current
+        if baseline is None:
+            return self._armed
+
+        fpl = max(baseline.fuel_per_lap, 1e-6)
+        laps_of_fuel = current_fuel / fpl
+
+        # Tire stint resets at the most recent planned pit stop
+        # whose lap is <= current_lap. Without this reset, a
+        # 30-lap tire model would arm permanently from lap 30
+        # onwards even though the planner expects fresh tires
+        # after the scheduled stop.
+        stint_start_lap = 0
+        for stop in baseline.pit_stops:
+            if stop.lap <= current_lap and stop.lap > stint_start_lap:
+                stint_start_lap = stop.lap
+        laps_into_stint = max(0, current_lap - stint_start_lap)
+        laps_of_tire = baseline.tire_life_laps - laps_into_stint
+
+        should_arm = (
+            laps_of_fuel <= _FUEL_ARM_THRESHOLD_LAPS
+            or laps_of_tire <= _TIRE_ARM_THRESHOLD_LAPS
+        )
+        self._armed = should_arm
+        return self._armed
 
     def compute_pre_race(
         self,
