@@ -22,7 +22,8 @@ from lap_coach_logger.core.pit_call_state import (
     STATE_ON_PLAN,
     advance_pit_call_state,
 )
-from lap_coach_logger.core.race_strategy import RaceStrategy, calculate_strategy, recalculate_live
+from lap_coach_logger.core.race_strategy import RaceStrategy
+from lap_coach_logger.core.race_strategy_service import RaceStrategyService
 from lap_coach_logger.utils.overlay_hwnd import apply_overlay_flags, apply_overlay_flags_to_all_overlays, remove_overlay_flags
 from lap_coach_logger.utils.qt_safe_slot import safe_slot
 from lap_coach_logger.viewmodels.overlay_helpers import (
@@ -162,6 +163,7 @@ class OverlayViewModel(QObject):
 
         # Race strategy
         self._strategy_vm: object | None = None  # StrategyViewModel reference
+        self._strategy_service: RaceStrategyService = RaceStrategyService()
         self._strategy: RaceStrategy | None = None
         self._strategy_total_laps: int = 0
         self._strategy_fuel_capacity: float = 65.0
@@ -860,13 +862,12 @@ class OverlayViewModel(QObject):
         self._strategy_pit_time = pit_time
         self._strategy_tire_life = tire_life
 
-        fpl = self._fuel_per_lap if self._fuel_per_lap > 0 else 3.0
-        self._strategy = calculate_strategy(
+        self._strategy = self._strategy_service.compute_pre_race(
             total_laps=total_laps,
             fuel_capacity=fuel_capacity,
-            fuel_per_lap=fpl,
-            tire_life_laps=tire_life,
             pit_time_s=pit_time,
+            tire_life_laps=tire_life,
+            fuel_per_lap=self._fuel_per_lap,
         )
         self._apply_strategy(self._strategy)
 
@@ -874,19 +875,13 @@ class OverlayViewModel(QObject):
     @Slot()
     def recalculateLiveStrategy(self) -> None:  # noqa: N802
         """Recalculate strategy from current telemetry."""
-        if self._strategy is None:
-            return
-        fpl = self._fuel_per_lap if self._fuel_per_lap > 0 else self._strategy.fuel_per_lap
-        laps_remaining = self._strategy.total_laps - self._lap_number
-        if laps_remaining <= 0:
-            return
-        new_strategy = recalculate_live(
-            strategy=self._strategy,
+        new_strategy = self._strategy_service.recalculate_from_telemetry(
             current_lap=self._lap_number,
             current_fuel=self._fuel_level,
-            actual_fuel_per_lap=fpl,
-            laps_remaining=laps_remaining,
+            fuel_per_lap=self._fuel_per_lap,
         )
+        if new_strategy is None:
+            return
         self._strategy = new_strategy
         self._apply_strategy(new_strategy)
 
