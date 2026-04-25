@@ -79,8 +79,44 @@ def widgets_in_category(category: str) -> tuple[str, ...]:
     )
 
 
+# ---------------------------------------------------------------------------
+# T129 — "Show advanced" toggle gates Streamer + Advanced tiers
+# ---------------------------------------------------------------------------
+# Both tiers gate behind the same toggle (despite the spec calling it
+# only "Streamer"): Advanced widgets clutter the picker for newcomers
+# the same way Streamer widgets do, and the manager UI doesn't need a
+# second sub-toggle. A user who unhides advanced gets both at once.
+_HIDDEN_BY_DEFAULT_CATEGORIES: frozenset[str] = frozenset({"Streamer", "Advanced"})
+
+
+def is_hidden_by_default(widget_id: str) -> bool:
+    """True iff ``widget_id`` is gated behind the "Show advanced"
+    toggle. Unknown widgets are treated as hidden — forces a
+    catalogue update before a new widget surfaces in the UI
+    (safer to under-show than over-show)."""
+    category = _WIDGET_TO_CATEGORY.get(widget_id)
+    if category is None:
+        return True
+    return category in _HIDDEN_BY_DEFAULT_CATEGORIES
+
+
+def visible_widget_ids(*, show_advanced: bool) -> tuple[str, ...]:
+    """Return every widget id the overlay manager should render
+    given the current toggle state. ``show_advanced=False`` (the
+    default) excludes Streamer + Advanced; ``True`` reveals
+    everything in the catalogue."""
+    if show_advanced:
+        return tuple(_WIDGET_TO_CATEGORY.keys())
+    return tuple(
+        wid for wid in _WIDGET_TO_CATEGORY
+        if not is_hidden_by_default(wid)
+    )
+
+
 __all__ = [
     "WIDGET_CATEGORIES",
     "get_widget_category",
+    "is_hidden_by_default",
+    "visible_widget_ids",
     "widgets_in_category",
 ]
