@@ -20,6 +20,35 @@ Item {
         "engineering": 4
     })
 
+    // T069: confirm dialog for the destructive Delete action.
+    // Uses the standard QtQuick.Dialogs MessageDialog so the look
+    // matches OS conventions (native modal on Windows). On accept,
+    // delegates to serviceVM.deleteSession() which removes the
+    // bundle on disk + the sync queue entry, then we navigate back
+    // to History so the UI doesn't show stale data.
+    Dialog {
+        id: deleteConfirmDialog
+        title: "Delete session?"
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.Yes | Dialog.Cancel
+
+        Text {
+            text: "This will permanently delete the session bundle on disk.\n\nThis cannot be undone."
+            font.family: Theme.Typography.bodyFamily
+            font.pixelSize: Theme.Typography.bodySize
+            color: Theme.Tokens.chalk
+            wrapMode: Text.Wrap
+        }
+
+        onAccepted: {
+            if (reviewVM.path) {
+                serviceVM.deleteSession(reviewVM.path)
+                root.backRequested()
+            }
+        }
+    }
+
     Column {
         anchors.fill: parent
         spacing: 0
@@ -119,8 +148,9 @@ Item {
                             onClicked: {
                                 if (modelData.label === "Open Folder")
                                     serviceVM.openOutputFolder()
+                                else if (modelData.label === "Delete")
+                                    deleteConfirmDialog.open()
                                 // T067: wire "Reprocess" → backend /sessions/:id/reprocess
-                                // T069: wire "Delete" with confirm dialog
                                 // T070: replace "Export CSV" with "View in webapp" link
                             }
                         }

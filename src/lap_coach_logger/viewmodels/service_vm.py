@@ -63,6 +63,12 @@ class ServiceViewModel(QObject):
     toastRequested = Signal(str)
     errorRequested = Signal(str)
 
+    # T069: emitted after a successful deleteSession() so QML can
+    # navigate away from the now-deleted review (otherwise the UI
+    # would still show the bundle's data after the underlying
+    # folder is gone). Argument is the path that was deleted.
+    sessionDeleted = Signal(str)
+
     # -- construction ------------------------------------------------------
 
     def __init__(self, service: DesktopService) -> None:
@@ -158,6 +164,21 @@ class ServiceViewModel(QObject):
     def openConfigFolder(self) -> None:  # noqa: N802
         """Open the config directory."""
         self._service.open_config_folder()
+
+    @Slot(str)
+    def deleteSession(self, path: str) -> None:  # noqa: N802
+        """T069: delete the session bundle at ``path`` and announce it.
+
+        QML calls this from the Review-page Delete button (after a
+        confirm dialog) and listens for ``sessionDeleted`` to
+        navigate away from the now-deleted review. Empty / blank
+        paths are a defensive no-op so a missing-prop bug on the
+        QML side can't trigger a delete on the wrong target.
+        """
+        if not path or not path.strip():
+            return
+        self._service.delete_review_session(path)
+        self.sessionDeleted.emit(path)
 
     # -- internal handlers -------------------------------------------------
 

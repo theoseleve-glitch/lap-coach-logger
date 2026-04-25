@@ -256,6 +256,55 @@ class TestSlotDelegation:
         vm.openConfigFolder()
         svc.open_config_folder.assert_called_once()
 
+    # T069 — Delete button wiring -----------------------------------------
+
+    def test_delete_session_delegates_to_service(self) -> None:
+        """``deleteSession(path)`` must forward to
+        ``DesktopService.delete_review_session(path)`` so the bundle
+        on disk + the sync queue entry are both cleaned up."""
+        svc = _make_service_mock()
+        vm = ServiceViewModel(svc)
+
+        vm.deleteSession("C:/sessions/2026-04-25_Spa")
+
+        svc.delete_review_session.assert_called_once_with(
+            "C:/sessions/2026-04-25_Spa"
+        )
+
+    def test_delete_session_with_empty_path_is_a_safe_noop(self) -> None:
+        """Defensive guard: a missing/empty path from QML must not
+        trigger any delete (would no-op anyway, but the VM short-
+        circuits to make intent clear)."""
+        svc = _make_service_mock()
+        vm = ServiceViewModel(svc)
+
+        vm.deleteSession("")
+        vm.deleteSession("   ")
+
+        svc.delete_review_session.assert_not_called()
+
+    def test_delete_session_emits_session_deleted_signal_on_success(self) -> None:
+        """QML uses this signal to navigate away from the now-
+        deleted review (otherwise the UI would still show the
+        bundle's data after the underlying folder is gone)."""
+        svc = _make_service_mock()
+        vm = ServiceViewModel(svc)
+
+        vm.deleteSession("C:/sessions/2026-04-25_Spa")
+
+        assert vm.sessionDeleted.call_count == 1
+        assert vm.sessionDeleted.call_args == (
+            ("C:/sessions/2026-04-25_Spa",),
+        )
+
+    def test_delete_session_does_not_emit_signal_for_empty_path(self) -> None:
+        svc = _make_service_mock()
+        vm = ServiceViewModel(svc)
+
+        vm.deleteSession("")
+
+        assert vm.sessionDeleted.call_count == 0
+
 
 # ---------------------------------------------------------------------------
 # Greeting logic
