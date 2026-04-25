@@ -64,6 +64,24 @@ class ReviewViewModel(QObject):
         self.dataChanged.emit()
         self.sectionChanged.emit()
 
+    @Slot(str)
+    def notifyInsightViewed(self, insight_id: str) -> None:  # noqa: N802
+        """T064: stub seam for the future coaching UI.
+
+        QML calls this when an insight card becomes visible (or is
+        clicked) so PostHog records the impression. Each call is one
+        event — repeat views of the same insight are intentional
+        (impressions, not state). Blank ids are dropped because they
+        signal a QML wiring bug, not data we want to record.
+        ``analytics.track`` is safe-noop when PostHog isn't wired.
+        """
+        if not insight_id or not insight_id.strip():
+            return
+        from lap_coach_logger import analytics
+        analytics.track(
+            "coaching_insight_viewed", insight_id=insight_id.strip()
+        )
+
     # -- public API ------------------------------------------------------------
 
     def load(self, review: dict) -> None:
