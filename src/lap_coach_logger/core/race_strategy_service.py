@@ -66,6 +66,22 @@ _FUEL_GUIDANCE_TANK_ROOM_LAPS = 2.0
 _FUEL_GUIDANCE_CRITICAL_LAPS = 3.0
 _TIRE_GUIDANCE_WEAR_PCT = 0.70
 
+# T149: iRacing flag strings that signal a *full-course* safety
+# car. Local yellows (``"yellow"`` / ``"yellow_waving"``) only
+# slow a single corner and don't trigger a strategy divergence.
+_SAFETY_CAR_FLAGS = frozenset({"caution", "caution_waving"})
+
+
+def is_safety_car_flag(flag_state: str) -> bool:
+    """T149: classify an iRacing flag string as safety-car.
+
+    Pure helper so the iRacing adapter can call it without
+    holding a service instance (e.g. when forwarding context
+    updates). Returns ``True`` only for the full-course caution
+    flags — local yellows do not divert the plan.
+    """
+    return flag_state in _SAFETY_CAR_FLAGS
+
 
 class RaceStrategyService:
     """Stateful orchestrator for race-strategy planning.
@@ -77,6 +93,11 @@ class RaceStrategyService:
     def __init__(self) -> None:
         self._current: RaceStrategy | None = None
         self._armed: bool = False
+        # T149: laps on which a safety car was detected. Each
+        # entry corresponds to a successful recalc trigger; the
+        # bundle (T146 plan-vs-actual) reads this to explain
+        # divergence from the baseline plan.
+        self._safety_car_events: list[int] = []
 
     @property
     def current(self) -> RaceStrategy | None:
@@ -85,6 +106,13 @@ class RaceStrategyService:
         with no pit stops (which is a real :class:`RaceStrategy`
         instance with ``num_stops == 0``)."""
         return self._current
+
+    @property
+    def safety_car_events(self) -> list[int]:
+        """T149: laps at which a safety-car triggered recalcs.
+        Returns a *copy* so callers can't mutate the internal
+        event log."""
+        return list(self._safety_car_events)
 
     @property
     def armed(self) -> bool:
@@ -154,6 +182,36 @@ class RaceStrategyService:
         )
         self._armed = should_arm
         return self._armed
+
+    def on_safety_car_detected(
+        self,
+        *,
+        current_lap: int,
+        current_fuel: float,
+        fuel_per_lap: float | None,
+    ) -> RaceStrategy | None:
+        """T149: handle a safety-car trigger.
+
+        Re-projects the strategy from current telemetry — SC
+        laps consume less fuel and tires than green pace, so the
+        pit window genuinely shifts — and records ``current_lap``
+        in :attr:`safety_car_events` for the post-race bundle.
+
+        Returns ``None`` (and skips recording) when the recalc
+        itself is a no-op: no baseline strategy, or the race is
+        already over. Mirrors :meth:`recalculate_from_telemetry`'s
+        precondition logic so SC events that arrive in those
+        states don't pollute the event log.
+        """
+        new_strategy = self.recalculate_from_telemetry(
+            current_lap=current_lap,
+            current_fuel=current_fuel,
+            fuel_per_lap=fuel_per_lap,
+        )
+        if new_strategy is None:
+            return None
+        self._safety_car_events.append(current_lap)
+        return new_strategy
 
     def compute_guidance(
         self,
@@ -289,4 +347,4 @@ class RaceStrategyService:
         return self._current
 
 
-__all__ = ["RaceStrategyService"]
+__all__ = ["RaceStrategyService", "is_safety_car_flag"]
