@@ -160,7 +160,22 @@ class IngestClient:
                     req = Request(url, data=body, headers=headers, method="POST")
                     with urlopen(req, timeout=self._timeout_s) as resp:
                         raw = resp.read().decode("utf-8", errors="replace")
-                        payload = json.loads(raw) if raw else {}
+                        # T054: a 2xx with a garbled body must return a typed
+                        # failure rather than letting JSONDecodeError escape.
+                        # Empty body is valid (no payload metadata, but the
+                        # upload itself succeeded).
+                        if raw:
+                            try:
+                                payload = json.loads(raw)
+                            except json.JSONDecodeError as exc:
+                                return IngestResult(
+                                    success=False,
+                                    http_status=resp.status,
+                                    error_code="malformed_response",
+                                    error_message=str(exc),
+                                )
+                        else:
+                            payload = {}
                         result = IngestResult(
                             success=True,
                             session_id=payload.get("session_id"),
