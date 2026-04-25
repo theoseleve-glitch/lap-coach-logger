@@ -51,6 +51,14 @@ class RuleBundleCacheError(RuntimeError):
     ``None`` instead so callers cold-start by re-fetching."""
 
 
+class RuleConditionError(RuntimeError):
+    """Raised when a rule's ``condition`` dict is malformed or
+    references an unsupported operator — almost always a server
+    bug or an out-of-date client. Failing loudly (rather than
+    silently no-firing) makes those bugs visible in logs/Sentry
+    instead of becoming silent gaps in coaching coverage."""
+
+
 @dataclass(frozen=True)
 class Rule:
     """One coaching rule from the bundle."""
@@ -326,6 +334,91 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+_COMPARISONS: dict[str, Callable[[float, float], bool]] = {
+    "lt": lambda a, b: a < b,
+    "lte": lambda a, b: a <= b,
+    "gt": lambda a, b: a > b,
+    "gte": lambda a, b: a >= b,
+    "eq": lambda a, b: a == b,
+}
+
+
+def evaluate_condition(
+    condition: dict[str, Any], *, features: dict[str, Any]
+) -> bool:
+    """Evaluate a rule's ``condition`` dict against a session
+    feature snapshot.
+
+    Supported operator types:
+
+    - ``feature_threshold``: ``{feature, comparison, value}``.
+      Comparisons: lt / lte / gt / gte / eq.
+      Missing or non-numeric feature → ``False`` (not raise) — a
+      rule depending on a metric that hasn't been computed for
+      this lap yet should sit dormant, not crash the engine.
+
+    - ``and`` / ``or``: ``{conditions: [...]}``. Children are
+      themselves conditions, evaluated recursively. Empty children
+      list collapses to vacuous-true (``and``) / vacuous-false
+      (``or``) per Python's ``all([]) / any([])`` convention.
+
+    Unknown operator types and malformed conditions raise
+    :class:`RuleConditionError` — those are server-side bugs that
+    should surface during dev rather than silently no-firing.
+    """
+    if not isinstance(condition, dict):
+        raise RuleConditionError(
+            f"condition must be a dict, got {type(condition).__name__}"
+        )
+    op_type = condition.get("type")
+
+    if op_type == "feature_threshold":
+        return _evaluate_feature_threshold(condition, features=features)
+    if op_type == "and":
+        children = _require_children(condition)
+        return all(
+            evaluate_condition(child, features=features) for child in children
+        )
+    if op_type == "or":
+        children = _require_children(condition)
+        return any(
+            evaluate_condition(child, features=features) for child in children
+        )
+
+    raise RuleConditionError(f"unsupported condition type: {op_type!r}")
+
+
+def _evaluate_feature_threshold(
+    condition: dict[str, Any], *, features: dict[str, Any]
+) -> bool:
+    feature = condition.get("feature")
+    comparison = condition.get("comparison")
+    threshold = condition.get("value")
+    if not isinstance(feature, str) or comparison is None or threshold is None:
+        raise RuleConditionError(
+            "feature_threshold requires feature, comparison, value"
+        )
+    op = _COMPARISONS.get(comparison)
+    if op is None:
+        raise RuleConditionError(f"unsupported comparison: {comparison!r}")
+
+    feature_value = features.get(feature)
+    if not isinstance(feature_value, (int, float)) or isinstance(
+        feature_value, bool
+    ):
+        return False  # missing or non-numeric → dormant
+    return op(float(feature_value), float(threshold))
+
+
+def _require_children(condition: dict[str, Any]) -> list[dict[str, Any]]:
+    children = condition.get("conditions")
+    if not isinstance(children, list):
+        raise RuleConditionError(
+            f"{condition.get('type')} requires 'conditions' list"
+        )
+    return children
+
+
 __all__ = [
     "CachedBundle",
     "Rule",
@@ -335,5 +428,7 @@ __all__ = [
     "RuleBundleFetchError",
     "RuleBundleHttpClient",
     "RuleBundleParseError",
+    "RuleConditionError",
+    "evaluate_condition",
     "load_bundle",
 ]
