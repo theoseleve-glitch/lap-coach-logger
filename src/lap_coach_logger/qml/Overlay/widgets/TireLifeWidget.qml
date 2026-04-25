@@ -16,6 +16,11 @@ Rectangle {
     property string condition: "good"  // good/worn/critical
     property real tempLF: 0; property real tempRF: 0
     property real tempLR: 0; property real tempRR: 0
+    // T159: degraded state — tire telemetry stalled or
+    // unavailable. When true the headline grip% / laps-left
+    // readouts render `--` placeholders in steel, distinguishing
+    // "no tire data" from "100% grip in green".
+    property bool degraded: false
 
     readonly property color condColor: condition === "critical" ? Theme.Tokens.safetyRed
                                      : condition === "worn" ? Theme.Tokens.marshalYellow
@@ -65,20 +70,21 @@ Rectangle {
         RowLayout {
             Layout.fillWidth: true
             Text {
-                text: Math.round(root.gripPct) + "%"
+                text: root.degraded ? "--" : Math.round(root.gripPct) + "%"
                 font { family: Theme.Typography.monoFamily; pixelSize: Math.round(22 * root.fontScale); weight: Font.Bold }
-                color: root.condColor
+                color: root.degraded ? Theme.Tokens.steel : root.condColor
             }
             Item { Layout.fillWidth: true }
             Column {
                 spacing: 1
                 Text {
-                    text: root.lapsRemaining + " laps left"
+                    text: root.degraded ? "-- laps left" : root.lapsRemaining + " laps left"
                     font { family: Theme.Typography.monoFamily; pixelSize: Math.round(10 * root.fontScale); weight: Font.Bold }
-                    color: Theme.Tokens.chalk; horizontalAlignment: Text.AlignRight
+                    color: root.degraded ? Theme.Tokens.steel : Theme.Tokens.chalk
+                    horizontalAlignment: Text.AlignRight
                 }
                 Text {
-                    text: "stint: " + root.lapCount + " laps"
+                    text: root.degraded ? "stint: -- laps" : "stint: " + root.lapCount + " laps"
                     font { family: Theme.Typography.monoFamily; pixelSize: Math.round(9 * root.fontScale) }
                     color: Theme.Tokens.steel; horizontalAlignment: Text.AlignRight
                 }
