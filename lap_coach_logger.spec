@@ -12,7 +12,7 @@ block_cipher = None
 ROOT = Path(SPECPATH)
 sys.path.insert(0, str(ROOT / "src"))
 
-from lap_coach_logger.assets import ABOUT_ART_CANDIDATES, APP_ICON_CANDIDATES, MONOGRAM_CANDIDATES, TRAY_ICON_CANDIDATES  # noqa: E402
+from lap_coach_logger.assets import ABOUT_ART_CANDIDATES, APP_ICON_CANDIDATES, MONOGRAM_CANDIDATES, OVERLAY_WORKSPACE_HERO_CANDIDATES, TRAY_ICON_CANDIDATES  # noqa: E402
 
 
 def _first_existing(root: Path, candidates: tuple[str, ...]) -> Path | None:
@@ -35,9 +35,20 @@ def _asset_data(path: Path) -> tuple[str, str]:
 
 datas = [
     (str(ROOT / "config.sample.json"), "."),
+    # T176: ship the QML tree at runtime — the QQmlApplicationEngine
+    # loads QML files by relative path, so they must be present in
+    # the bundled distribution alongside the entry point.
     (str(ROOT / "src" / "lap_coach_logger" / "qml"), "lap_coach_logger/qml"),
 ]
-for candidates in (APP_ICON_CANDIDATES, TRAY_ICON_CANDIDATES, ABOUT_ART_CANDIDATES, MONOGRAM_CANDIDATES):
+# T176: include OVERLAY_WORKSPACE_HERO_CANDIDATES — the overlay
+# workspace dashboard hero art was added during this sprint.
+for candidates in (
+    APP_ICON_CANDIDATES,
+    TRAY_ICON_CANDIDATES,
+    ABOUT_ART_CANDIDATES,
+    MONOGRAM_CANDIDATES,
+    OVERLAY_WORKSPACE_HERO_CANDIDATES,
+):
     asset_path = _first_existing(ROOT, candidates)
     if asset_path is not None:
         entry = _asset_data(asset_path)
@@ -46,6 +57,13 @@ for candidates in (APP_ICON_CANDIDATES, TRAY_ICON_CANDIDATES, ABOUT_ART_CANDIDAT
 branding_readme = ROOT / "assets" / "branding" / "README.md"
 if branding_readme.exists():
     datas.append(_asset_data(branding_readme))
+overlay_workspace_dir = ROOT / "assets" / "overlay_workspace"
+if overlay_workspace_dir.exists():
+    for asset_path in overlay_workspace_dir.rglob("*"):
+        if asset_path.is_file():
+            entry = _asset_data(asset_path)
+            if entry not in datas:
+                datas.append(entry)
 
 a = Analysis(
     [str(ROOT / "src" / "lap_coach_logger" / "__main__.py")],
