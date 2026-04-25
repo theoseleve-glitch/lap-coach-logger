@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Any
 
 from lap_coach_logger import __version__
+from lap_coach_logger.core.actual_pit_events import ActualPitEventLog
+from lap_coach_logger.core.plan_vs_actual import compute_plan_vs_actual
 from lap_coach_logger.core.race_strategy import RaceStrategy
 from lap_coach_logger.normalization.resolver import CanonicalResolver
 from lap_coach_logger.writers.analysis_writer import build_analysis
@@ -66,6 +68,7 @@ def write_bundle_v2(
     resolver: CanonicalResolver | None = None,
     environment_tag: str = "",
     race_strategy: RaceStrategy | None = None,
+    actual_pit_events: ActualPitEventLog | None = None,
 ) -> dict[str, Any]:
     """Write session.json v2 + analysis.json into ``session_dir``.
 
@@ -77,6 +80,13 @@ def write_bundle_v2(
     lands under a top-level ``race_strategy`` key in the manifest.
     Omitting it leaves the key absent so older sessions stay
     backwards-compatible (no noisy ``null`` field).
+
+    T146: when ``actual_pit_events`` is provided, the bundle
+    gains an ``actual_pit_events`` list. When *both*
+    ``race_strategy`` and ``actual_pit_events`` are provided,
+    the bundle additionally carries a precomputed
+    ``plan_vs_actual`` summary so the webapp doesn't recompute
+    on every page load.
     """
     sim_id = SIM_ID_MAP.get(sim_name, sim_name.lower().replace(" ", "_"))
     resolver = resolver or CanonicalResolver()
@@ -212,6 +222,16 @@ def write_bundle_v2(
     # sessions (no noisy `null` field).
     if race_strategy is not None:
         manifest["race_strategy"] = serialize_race_strategy(race_strategy)
+
+    # T146: actual pit events (raw log) + plan-vs-actual summary
+    # (when both inputs are present). Same minimal-noise rule as
+    # T144: keys absent when their inputs aren't provided.
+    if actual_pit_events is not None:
+        manifest["actual_pit_events"] = actual_pit_events.to_list()
+        if race_strategy is not None:
+            manifest["plan_vs_actual"] = compute_plan_vs_actual(
+                race_strategy, actual_pit_events,
+            )
 
     session_json_bytes = json.dumps(manifest, indent=2).encode("utf-8")
 
