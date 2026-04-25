@@ -177,6 +177,7 @@ class SessionFinalizer:
         raw_catalogs: dict[str, Any] | None = None,
         raw_var_schema: list[dict[str, Any]] | None = None,
         live_insights: list[CoachingInsight] | None = None,
+        environment_tag: str | None = None,
     ) -> Path | None:
         """Write session bundle and return the final folder path (or None on total failure).
 
@@ -366,6 +367,7 @@ class SessionFinalizer:
                     laps=laps_payload,
                     events=events_payload,
                     quality_report=quality_payload,
+                    environment_tag=environment_tag or "",
                 )
             else:
                 write_bundle_v2(
@@ -385,6 +387,7 @@ class SessionFinalizer:
                     laps=laps_payload,
                     events=events_payload,
                     quality_report=quality_payload,
+                    environment_tag=environment_tag or "",
                 )
 
             # ── manifest.json (Bundle v2 contract, T026/T030) ──

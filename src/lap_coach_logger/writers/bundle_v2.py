@@ -62,6 +62,7 @@ def write_bundle_v2(
     events: list[dict[str, Any]],
     quality_report: dict[str, Any] | None = None,
     resolver: CanonicalResolver | None = None,
+    environment_tag: str = "",
 ) -> dict[str, Any]:
     """Write session.json v2 + analysis.json into ``session_dir``.
 
@@ -180,6 +181,7 @@ def write_bundle_v2(
         "session": {
             "session_uid": session_id,
             "mode": mode,
+            "environment_tag": environment_tag,
             "driver_name": driver_name,
             "start_time": start_time,
             "end_time": end_time,
@@ -234,6 +236,7 @@ def write_bundle_v2_from_manifest(
     events: list[dict[str, Any]],
     quality_report: dict[str, Any] | None = None,
     resolver: CanonicalResolver | None = None,
+    environment_tag: str = "",
 ) -> dict[str, Any]:
     """Canonical entry point: derive bundle v2 kwargs from a ``SessionManifest`` (T040).
 
@@ -267,6 +270,7 @@ def write_bundle_v2_from_manifest(
         events=events,
         quality_report=quality_report,
         resolver=resolver,
+        environment_tag=environment_tag,
     )
 
 
