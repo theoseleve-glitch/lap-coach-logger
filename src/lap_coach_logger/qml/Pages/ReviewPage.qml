@@ -335,17 +335,14 @@ Item {
                     }
                     spacing: Theme.Tokens.lg
 
-                    // 4 MetricCards
+                    // T071: compact summary \u2014 header already shows
+                    // laps + best + DQ; this row keeps only the
+                    // Consistency dimension. Median Lap / Clean Laps /
+                    // Data Size dropped (full breakdown lives in
+                    // lap-webapp per Q95; T072 adds the CTA).
                     RowLayout {
                         width: parent.width
                         spacing: Theme.Tokens.md
-
-                        Components.MetricCard {
-                            Layout.fillWidth: true
-                            label: "Median Lap"
-                            value: reviewVM.data.median_lap || "\u2014"
-                            subtitle: "Median time"
-                        }
 
                         Components.MetricCard {
                             Layout.fillWidth: true
@@ -353,24 +350,11 @@ Item {
                             value: reviewVM.data.consistency || "\u2014"
                             subtitle: reviewVM.data.consistency_sigma || ""
                         }
-
-                        Components.MetricCard {
-                            Layout.fillWidth: true
-                            label: "Clean Laps"
-                            value: reviewVM.data.clean_laps !== undefined
-                                   ? reviewVM.data.clean_laps.toString() : "\u2014"
-                            subtitle: "Out of " + (reviewVM.data.laps || 0)
-                        }
-
-                        Components.MetricCard {
-                            Layout.fillWidth: true
-                            label: "Data Size"
-                            value: reviewVM.data.data_size || "\u2014"
-                            subtitle: "Session files"
-                        }
                     }
 
-                    // LapTimeChart
+                    // LapTimeChart \u2014 visual companion to the four
+                    // T071 dimensions (shows lap-by-lap variance which
+                    // is exactly what consistency summarises).
                     Components.LapTimeChart {
                         width: parent.width
                         height: 180
