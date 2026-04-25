@@ -395,6 +395,23 @@ class SessionFinalizer:
                 final_dir = self._output_root / f"{folder_name}_{ended_at.strftime('%f')}"
             shutil.move(str(tmp_dir), str(final_dir))
             log.info("Session bundle finalized → %s", final_dir)
+
+            # T061: fire session_captured *after* the atomic rename so
+            # only durable bundles count toward analytics funnels.
+            # analytics.track is safe-noop when bootstrap hasn't wired
+            # PostHog (dev runs, T065 opt-out, headless tests).
+            # ``car_name`` was extracted upstream from extra.pop("car"),
+            # so we use it directly instead of re-querying extra.
+            from lap_coach_logger import analytics
+            analytics.track(
+                "session_captured",
+                sim=sim,
+                track=track,
+                car=car_name,
+                session_type=session_type,
+                duration_s=duration_s,
+            )
+
             return final_dir
 
         except Exception:
