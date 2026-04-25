@@ -434,6 +434,62 @@ def _require_children(condition: dict[str, Any]) -> list[dict[str, Any]]:
     return children
 
 
+class CorroborationGate:
+    """False-positive gating for noisy detectors.
+
+    A rule with ``min_corroborating_laps > 1`` is suppressed
+    until it has fired on N consecutive laps. After that, every
+    subsequent firing lap re-emits — the user is still making
+    the mistake, the gate has done its job suppressing first-fire
+    noise. T092 (overlay VM cooldown) is the layer that says
+    "stop telling me every lap forever".
+
+    Reset semantics: a non-firing lap resets the rule's consecutive
+    count to zero. Consecutive (not sliding-window) is the user-
+    interpretable shape: "I've been doing this every lap since
+    lap 5" is clearer than "I did this 3 of the last 5 laps".
+
+    Default ``min_corroborating_laps = 1`` (T076) makes the gate
+    a no-op for most rules — a noisy detector ships with N > 1
+    explicitly to opt into corroboration.
+    """
+
+    def __init__(self, bundle: RuleBundle) -> None:
+        self._min_laps_by_rule = {
+            rule.id: rule.min_corroborating_laps for rule in bundle.rules
+        }
+        self._consec_fires: dict[str, int] = {
+            rule.id: 0 for rule in bundle.rules
+        }
+
+    def process(
+        self, insights: list[CoachingInsight]
+    ) -> list[CoachingInsight]:
+        """Update consecutive-fire counts for every known rule
+        based on which ones fired this lap, then return the
+        subset that has corroborated enough times to emit.
+
+        Insights for rules unknown to the gate (e.g., bundle
+        hot-reloaded between gate construction and this call)
+        pass through with default min=1 rather than crashing —
+        keeps the system operational across rule churn.
+        """
+        fired_ids = {i.rule_id for i in insights}
+
+        for rule_id in self._min_laps_by_rule:
+            if rule_id in fired_ids:
+                self._consec_fires[rule_id] += 1
+            else:
+                self._consec_fires[rule_id] = 0
+
+        return [
+            insight
+            for insight in insights
+            if self._consec_fires.get(insight.rule_id, 1)
+            >= self._min_laps_by_rule.get(insight.rule_id, 1)
+        ]
+
+
 class InsightQueue:
     """Thread-safe handoff between the rules engine (sample
     thread, T083) and the overlay VM (Qt main thread, T091).
@@ -496,6 +552,7 @@ def evaluate_bundle(
 __all__ = [
     "CachedBundle",
     "CoachingInsight",
+    "CorroborationGate",
     "InsightQueue",
     "Rule",
     "RuleBundle",
