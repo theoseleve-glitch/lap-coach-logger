@@ -26,6 +26,13 @@ GlassSurface {
     property string severity: "positive"   // positive | caution | critical
     property int    confidence: 0          // 0-100
     property string sector: ""
+    // T160: explicit empty-state — coaching engine has no
+    // insight to surface (fresh session, no significant loss
+    // detected). When true the card replaces the headline /
+    // sub / confidence content with an "INSIGHTS NOT AVAILABLE"
+    // banner so the user knows coaching is alive but quiet,
+    // not broken.
+    property bool noInsightsAvailable: false
 
     signal dismissed()
 
@@ -179,8 +186,23 @@ GlassSurface {
             }
         }
 
+        // ── T160: empty-state banner ───────────────────────────────
+        Text {
+            visible: root.noInsightsAvailable
+            text: "INSIGHTS NOT AVAILABLE"
+            font.family: Theme.Typography.monoFamily
+            font.pixelSize: Math.round(11 * root.fontScale)
+            font.weight: Font.Bold
+            font.letterSpacing: 1.2
+            color: Theme.Tokens.steel
+            Layout.fillWidth: true
+            Layout.topMargin: 8
+            horizontalAlignment: Text.AlignHCenter
+        }
+
         // ── Headline ───────────────────────────────────────────────
         Text {
+            visible: !root.noInsightsAvailable
             text: root.headline || ""
             font.family: Theme.Typography.bodyFamily
             font.pixelSize: Math.round(19 * root.fontScale)
@@ -193,7 +215,7 @@ GlassSurface {
 
         // ── Sub line ───────────────────────────────────────────────
         Text {
-            visible: (root.sub ? root.sub.length : 0) > 0
+            visible: !root.noInsightsAvailable && (root.sub ? root.sub.length : 0) > 0
             text: root.sub || ""
             font.family: Theme.Typography.bodyFamily
             font.pixelSize: Math.round(12 * root.fontScale)
@@ -205,6 +227,7 @@ GlassSurface {
 
         // ── Confidence bar + percentage + "Coach" ──────────────────
         RowLayout {
+            visible: !root.noInsightsAvailable
             Layout.fillWidth: true
             Layout.topMargin: 10
             spacing: 8
