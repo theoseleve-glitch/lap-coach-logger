@@ -113,10 +113,45 @@ def visible_widget_ids(*, show_advanced: bool) -> tuple[str, ...]:
     )
 
 
+# ---------------------------------------------------------------------------
+# T130 — Widget search in the overlay manager
+# ---------------------------------------------------------------------------
+
+
+def _widget_label(widget_id: str) -> str:
+    """Display label for ``widget_id`` — matches T127's preset
+    label normalisation (snake/hyphen → spaces, title case)."""
+    return widget_id.replace("_", " ").replace("-", " ").title()
+
+
+def widget_matches_search(widget_id: str, query: str) -> bool:
+    """Case-insensitive substring match against the widget id
+    AND its display label. Empty / whitespace queries match
+    everything (the no-filter case)."""
+    needle = query.strip().lower()
+    if not needle:
+        return True
+    haystack_id = widget_id.lower()
+    haystack_label = _widget_label(widget_id).lower()
+    return needle in haystack_id or needle in haystack_label
+
+
+def search_widgets(query: str, *, show_advanced: bool) -> tuple[str, ...]:
+    """Filter the visible widget set (per T129's toggle gate)
+    down to ones matching ``query``. Empty query returns the
+    full visible set."""
+    return tuple(
+        wid for wid in visible_widget_ids(show_advanced=show_advanced)
+        if widget_matches_search(wid, query)
+    )
+
+
 __all__ = [
     "WIDGET_CATEGORIES",
     "get_widget_category",
     "is_hidden_by_default",
+    "search_widgets",
     "visible_widget_ids",
+    "widget_matches_search",
     "widgets_in_category",
 ]
