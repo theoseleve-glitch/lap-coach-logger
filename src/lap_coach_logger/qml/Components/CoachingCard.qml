@@ -17,7 +17,15 @@ Rectangle {
     // -- VM contract ----------------------------------------------------------
     // The HUD shell injects ``coachingCardVM`` into this widget's scope.
 
-    visible: coachingCardVM.has_insight
+    // T095: opacity-based fade. ``visible`` tracks ``opacity > 0``
+    // (not ``has_insight`` directly) so the fade-out animation
+    // has time to play before the widget stops rendering.
+    opacity: coachingCardVM.has_insight ? 1.0 : 0.0
+    visible: opacity > 0
+
+    Behavior on opacity {
+        NumberAnimation { duration: Theme.Motion.dialogDuration }
+    }
 
     implicitWidth: 320
     implicitHeight: contentColumn.implicitHeight + Theme.Tokens.xl * 2
