@@ -230,3 +230,41 @@ def test_after_init_capture_exception_routes_to_sentry(
     fake_sentry.capture_exception(err)
 
     assert fake_sentry.capture_calls == [err]
+
+
+# ---------------------------------------------------------------------------
+# T058: sentry_release_tag — <package>@<version> for Sentry "Releases"
+# ---------------------------------------------------------------------------
+
+
+def test_sentry_release_tag_uses_recommended_package_at_version_format() -> None:
+    from lap_coach_logger.utils.sentry_init import sentry_release_tag
+
+    assert sentry_release_tag(version="9.9.9") == "lap-coach-logger@9.9.9"
+
+
+def test_sentry_release_tag_default_pulls_live_package_version() -> None:
+    """When no explicit version is passed, the helper reads
+    ``lap_coach_logger.__version__`` so a version bump in
+    ``app_identity.py`` flows automatically into the Sentry release
+    tag without a second edit."""
+    from lap_coach_logger import __version__
+    from lap_coach_logger.utils.sentry_init import sentry_release_tag
+
+    assert sentry_release_tag() == f"lap-coach-logger@{__version__}"
+
+
+def test_init_sentry_with_release_tag_helper_round_trips_to_sdk(
+    fake_sentry: _FakeSentry,
+) -> None:
+    """The bootstrap will call ``init_sentry(release=sentry_release_tag())``
+    so make sure the resulting kwarg reaches the SDK as-is."""
+    from lap_coach_logger.utils.sentry_init import init_sentry, sentry_release_tag
+
+    init_sentry(
+        dsn="https://abc@example.ingest.sentry.io/123",
+        release=sentry_release_tag(version="2.0.0"),
+        sentry_module=fake_sentry,
+    )
+
+    assert fake_sentry.init_calls[0]["release"] == "lap-coach-logger@2.0.0"

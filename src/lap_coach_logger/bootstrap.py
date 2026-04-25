@@ -85,10 +85,16 @@ def run(*, debug_override: bool = False) -> None:
 
     # T056: initialize Sentry early so any failure later in bootstrap
     # (or during the run) is captured. Reads DSN from SENTRY_DSN env
-    # var; no DSN -> no-op (so dev builds stay silent). T058 will add
-    # release tagging; T065 will plug the user opt-out flag here.
-    from lap_coach_logger.utils.sentry_init import init_sentry
-    sentry_active = init_sentry()
+    # var; no DSN -> no-op (so dev builds stay silent). T065 will plug
+    # the user opt-out flag here.
+    # T058: pass release=lap-coach-logger@<__version__> so Sentry's
+    # "Releases" page groups events by build, and the environment tag
+    # distinguishes packaged release builds from `python -m` dev runs.
+    from lap_coach_logger.utils.sentry_init import init_sentry, sentry_release_tag
+    sentry_active = init_sentry(
+        release=sentry_release_tag(),
+        environment="production" if IS_FROZEN else "development",
+    )
     log.info(
         "Error telemetry: %s", "enabled (Sentry)" if sentry_active else "disabled"
     )

@@ -91,4 +91,24 @@ def _import_sentry_sdk() -> Any | None:
     return sentry_sdk
 
 
-__all__ = ["init_sentry"]
+# Sentry's "Releases" feature groups errors by build identifier;
+# the recommended format is ``<package>@<version>`` so events can be
+# linked back to source maps / commits in CI integrations.
+_RELEASE_PACKAGE = "lap-coach-logger"
+
+
+def sentry_release_tag(version: str | None = None) -> str:
+    """Return the Sentry-formatted release tag ``<package>@<version>``.
+
+    With no explicit ``version``, the helper reads
+    ``lap_coach_logger.__version__`` (sourced from
+    ``app_identity.VERSION``) so a single bump there flows into
+    every Sentry release tag without a second edit.
+    """
+    if version is None:
+        from lap_coach_logger import __version__ as live_version
+        version = live_version
+    return f"{_RELEASE_PACKAGE}@{version}"
+
+
+__all__ = ["init_sentry", "sentry_release_tag"]
