@@ -30,6 +30,7 @@ from PySide6.QtCore import Property, QObject, Signal, Slot
 
 from lap_coach_logger.coaching.rules_engine import (
     CoachingInsight,
+    InsightCooldownFilter,
     InsightQueue,
 )
 
@@ -39,9 +40,17 @@ class CoachingCardViewModel(QObject):
 
     insightChanged = Signal()
 
-    def __init__(self, *, queue: InsightQueue) -> None:
+    def __init__(
+        self,
+        *,
+        queue: InsightQueue,
+        cooldown_filter: InsightCooldownFilter | None = None,
+    ) -> None:
         super().__init__()
         self._queue = queue
+        # T092: optional cooldown filter. None = no cooldown
+        # (T091 tests; production wiring passes a 30s filter).
+        self._cooldown_filter = cooldown_filter
         self._current: CoachingInsight | None = None
         self._pending: deque[CoachingInsight] = deque()
 
@@ -75,6 +84,8 @@ class CoachingCardViewModel(QObject):
         Empty drain ⇒ no signal emit (avoid pointless QML
         rebinds on every timer tick)."""
         new_insights = self._queue.drain()
+        if self._cooldown_filter is not None:
+            new_insights = self._cooldown_filter.filter(new_insights)
         if not new_insights:
             return
 

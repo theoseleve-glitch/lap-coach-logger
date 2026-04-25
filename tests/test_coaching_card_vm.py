@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from lap_coach_logger.coaching.rules_engine import (
     CoachingInsight,
+    InsightCooldownFilter,
     InsightQueue,
 )
 from lap_coach_logger.viewmodels.coaching_card_vm import CoachingCardViewModel
@@ -186,6 +187,55 @@ def test_dismiss_when_no_current_is_a_noop() -> None:
 # ---------------------------------------------------------------------------
 # Multiple poll cycles accumulate pending insights
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# T092: Cooldown filter integration
+# ---------------------------------------------------------------------------
+
+
+def test_vm_with_cooldown_drops_repeated_same_rule_insight() -> None:
+    """The VM honours its cooldown filter: a second fire of the
+    same rule within the cooldown window does NOT show a card.
+
+    Pinning here ensures T092's cooldown actually flows through
+    the VM — the InsightCooldownFilter unit tests cover the
+    filter's own semantics; this one covers wiring."""
+    queue = InsightQueue()
+    clock = [1000.0]
+    cooldown = InsightCooldownFilter(
+        cooldown_seconds=30.0, now=lambda: clock[0]
+    )
+    vm = CoachingCardViewModel(queue=queue, cooldown_filter=cooldown)
+
+    queue.publish([_insight("br.late")])
+    vm.poll()  # shows br.late
+    vm.dismiss()  # user moves on
+
+    queue.publish([_insight("br.late")])
+    clock[0] = 1010.0  # 10s later — within cooldown
+    vm.poll()
+
+    assert vm.has_insight is False  # filtered out
+
+
+def test_vm_with_cooldown_passes_repeat_after_window_expires() -> None:
+    queue = InsightQueue()
+    clock = [1000.0]
+    cooldown = InsightCooldownFilter(
+        cooldown_seconds=30.0, now=lambda: clock[0]
+    )
+    vm = CoachingCardViewModel(queue=queue, cooldown_filter=cooldown)
+
+    queue.publish([_insight("br.late")])
+    vm.poll()
+    vm.dismiss()
+
+    queue.publish([_insight("br.late")])
+    clock[0] = 1030.5  # past cooldown
+    vm.poll()
+
+    assert vm.insight["rule_id"] == "br.late"
 
 
 def test_subsequent_polls_append_to_pending() -> None:

@@ -22,6 +22,7 @@ from __future__ import annotations
 import enum
 import json
 import queue
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -594,6 +595,56 @@ class CorroborationGate:
         ]
 
 
+class InsightCooldownFilter:
+    """Per-rule cooldown — drops insights for rules shown within
+    the cooldown window.
+
+    Distinct from :class:`CorroborationGate`: that one suppresses
+    *first-fire spam* (rule must fire on N consecutive laps before
+    its first emission). This one suppresses *steady-state spam*
+    (after the first emission, drop subsequent fires of the same
+    rule until the cooldown expires).
+
+    Default 30 s — long enough that the same coaching tip stops
+    being useful (driver heard it; either fixing it or actively
+    ignoring it for now), short enough that the tip can re-surface
+    if the mistake persists across multiple corner sequences.
+
+    ``cooldown_seconds=0`` disables the filter — the right default
+    for tests that don't care about cooldown semantics.
+    """
+
+    def __init__(
+        self,
+        *,
+        cooldown_seconds: float = 30.0,
+        now: Callable[[], float] | None = None,
+    ) -> None:
+        if cooldown_seconds < 0:
+            raise ValueError(
+                f"cooldown_seconds must be >= 0, got {cooldown_seconds}"
+            )
+        self._cooldown_seconds = cooldown_seconds
+        self._now = now if now is not None else time.monotonic
+        self._last_shown_at: dict[str, float] = {}
+
+    def filter(
+        self, insights: list[CoachingInsight]
+    ) -> list[CoachingInsight]:
+        """Return insights NOT in cooldown, preserving input
+        order. Updates the cooldown timer for those that pass."""
+        if self._cooldown_seconds <= 0:
+            return list(insights)
+        current_time = self._now()
+        passed: list[CoachingInsight] = []
+        for insight in insights:
+            last = self._last_shown_at.get(insight.rule_id)
+            if last is None or current_time - last >= self._cooldown_seconds:
+                passed.append(insight)
+                self._last_shown_at[insight.rule_id] = current_time
+        return passed
+
+
 class InsightQueue:
     """Thread-safe handoff between the rules engine (sample
     thread, T083) and the overlay VM (Qt main thread, T091).
@@ -659,6 +710,7 @@ __all__ = [
     "CachedBundle",
     "CoachingInsight",
     "CorroborationGate",
+    "InsightCooldownFilter",
     "InsightQueue",
     "Rule",
     "RuleBundle",
