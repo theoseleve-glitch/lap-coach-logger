@@ -20,6 +20,7 @@ them in T076 would force a Block-F rework when those land.
 from __future__ import annotations
 
 import json
+import queue
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -433,6 +434,43 @@ def _require_children(condition: dict[str, Any]) -> list[dict[str, Any]]:
     return children
 
 
+class InsightQueue:
+    """Thread-safe handoff between the rules engine (sample
+    thread, T083) and the overlay VM (Qt main thread, T091).
+
+    Wraps :class:`queue.Queue` to expose just the two operations
+    the boundary uses (publish list, drain to list). The Queue
+    itself is thread-safe by construction in CPython, so all this
+    layer adds is the engine-shaped API and an unbounded
+    buffer — sample-thread publishes never raise ``queue.Full``,
+    UI-thread drains never raise ``queue.Empty``.
+    """
+
+    def __init__(self) -> None:
+        self._queue: queue.Queue[CoachingInsight] = queue.Queue()
+
+    def publish(self, insights: list[CoachingInsight]) -> None:
+        """Publish a list of insights produced by one
+        :func:`evaluate_bundle` call. Empty list is a no-op
+        (every lap calls this regardless of whether any rule
+        fired, so the no-fire path stays branchless on the
+        producer side)."""
+        for insight in insights:
+            self._queue.put_nowait(insight)
+
+    def drain(self) -> list[CoachingInsight]:
+        """Pull every pending insight off the queue and return
+        them in the order they were published. Empty queue
+        returns ``[]`` so the consumer's polling loop doesn't
+        have to special-case "nothing yet"."""
+        drained: list[CoachingInsight] = []
+        while True:
+            try:
+                drained.append(self._queue.get_nowait())
+            except queue.Empty:
+                return drained
+
+
 def evaluate_bundle(
     bundle: RuleBundle, *, features: dict[str, Any]
 ) -> list[CoachingInsight]:
@@ -458,6 +496,7 @@ def evaluate_bundle(
 __all__ = [
     "CachedBundle",
     "CoachingInsight",
+    "InsightQueue",
     "Rule",
     "RuleBundle",
     "RuleBundleCache",
