@@ -20,6 +20,11 @@ Rectangle {
     property real longG: 0.0
     property real maxG:  3.0
     property var  trail: []          // [{x, y}] recent G samples
+    // T162: degraded state — G-force telemetry stalled. When
+    // true the combined-G readout flips to `-- G` and an
+    // overlay "SENSOR STALE" banner is shown so the user knows
+    // the dot at center means "no data", not "stationary".
+    property bool degraded: false
 
     // ── null-safe derived ───────────────────────────────────────────
     readonly property real safeLatG:  isFinite(latG)  ? latG  : 0.0
@@ -67,7 +72,7 @@ Rectangle {
 
             // Combined G readout
             Text {
-                text: root.combinedG.toFixed(2) + " G"
+                text: root.degraded ? "-- G" : root.combinedG.toFixed(2) + " G"
                 font.family: Theme.Typography.monoFamily
                 font.pixelSize: Theme.Typography.microSize
                 color: Theme.Tokens.steel
@@ -199,6 +204,29 @@ Rectangle {
             }
 
             Component.onCompleted: requestPaint()
+        }
+    }
+
+    // ── T162: SENSOR STALE overlay banner ─────────────────────────────
+    Rectangle {
+        visible: root.degraded
+        anchors.centerIn: parent
+        width: staleText.implicitWidth + 16
+        height: staleText.implicitHeight + 8
+        radius: 4
+        color: Qt.rgba(Theme.Tokens.marshalYellow.r, Theme.Tokens.marshalYellow.g, Theme.Tokens.marshalYellow.b, 0.15)
+        border.width: 1
+        border.color: Theme.Tokens.marshalYellow
+
+        Text {
+            id: staleText
+            anchors.centerIn: parent
+            text: "SENSOR STALE"
+            font.family: Theme.Typography.monoFamily
+            font.pixelSize: Math.round(10 * root.fontScale)
+            font.weight: Font.Bold
+            font.letterSpacing: 1.2
+            color: Theme.Tokens.marshalYellow
         }
     }
 }
