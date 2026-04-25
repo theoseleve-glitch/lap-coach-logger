@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import os
@@ -631,6 +632,12 @@ class DesktopService(QObject):
         return snapshot
 
     def save_settings(self, values: dict) -> None:
+        # T174: snapshot in-memory config before mutation so we
+        # can roll back if the disk write fails. Without this,
+        # a failed save leaves self._config holding new values
+        # while disk still has the old ones — UI/disk divergence
+        # until the next successful save.
+        config_snapshot = copy.deepcopy(self._config)
         try:
             self._config.output_dir = values["output_dir"]
             self._config.driver_name = str(values["driver_name"]).strip()
@@ -683,6 +690,10 @@ class DesktopService(QObject):
             self._emit_snapshot()
             self.refresh_history()
         except Exception as exc:
+            # T174: rollback in-memory state so callers reading
+            # self._config after the failure see the last-saved
+            # values — matches what's actually on disk.
+            self._config = config_snapshot
             self.settings_failed.emit(str(exc))
 
     # -- snapshots -----------------------------------------------------
