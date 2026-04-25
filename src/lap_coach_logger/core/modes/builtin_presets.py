@@ -1,9 +1,11 @@
 """T122-T125: Built-in :class:`ModeOverlayPreset` instances.
 
-Each Mode (T107-T110 — Practice / Sprint / Endurance / Review)
-points at one of these via its ``overlay_preset_id`` attribute.
-T122 shipped race-minimal; T123 added Practice; T124 adds
-Endurance; T125 will add Streamer.
+T122-T124 ship the four Mode-driven presets — each Mode
+(T107-T110 — Practice / Sprint / Endurance / Review) points
+at one via its ``overlay_preset_id`` attribute. T125 adds
+**streamer**, which is *not* tied to a Mode — it's an opt-in
+broadcast layout for content creators that swaps driver
+ergonomics for viewer-friendly framing.
 
 Positions are normalised to ``0..1`` so the same preset works
 across monitor resolutions — the renderer multiplies by the
@@ -121,9 +123,60 @@ ENDURANCE_PRESET: ModeOverlayPreset = ModeOverlayPreset(
 )
 
 
+# ---------------------------------------------------------------------------
+# T125 — Streamer preset (no Mode target — opt-in broadcast layout)
+# ---------------------------------------------------------------------------
+# 15 widgets per spec. Layout splits into three bands:
+#
+#   Top banner (broadcast identity):
+#     driver_name, session_clock, weather
+#
+#   Side panels (mid-screen, viewer-engaging):
+#     coach + inputs (left), track_map + flags (right)
+#
+#   Bottom ticker (telemetry strip — viewers see this in OBS
+#                  even though the driver's HUD already covers it):
+#     position, gap, lap_delta, sector_color, gear, speedometer,
+#     fuel, tires
+#
+# No race-minimal inheritance — Streamer's framing intentionally
+# differs from driver-mode layouts. preset_id is "streamer" and
+# no built-in Mode targets it (test_no_built_in_mode_targets_streamer_preset
+# pins this contract).
+STREAMER_PRESET: ModeOverlayPreset = ModeOverlayPreset(
+    preset_id="streamer",
+    widgets=(
+        # Top banner — broadcast identity
+        WidgetPlacement("driver_name", x=0.02, y=0.02, width=0.20, height=0.05),
+        WidgetPlacement("session_clock", x=0.45, y=0.02, width=0.10, height=0.05),
+        WidgetPlacement("weather", x=0.78, y=0.02, width=0.20, height=0.05),
+        # Left side panel — coaching + inputs (engaging mid-shot content)
+        WidgetPlacement("coach", x=0.02, y=0.10, width=0.30, height=0.10),
+        WidgetPlacement("inputs", x=0.02, y=0.22, width=0.30, height=0.08),
+        # Right side panel — track map + flags
+        WidgetPlacement("track_map", x=0.78, y=0.10, width=0.20, height=0.20),
+        WidgetPlacement("flags", x=0.78, y=0.32, width=0.20, height=0.05),
+        # Bottom ticker — 8-up telemetry strip
+        WidgetPlacement("position", x=0.02, y=0.85, width=0.08, height=0.10),
+        WidgetPlacement("gap", x=0.12, y=0.85, width=0.10, height=0.10),
+        WidgetPlacement("lap_delta", x=0.24, y=0.85, width=0.14, height=0.10),
+        WidgetPlacement("sector_color", x=0.40, y=0.85, width=0.10, height=0.10),
+        WidgetPlacement("gear", x=0.52, y=0.85, width=0.06, height=0.10),
+        WidgetPlacement("speedometer", x=0.60, y=0.85, width=0.12, height=0.10),
+        WidgetPlacement("fuel", x=0.74, y=0.85, width=0.10, height=0.10),
+        WidgetPlacement("tires", x=0.86, y=0.85, width=0.12, height=0.10),
+    ),
+)
+
+
 _BUILTIN_PRESETS: dict[str, ModeOverlayPreset] = {
     p.preset_id: p
-    for p in (RACE_MINIMAL_PRESET, PRACTICE_PRESET, ENDURANCE_PRESET)
+    for p in (
+        RACE_MINIMAL_PRESET,
+        PRACTICE_PRESET,
+        ENDURANCE_PRESET,
+        STREAMER_PRESET,
+    )
 }
 
 
@@ -138,5 +191,6 @@ __all__ = [
     "ENDURANCE_PRESET",
     "PRACTICE_PRESET",
     "RACE_MINIMAL_PRESET",
+    "STREAMER_PRESET",
     "get_builtin_preset",
 ]
