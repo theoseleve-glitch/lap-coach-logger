@@ -168,6 +168,7 @@ def test_to_dict_emits_preset_id_and_widget_list() -> None:
             {"widget_id": "lap_delta", "x": 0.05, "y": 0.05, "width": 0.20, "height": 0.10},
             {"widget_id": "fuel", "x": 0.05, "y": 0.20, "width": 0.20, "height": 0.10},
         ],
+        "version": 1,
     }
 
 

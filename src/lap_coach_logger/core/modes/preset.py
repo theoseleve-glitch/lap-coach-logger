@@ -56,10 +56,18 @@ class WidgetPlacement:
 
 @dataclass(frozen=True, slots=True)
 class ModeOverlayPreset:
-    """A mode's static widget set: id + list of placements."""
+    """A mode's static widget set: id + list of placements.
+
+    T134: ``version`` tracks edit iterations of a given preset_id.
+    Distinct from T132's ``schema_version`` envelope (the wire
+    format) — this is *content* version. Bumped on every edit so
+    a user's local copy can be compared against an exported one
+    to detect drift.
+    """
 
     preset_id: str
     widgets: tuple[WidgetPlacement, ...] = field(default_factory=tuple)
+    version: int = 1
 
     def __post_init__(self) -> None:
         seen: set[str] = set()
@@ -77,10 +85,20 @@ class ModeOverlayPreset:
                 return placement
         return None
 
+    def bumped(self) -> ModeOverlayPreset:
+        """Return a copy with ``version + 1``. Frozen-dataclass-
+        safe — the original instance is left untouched."""
+        return ModeOverlayPreset(
+            preset_id=self.preset_id,
+            widgets=self.widgets,
+            version=self.version + 1,
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "preset_id": self.preset_id,
             "widgets": [w.to_dict() for w in self.widgets],
+            "version": self.version,
         }
 
     @classmethod
@@ -89,7 +107,13 @@ class ModeOverlayPreset:
         widgets = tuple(
             WidgetPlacement.from_dict(w) for w in widgets_raw
         )
-        return cls(preset_id=str(payload["preset_id"]), widgets=widgets)
+        # Pre-T134 payloads lack the version field — assume 1.
+        version = int(payload.get("version", 1))
+        return cls(
+            preset_id=str(payload["preset_id"]),
+            widgets=widgets,
+            version=version,
+        )
 
 
 __all__ = ["ModeOverlayPreset", "WidgetPlacement"]
