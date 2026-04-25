@@ -59,6 +59,7 @@ from lap_coach_logger.core.sync_service import DisabledSyncService, SyncService
 from lap_coach_logger.detection.process_watcher import ProcessWatcher
 from lap_coach_logger.ui.desktop.session_index import SessionIndex
 from lap_coach_logger.ui.desktop.status_text import build_status_detail
+from lap_coach_logger.utils.file_explorer import reveal_in_file_explorer
 from lap_coach_logger.utils.paths import config_dir, logs_dir
 from lap_coach_logger.utils.win_autostart import is_autostart_enabled, set_autostart
 
@@ -320,20 +321,24 @@ class DesktopService(QObject):
         self._emit_snapshot()
 
     def open_output_folder(self) -> None:
+        # T068: cross-platform reveal-in-file-manager (Windows
+        # Explorer / macOS Finder / Linux xdg-open). Auto-creates
+        # the output dir on demand because users expect this even
+        # before the first session is captured.
         p = Path(self._config.output_dir)
         p.mkdir(parents=True, exist_ok=True)
-        os.startfile(str(p))
+        reveal_in_file_explorer(p)
 
     def open_logs_folder(self) -> None:
-        os.startfile(str(logs_dir()))
+        reveal_in_file_explorer(logs_dir())
 
     def open_config_folder(self) -> None:
-        os.startfile(str(config_dir()))
+        reveal_in_file_explorer(config_dir())
 
     def open_path(self, path: str) -> None:
-        p = Path(path)
-        if p.exists():
-            os.startfile(str(p))
+        # No mkdir here: open_path is for revealing an EXISTING
+        # session bundle; missing-path is a true no-op.
+        reveal_in_file_explorer(path)
 
     def refresh_setup_tools(self) -> None:
         self._refresh_setup_state(force=True)
