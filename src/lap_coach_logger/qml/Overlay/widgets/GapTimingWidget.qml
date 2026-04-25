@@ -20,6 +20,11 @@ Rectangle {
     property real gapBehind: NaN       // seconds; NaN = no data
     property int  positionAhead: 0
     property int  positionBehind: 0
+    // T167: degraded state — telemetry stalled. When true both
+    // cells flip to "—" simultaneously (re-uses the existing
+    // em-dash path), so frozen cached gaps don't pass for live
+    // data.
+    property bool degraded: false
 
     // -- helpers ----------------------------------------------------------
     function formatGap(seconds, hasData) {
@@ -31,8 +36,8 @@ Rectangle {
         return n > 0 ? "P" + n : ""
     }
 
-    readonly property bool hasAhead: !isNaN(gapAhead) && gapAhead > 0
-    readonly property bool hasBehind: !isNaN(gapBehind) && gapBehind > 0
+    readonly property bool hasAhead: !root.degraded && !isNaN(gapAhead) && gapAhead > 0
+    readonly property bool hasBehind: !root.degraded && !isNaN(gapBehind) && gapBehind > 0
 
     // Background
     Rectangle {
