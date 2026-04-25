@@ -171,6 +171,13 @@ class AppConfig:
     # config files that predate this field load as True via
     # ``from_dict``, so the upgrade is silent.
     telemetry_enabled: bool = True
+    # T187: opt-OUT switch for the auto-update version check
+    # (T185) and downloader (T186). Same opt-OUT convention as
+    # ``telemetry_enabled``: defaults True, old configs upgrade
+    # silently via ``from_dict``. When False, bootstrap skips
+    # spawning the update-check thread entirely — no network
+    # probe, no log spam.
+    auto_update_enabled: bool = True
     iracing: IRacingConfig = field(default_factory=IRacingConfig)
     assetto_corsa: AssettoCorsaConfig = field(default_factory=AssettoCorsaConfig)
     acc: ACCConfig = field(default_factory=ACCConfig)

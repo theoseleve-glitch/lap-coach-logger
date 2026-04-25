@@ -155,29 +155,16 @@ def run(*, debug_override: bool = False) -> None:
     # / unreachable manifest URL never blocks startup. The
     # checker captures all errors in the result so the thread
     # can't crash the app on a network blip.
-    import threading
-    from lap_coach_logger.updates import check_for_updates
+    # T187: helper respects ``config.auto_update_enabled`` —
+    # when False, no thread is spawned and a "disabled" line
+    # is logged instead.
+    from lap_coach_logger.updates import start_update_check_thread
 
-    def _run_update_check() -> None:
-        result = check_for_updates(__version__)
-        if result.error:
-            log.info("Update check skipped: %s", result.error)
-        elif result.has_update:
-            log.info(
-                "Update available: v%s (currently v%s)",
-                result.latest_version, result.current_version,
-            )
-        else:
-            log.info(
-                "Update check: app is current (v%s)",
-                result.current_version,
-            )
-
-    threading.Thread(
-        target=_run_update_check,
-        daemon=True,
-        name="update-check",
-    ).start()
+    start_update_check_thread(
+        __version__,
+        enabled=config.auto_update_enabled,
+        log=log,
+    )
 
     # 4. Validate config
     errors = config.validate()

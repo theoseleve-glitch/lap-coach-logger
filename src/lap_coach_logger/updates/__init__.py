@@ -18,6 +18,7 @@ from lap_coach_logger.updates.downloader import (
     read_pending_update,
     verify_signature,
 )
+from lap_coach_logger.updates.runner import start_update_check_thread
 
 __all__ = [
     "DEFAULT_MANIFEST_URL",
@@ -28,5 +29,6 @@ __all__ = [
     "download_update",
     "mark_update_pending",
     "read_pending_update",
+    "start_update_check_thread",
     "verify_signature",
 ]

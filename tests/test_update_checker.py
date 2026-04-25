@@ -237,18 +237,26 @@ def test_semver_comparison_is_numeric(
 def test_bootstrap_imports_update_checker() -> None:
     """Bootstrap must wire the update check so it actually
     *runs* on app start. Pin the import path — if a refactor
-    drops the wiring, this fails loudly."""
+    drops the wiring, this fails loudly.
+
+    Accepts either a direct ``check_for_updates`` reference or
+    a call to ``start_update_check_thread`` (T187 helper that
+    transitively runs the check) — both prove the wiring is
+    in place; pinning a specific function name would over-fit
+    to one implementation."""
     import lap_coach_logger.bootstrap as bootstrap
-    src = Path = __import__("pathlib").Path
+    Path = __import__("pathlib").Path
     bootstrap_src = Path(bootstrap.__file__).read_text(encoding="utf-8")
-    assert "lap_coach_logger.updates" in bootstrap_src or (
-        "from lap_coach_logger.updates" in bootstrap_src
-    ), (
+    assert "lap_coach_logger.updates" in bootstrap_src, (
         "bootstrap.py must import from `lap_coach_logger.updates` "
         "so the update check actually runs at app start"
     )
-    # And it must reference check_for_updates by name (or a
-    # local alias) so the import is actually invoked.
-    assert "check_for_updates" in bootstrap_src, (
-        "bootstrap.py must call `check_for_updates` at startup"
+    runs_check = (
+        "check_for_updates" in bootstrap_src
+        or "start_update_check_thread" in bootstrap_src
+    )
+    assert runs_check, (
+        "bootstrap.py must invoke the update check — either "
+        "directly via `check_for_updates` or via the T187 "
+        "helper `start_update_check_thread`"
     )
