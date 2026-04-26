@@ -176,7 +176,12 @@ Item {
                 }
             }
 
-            // ── Step 2: Ready ──
+            // ── Step 2: Pair phone (T190) ──
+            // Replaces the previous "You're all set" affirmation.
+            // Pairing is the natural last wizard action: the user
+            // gets the QR (placeholder until T191 wires the real
+            // pairing-token endpoint), scans it on their phone,
+            // and dismisses the wizard.
             Column {
                 visible: root.currentStep === 2
                 width: parent.width
@@ -184,12 +189,7 @@ Item {
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "\u2728"
-                    font.pixelSize: 32
-                }
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "You're all set"
+                    text: "Pair your phone"
                     font.family: Theme.Typography.bodyFamily
                     font.pixelSize: Theme.Typography.titleSize
                     font.weight: Font.Bold
@@ -197,13 +197,35 @@ Item {
                 }
                 Text {
                     width: parent.width
-                    text: "Start any sim and Lap Coach will begin\nrecording automatically."
+                    text: "Scan this code with your phone\nto see live coaching tips."
                     font.family: Theme.Typography.bodyFamily
                     font.pixelSize: Theme.Typography.bodySize
                     color: Theme.Tokens.steel
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
                     lineHeight: 1.4
+                }
+                // T190: QR placeholder. Real QR encoder lands in
+                // T191+ when the pairing-token endpoint is live;
+                // until then, this Rectangle keeps the layout
+                // honest so the wizard renders end-to-end.
+                Rectangle {
+                    id: pairingQr
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 180
+                    height: 180
+                    radius: Theme.Tokens.radiusMd
+                    color: Theme.Tokens.chalk
+                    border.width: 1
+                    border.color: Theme.Tokens.subtle(Theme.Tokens.chalk, 0.20)
+                    Text {
+                        anchors.centerIn: parent
+                        text: "[QR]"
+                        font.family: Theme.Typography.bodyFamily
+                        font.pixelSize: 24
+                        font.weight: Font.Bold
+                        color: Theme.Tokens.void_
+                    }
                 }
                 Item { width: 1; height: Theme.Tokens.sm }
                 Rectangle {
