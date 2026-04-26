@@ -94,6 +94,9 @@ Rectangle {
                     required property var modelData
                     readonly property bool isActive: root.currentPage === modelData.pageId
 
+                    Accessible.role: Accessible.PageTab
+                    Accessible.name: modelData.label
+
                     width: tabLabel.implicitWidth + Theme.Tokens.lg * 2
                     height: 30
                     radius: Theme.Tokens.radiusMd
@@ -147,6 +150,8 @@ Rectangle {
         // === 5. PAUSE button (only when Recording) ===
         Rectangle {
             visible: root.status === "Recording"
+            Accessible.role: Accessible.Button
+            Accessible.name: "Pause recording"
             width: pauseLabel.implicitWidth + Theme.Tokens.lg * 2
             height: 26
             radius: Theme.Tokens.radiusSm
@@ -173,6 +178,8 @@ Rectangle {
 
         // === 6. Overlay toggle button ===
         Rectangle {
+            Accessible.role: Accessible.Button
+            Accessible.name: "Toggle overlay widgets"
             width: overlayLabel.implicitWidth + Theme.Tokens.lg * 2
             height: 26
             radius: Theme.Tokens.radiusSm
@@ -210,6 +217,8 @@ Rectangle {
         Rectangle {
             id: modeDropdown
             visible: typeof modeVM !== "undefined" && modeVM
+            Accessible.role: Accessible.Button
+            Accessible.name: "Change session mode"
             implicitWidth: modeBadgeText.implicitWidth + modeCaret.implicitWidth + 16
             height: 20
             radius: 4
@@ -278,6 +287,8 @@ Rectangle {
         // === 7. Gear icon button ===
         Rectangle {
             id: gearBtn
+            Accessible.role: Accessible.Button
+            Accessible.name: "Settings"
             width: 36
             height: 36
             radius: Theme.Tokens.radiusMd
