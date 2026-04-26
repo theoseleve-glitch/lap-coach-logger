@@ -62,6 +62,11 @@ UsePreviousTasks=yes
 OutputDir=..
 OutputBaseFilename=LapCoachLogger-Setup-{#AppVersion}
 SetupIconFile={#SetupIconFile}
+; T193: show the MIT license during install. The repo-root
+; LICENSE file is the canonical source — no .txt extension is
+; required; Inno sniffs RTF by content. Without LicenseFile=
+; the wizard skips the agreement page entirely.
+LicenseFile=..\\LICENSE
 ; T179: invoke the registered signtool command on both the
 ; installer and the uninstaller so users get a consistent
 ; signed-publisher SmartScreen experience for install and
