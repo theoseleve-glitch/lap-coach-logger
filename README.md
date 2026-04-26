@@ -7,6 +7,47 @@ personal Windows application without cloud services.
 
 Version: `2.0.0`
 
+## Install
+
+Most users should install from a packaged release rather than building from
+source.
+
+1. Download the latest `LapCoachLogger-Setup-2.0.0.exe` installer from the
+   project Releases page.
+2. Run the installer — it shows the MIT license and the privacy notice
+   before writing any files. Default install path is
+   `C:\Program Files\Lap Coach Logger`.
+3. Launch from the Start Menu (`Lap Coach Logger`) or from the desktop
+   shortcut if you opted into one during install.
+
+The installer is signed; Windows SmartScreen will show the publisher
+correctly. To uninstall, use Apps & Features in Windows Settings — the
+uninstaller cleans the install directory and the autostart registry entry.
+
+## Pair Your Phone
+
+The first launch shows an onboarding wizard with three steps: Welcome →
+sim selection → **Pair your phone**. Scan the QR code with your phone's
+camera to receive live coaching tips while you drive — the phone view
+updates in real time as the desktop logger captures telemetry.
+
+If you skipped pairing during onboarding, re-open the wizard from the
+About dialog (or via the Settings → Onboarding action).
+
+## First Session
+
+After install + pairing:
+
+1. Configure your output folder in **Settings → Output** (defaults to
+   `Documents\LapCoachLogger_sessions`).
+2. Start your simulator. Lap Coach Logger detects iRacing, ACC, Assetto
+   Corsa, and Le Mans Ultimate automatically and shows a green
+   "Connected" indicator on the dashboard.
+3. Drive a session. The app records every lap, sector, and input sample
+   to a session folder under your output path.
+4. After your session ends, open **History** to review laps and compare
+   against your reference lap.
+
 ## What Ships
 
 - **QML declarative frontend** with GPU-accelerated animations, unified top navigation, and Apple Health/Tesla-inspired design language (replaces PySide6 QWidgets shell).
