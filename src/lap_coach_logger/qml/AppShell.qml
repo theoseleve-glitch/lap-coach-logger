@@ -465,6 +465,20 @@ Item {
         onActivated: { if (overlayVM) { overlayVM.autoArrangeOverlays(); toast.show("Overlays arranged") } }
     }
 
+    // Ctrl+Shift+R — restart with clean config (testing aid; T236).
+    // The handler renames config.json aside so the next launch
+    // falls through to the "no config -> write defaults" path,
+    // then signals the runtime to spawn a fresh process.
+    Shortcut {
+        sequence: "Ctrl+Shift+R"
+        onActivated: {
+            if (typeof restartVM !== "undefined" && restartVM) {
+                restartVM.restartWithCleanConfig()
+                toast.show("Restarting with clean config…")
+            }
+        }
+    }
+
     // Alt+1 through Alt+9 — quick-toggle individual overlay widgets
     Repeater {
         model: 9
