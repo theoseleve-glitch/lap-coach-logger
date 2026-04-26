@@ -2,6 +2,63 @@
 
 All notable changes to Lap Coach Logger are documented here.
 
+## Unreleased — Milestone Tracking
+
+The 6-month roadmap (`docs/roadmap/04-ROADMAP-6MO.md`) divides
+delivery into six 30-day milestones. Until each milestone
+ships and earns a version tag, work-in-progress entries live
+here.
+
+### M1 — FOUNDATION (Apr 23 → May 22)
+
+Theme: nothing new ships. P0 defects die. Contracts get
+locked. Everything downstream depends on M1 being clean.
+
+- **Schemas** — `lap-schemas` package published with the top
+  Pydantic models + TypeScript / Swift codegen. Bundle v2
+  format defined and the desktop `SessionFinalizer` writes
+  it (`SessionManifest`, `SessionRecord`, `TelemetrySample`,
+  `DataQuality`, `SensorConfigSnapshot`).
+- **P0 fixes** — desktop `live_telemetry_processor` import
+  break resolved via the `LiveProcessor` ABC + per-domain
+  Processors; QML bootstrap test collection green; CI
+  workflow unblocked across `pytest` / ruff / mypy.
+- **FastAPI ingest** — backend skeleton up; `/sessions/ingest`
+  accepts Bundle v2 payloads. Integration test currently
+  blocked on backend live deployment (T035).
+- **Packaging hardening** — single-folder PyInstaller build;
+  Inno Setup installer signed (T179), uninstaller cleans
+  the `Run` autostart registry (T181); license + privacy
+  notices visible in installer (T193 / T194); CI build
+  matrix Win10 + Win11 (T195); installer / uninstaller
+  smoke runners (T196 / T197).
+- **Auto-update infrastructure** — version check, atomic
+  download, Ed25519 signature verify, opt-out switch,
+  rollback bail-out logic (T185-T188).
+- **Observability** — Sentry + PostHog wired with
+  `telemetry_enabled` opt-out; crash dump submission
+  plumbing (T189).
+
+### M2 — INTELLIGENCE (May 23 → Jun 22)
+
+Theme: live processor produces real-time insights; mobile
+upload queue lands; private beta opens.
+
+- **Live telemetry processor** — three composed Processors
+  (Coaching, Dashboard, InputDiagnostics) feeding the
+  desktop QML overlays in real time.
+- **`next_actions` engine** — backend computes "do this
+  next" recommendations from the latest session bundle.
+- **Mobile upload queue** — never-lose telemetry; iOS
+  uploads queue locally if the server is unreachable and
+  resync when the network returns.
+- **Private beta** — 30 invited drivers running the
+  end-to-end pipeline (desktop capture → backend ingest →
+  mobile review).
+- **Coaching library** — initial rule pack distributed via
+  the rules-bundle download (T191) so coaching works
+  offline against cached bundles.
+
 ## 2.0.0 — QML Frontend Rewrite
 
 ### Major Changes

@@ -153,7 +153,16 @@ def test_cli_runs_against_real_history() -> None:
     ``python scripts/gen_release_checklist.py HEAD~2 HEAD``
     and produce non-empty markdown on stdout. This is the
     user-visible contract — tests above pin the internals; this
-    pin guarantees the wiring works."""
+    pin guarantees the wiring works.
+
+    T200: PYTHONIOENCODING=utf-8 forces the script's stdout
+    to UTF-8 instead of Windows' cp1252 default; ``errors=
+    "replace"`` is a safety net for any cp1252 bytes that
+    slip through (em-dashes in commit messages were the
+    motivating regression)."""
+    import os as _os
+    env = _os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
     result = subprocess.run(
         [
             "python",
@@ -167,6 +176,8 @@ def test_cli_runs_against_real_history() -> None:
         capture_output=True,
         text=True,
         encoding="utf-8",
+        errors="replace",
+        env=env,
     )
     assert result.returncode == 0, (
         f"CLI failed: stdout={result.stdout!r} "

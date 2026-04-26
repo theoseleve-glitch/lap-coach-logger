@@ -52,6 +52,11 @@ def git_commits_between(
         "--pretty=format:%h\t%s",
         f"{from_ref}..{to_ref}",
     ]
+    # T200: ``errors="replace"`` so commit messages with
+    # non-UTF-8 bytes (e.g., em-dashes encoded as cp1252 on
+    # Windows) don't crash the script with a UnicodeDecodeError.
+    # The replacement char ``�`` is acceptable in a
+    # release-notes file; raising would block the pipeline.
     result = subprocess.run(
         cmd,
         cwd=repo_root,
@@ -59,6 +64,7 @@ def git_commits_between(
         text=True,
         check=True,
         encoding="utf-8",
+        errors="replace",
     )
     commits: list[Commit] = []
     for line in result.stdout.splitlines():
