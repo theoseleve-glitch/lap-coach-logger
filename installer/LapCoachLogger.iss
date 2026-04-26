@@ -67,6 +67,13 @@ SetupIconFile={#SetupIconFile}
 ; required; Inno sniffs RTF by content. Without LicenseFile=
 ; the wizard skips the agreement page entirely.
 LicenseFile=..\\LICENSE
+; T194: show the privacy notice before install starts. The
+; repo-root PRIVACY.md is shown as plain text (markdown
+; markers are sparse and readable). InfoBeforeFile= adds a
+; wizard page so the user reads the privacy commitment
+; before clicking Install — first encounter with the
+; "local-only, no cloud" promise the app makes.
+InfoBeforeFile=..\\PRIVACY.md
 ; T179: invoke the registered signtool command on both the
 ; installer and the uninstaller so users get a consistent
 ; signed-publisher SmartScreen experience for install and
