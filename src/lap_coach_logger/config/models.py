@@ -197,6 +197,11 @@ class AppConfig:
     # spawning the update-check thread entirely — no network
     # probe, no log spam.
     auto_update_enabled: bool = True
+    # T232: log level configurable via Settings. Defaults to
+    # INFO — DEBUG would balloon the log file under ordinary
+    # use; WARNING would hide useful diagnostic context. Old
+    # configs without this field load as "INFO" via from_dict.
+    log_level: str = "INFO"
     iracing: IRacingConfig = field(default_factory=IRacingConfig)
     assetto_corsa: AssettoCorsaConfig = field(default_factory=AssettoCorsaConfig)
     acc: ACCConfig = field(default_factory=ACCConfig)
@@ -323,4 +328,11 @@ class AppConfig:
             errors.append("overlay.pin_mode must be overlay_on_top, dashboard_on_top, or floating")
         if not self.output_dir:
             errors.append("output_dir must not be empty")
+        # T232: only accept the five canonical Python logging
+        # levels — anything else is a user-facing error rather
+        # than a silent fallback, so typos surface clearly.
+        if self.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+            errors.append(
+                "log_level must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL"
+            )
         return errors

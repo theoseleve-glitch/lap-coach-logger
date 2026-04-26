@@ -24,9 +24,41 @@ _MAX_BYTES = 10 * 1024 * 1024  # 10 MB per file (T231)
 _BACKUP_COUNT = 7  # one week of post-mortems if rotation triggers daily (T231)
 
 
-def setup_logging(*, debug: bool = False) -> None:
-    """Configure root logger with file + stderr handlers."""
-    level = logging.DEBUG if debug else logging.INFO
+_VALID_LEVELS: dict[str, int] = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
+
+
+def setup_logging(
+    *,
+    debug: bool = False,
+    log_level: str | None = None,
+) -> None:
+    """Configure root logger with file + stderr handlers.
+
+    Level resolution (T232):
+      - explicit ``log_level=...`` (case-insensitive string) wins
+      - else fall back to legacy ``debug=True → DEBUG`` /
+        ``debug=False → INFO``
+      - unknown ``log_level`` strings fall back to INFO with a
+        warning so a malformed config doesn't crash the app
+    """
+    if log_level is not None:
+        level = _VALID_LEVELS.get(log_level.upper())
+        if level is None:
+            # Configure handlers first so the warning we emit
+            # below actually goes somewhere.
+            level = logging.INFO
+            _bad_level = log_level
+        else:
+            _bad_level = None
+    else:
+        level = logging.DEBUG if debug else logging.INFO
+        _bad_level = None
     root = logging.getLogger()
     root.setLevel(level)
 
@@ -64,6 +96,17 @@ def setup_logging(*, debug: bool = False) -> None:
     sh.addFilter(dedupe)
 
     _install_global_exception_logging()
+
+    if _bad_level is not None:
+        # Now that the file + stderr handlers are wired, surface
+        # the bad-config-input warning where it'll actually be
+        # seen instead of silently dropping it.
+        logging.getLogger(__name__).warning(
+            "Unknown log_level=%r; falling back to INFO. "
+            "Valid values: %s",
+            _bad_level,
+            sorted(_VALID_LEVELS.keys()),
+        )
 
 
 def _is_qt_dispatch_exception(exc_traceback: object) -> bool:

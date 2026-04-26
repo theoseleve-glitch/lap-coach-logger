@@ -75,7 +75,7 @@ class NativeBridgeController(QObject):
         super().__init__()
         cfg_manager = ConfigManager()
         config: AppConfig = cfg_manager.load()
-        setup_logging(debug=config.debug)
+        setup_logging(debug=config.debug, log_level=config.log_level)
 
         # Debounced save scheduler — mirrors qml_bootstrap wiring.
         # T173: 2.0s window — at most one disk write per 2 seconds.

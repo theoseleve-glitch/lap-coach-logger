@@ -74,7 +74,7 @@ def run(*, debug_override: bool = False) -> None:
     )
 
     # 3. Logging (after config so we know debug flag)
-    setup_logging(debug=config.debug)
+    setup_logging(debug=config.debug, log_level=config.log_level)
     from lap_coach_logger.utils.release_build import BUILD_KIND, IS_FROZEN
     from lap_coach_logger.utils.runtime_check import check_runtime
     # Release builds are pinned to Python 3.12 and must refuse to boot
