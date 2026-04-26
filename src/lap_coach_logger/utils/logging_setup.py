@@ -20,8 +20,8 @@ _LOG_FORMAT = (
 )
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-_MAX_BYTES = 5 * 1024 * 1024  # 5 MB per file
-_BACKUP_COUNT = 3
+_MAX_BYTES = 10 * 1024 * 1024  # 10 MB per file (T231)
+_BACKUP_COUNT = 7  # one week of post-mortems if rotation triggers daily (T231)
 
 
 def setup_logging(*, debug: bool = False) -> None:
