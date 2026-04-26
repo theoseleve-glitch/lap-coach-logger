@@ -11,6 +11,7 @@ import logging
 import tempfile
 from pathlib import Path
 
+from lap_coach_logger.config.migrations import migrate_to_current
 from lap_coach_logger.config.models import AppConfig
 from lap_coach_logger.utils.paths import config_file_path
 
@@ -34,7 +35,15 @@ class ConfigManager:
 
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
+            data, did_migrate = migrate_to_current(data)
             cfg = AppConfig.from_dict(data)
+            if did_migrate:
+                # Persist the migrated form so we don't re-migrate
+                # on every launch. The save() path already rewrites
+                # the file atomically, so a crash mid-save leaves
+                # the original v1 file intact.
+                log.info("Config migrated to current schema; re-saving")
+                self.save(cfg)
             log.info("Config loaded from %s", self.path)
             return cfg
         except Exception:

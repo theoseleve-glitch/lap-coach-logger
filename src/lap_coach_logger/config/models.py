@@ -213,7 +213,14 @@ class AppConfig:
         return round(1.0 / self.sample_interval_s, 2) if self.sample_interval_s > 0 else 0
 
     def to_dict(self) -> dict:
-        return dataclasses.asdict(self)
+        # Stamp the current schema version so ConfigManager can
+        # detect the format on next load. The dataclass itself
+        # doesn't carry the field — it's a dict-layer concern
+        # (T222: settings schema migration).
+        from lap_coach_logger.config.migrations import CURRENT_SCHEMA_VERSION
+        payload = dataclasses.asdict(self)
+        payload["schema_version"] = CURRENT_SCHEMA_VERSION
+        return payload
 
     @classmethod
     def from_dict(cls, data: dict) -> AppConfig:
