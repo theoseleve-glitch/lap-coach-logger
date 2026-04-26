@@ -372,7 +372,7 @@ Item {
                             font.family: Theme.Typography.bodyFamily
                             font.pixelSize: Theme.Typography.bodySize
                             font.weight: Font.DemiBold
-                            color: "#ffffff"
+                            color: Theme.Tokens.chalk
                         }
 
                         MouseArea {
