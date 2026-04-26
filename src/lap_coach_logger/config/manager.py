@@ -34,14 +34,19 @@ class ConfigManager:
             return cfg
 
         try:
-            data = json.loads(self.path.read_text(encoding="utf-8"))
+            # Read the raw bytes first so we can back them up
+            # byte-for-byte if migration is needed (T223). Don't
+            # round-trip through json.dumps for the backup — that
+            # would lose the user's original formatting.
+            raw_bytes = self.path.read_bytes()
+            data = json.loads(raw_bytes.decode("utf-8"))
             data, did_migrate = migrate_to_current(data)
             cfg = AppConfig.from_dict(data)
             if did_migrate:
-                # Persist the migrated form so we don't re-migrate
-                # on every launch. The save() path already rewrites
-                # the file atomically, so a crash mid-save leaves
-                # the original v1 file intact.
+                # Back up the original BEFORE re-saving — if save()
+                # crashes mid-write, the user still has the
+                # untouched v1 file recoverable from the .bak.
+                self._write_backup_if_absent(raw_bytes)
                 log.info("Config migrated to current schema; re-saving")
                 self.save(cfg)
             log.info("Config loaded from %s", self.path)
@@ -49,6 +54,30 @@ class ConfigManager:
         except Exception:
             log.exception("Failed to parse config – falling back to defaults")
             return AppConfig()
+
+    # ------------------------------------------------------------------
+    def _backup_path(self) -> Path:
+        """Path for the pre-migration backup file. Suffix-style
+        (``config.json.v1.bak``) so file managers keep the
+        original and backup grouped alphabetically."""
+        return self.path.with_suffix(self.path.suffix + ".v1.bak")
+
+    def _write_backup_if_absent(self, raw_bytes: bytes) -> None:
+        """Write the original config bytes to the backup path.
+        If a backup already exists from a prior migration, leave
+        it alone — the FIRST backup is the most-original state
+        and is the most valuable to preserve (T223)."""
+        backup = self._backup_path()
+        if backup.exists():
+            log.debug("Migration backup already present at %s", backup)
+            return
+        try:
+            backup.write_bytes(raw_bytes)
+            log.info("Pre-migration config backup written to %s", backup)
+        except OSError:
+            # Don't block migration on a backup failure (e.g.
+            # read-only fs) — log loudly but continue.
+            log.exception("Failed to write pre-migration backup")
 
     # ------------------------------------------------------------------
     def save(self, cfg: AppConfig) -> None:
