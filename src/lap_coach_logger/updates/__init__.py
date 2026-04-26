@@ -18,17 +18,31 @@ from lap_coach_logger.updates.downloader import (
     read_pending_update,
     verify_signature,
 )
+from lap_coach_logger.updates.rollback import (
+    ProbationStatus,
+    confirm_version_stable,
+    increment_probation_attempt,
+    mark_version_on_probation,
+    read_probation_status,
+    should_rollback,
+)
 from lap_coach_logger.updates.runner import start_update_check_thread
 
 __all__ = [
     "DEFAULT_MANIFEST_URL",
     "PendingUpdate",
+    "ProbationStatus",
     "UpdateCheckResult",
     "check_for_updates",
     "clear_pending_update",
+    "confirm_version_stable",
     "download_update",
+    "increment_probation_attempt",
     "mark_update_pending",
+    "mark_version_on_probation",
     "read_pending_update",
+    "read_probation_status",
+    "should_rollback",
     "start_update_check_thread",
     "verify_signature",
 ]
