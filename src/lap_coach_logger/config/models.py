@@ -183,6 +183,13 @@ class AppConfig:
     # config files that predate this field load as True via
     # ``from_dict``, so the upgrade is silent.
     telemetry_enabled: bool = True
+    # T224: explicit first-run consent. Defaults False — collection
+    # is GATED on this AND on telemetry_enabled (see
+    # ``telemetry_active`` below). Pre-T224 configs lack this
+    # field, so they load as False and the user gets prompted on
+    # first launch under the new code (we cannot infer consent
+    # from before we asked).
+    telemetry_consent_given: bool = False
     # T187: opt-OUT switch for the auto-update version check
     # (T185) and downloader (T186). Same opt-OUT convention as
     # ``telemetry_enabled``: defaults True, old configs upgrade
@@ -207,6 +214,13 @@ class AppConfig:
     @property
     def output_path(self) -> Path:
         return Path(self.output_dir)
+
+    @property
+    def telemetry_active(self) -> bool:
+        """T224: canonical gate every collector checks. True only
+        when the user has answered the first-run prompt AND not
+        opted out in settings."""
+        return self.telemetry_consent_given and self.telemetry_enabled
 
     @property
     def sample_rate_hz(self) -> float:

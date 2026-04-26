@@ -94,11 +94,14 @@ def run(*, debug_override: bool = False) -> None:
     # T065: respect the user's telemetry opt-out — when
     # ``config.telemetry_enabled`` is False, init_sentry returns False
     # and no DSN is read (and no events are sent).
+    # T224: gate on ``telemetry_active`` (consent_given AND enabled)
+    # so first-run users without explicit consent get no telemetry
+    # regardless of the legacy opt-OUT default on telemetry_enabled.
     from lap_coach_logger.utils.sentry_init import init_sentry, sentry_release_tag
     sentry_active = init_sentry(
         release=sentry_release_tag(),
         environment="production" if IS_FROZEN else "development",
-        enabled=config.telemetry_enabled,
+        enabled=config.telemetry_active,
     )
     log.info(
         "Error telemetry: %s", "enabled (Sentry)" if sentry_active else "disabled"
@@ -119,8 +122,9 @@ def run(*, debug_override: bool = False) -> None:
     # hosted instances). No key -> no-op so dev runs stay silent.
     # T065: same opt-out switch as Sentry — disabled config keeps the
     # SDK uninitialized regardless of env-var configuration.
+    # T224: same consent gate as Sentry above.
     from lap_coach_logger.utils.posthog_init import init_posthog
-    posthog_active = init_posthog(enabled=config.telemetry_enabled)
+    posthog_active = init_posthog(enabled=config.telemetry_active)
     log.info(
         "Product analytics: %s",
         "enabled (PostHog)" if posthog_active else "disabled",
