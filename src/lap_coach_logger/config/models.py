@@ -155,6 +155,18 @@ class OverlayConfig:
 
 
 @dataclass
+class AccessibilityConfig:
+    """T218: opt-in accessibility settings.
+
+    ``high_contrast`` flips the desktop UI to a higher-contrast
+    palette for users with low vision. Defaults to False — users
+    explicitly enable in settings. Visual application across QML
+    layers on top of this flag (separate scope).
+    """
+    high_contrast: bool = False
+
+
+@dataclass
 class AppConfig:
     """Top-level application configuration."""
     output_dir: str = field(default_factory=lambda: str(default_output_dir()))
@@ -188,6 +200,7 @@ class AppConfig:
     lap_analysis: LapAnalysisConfig = field(default_factory=LapAnalysisConfig)
     sync: SyncConfig = field(default_factory=SyncConfig)
     overlay: OverlayConfig = field(default_factory=OverlayConfig)
+    accessibility: AccessibilityConfig = field(default_factory=AccessibilityConfig)
 
     # --- helpers -----------------------------------------------------------
 
@@ -215,6 +228,7 @@ class AppConfig:
         lap_analysis = LapAnalysisConfig(**data.pop("lap_analysis", {}))
         sync = SyncConfig(**data.pop("sync", {}))
         overlay = OverlayConfig(**data.pop("overlay", {}))
+        accessibility = AccessibilityConfig(**data.pop("accessibility", {}))
         # Strip unknown keys that might exist in old config files
         known = {f.name for f in dataclasses.fields(cls)}
         filtered = {k: v for k, v in data.items() if k in known}
@@ -229,6 +243,7 @@ class AppConfig:
             lap_analysis=lap_analysis,
             sync=sync,
             overlay=overlay,
+            accessibility=accessibility,
             **filtered,
         )
 
