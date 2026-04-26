@@ -88,8 +88,9 @@ Item {
 
                 ShortcutRow { key: "Ctrl+1"; desc: "Dashboard" }
                 ShortcutRow { key: "Ctrl+2"; desc: "Live telemetry" }
-                ShortcutRow { key: "Ctrl+3"; desc: "Session history" }
-                ShortcutRow { key: "Ctrl+4"; desc: "Overlay manager" }
+                ShortcutRow { key: "Ctrl+3"; desc: "Strategy" }
+                ShortcutRow { key: "Ctrl+4"; desc: "Session history" }
+                ShortcutRow { key: "Ctrl+5"; desc: "Overlay manager" }
 
                 Rectangle {
                     width: parent.width; height: 1
