@@ -1,5 +1,7 @@
 # Overlay Platform Backend
 
+_Last reviewed: 2026-04-26_
+
 This document defines the backend architecture for LAP COACH overlay management.
 
 ## 1. Architecture Proposal
@@ -43,6 +45,29 @@ The new backend package lives in `src/lap_coach_logger/overlays/`.
   Preview/live runtime state controller with no Qt dependency.
 - `service.py`
   Main orchestration service and the event bus.
+- `browser.py`
+  Read-model state for the overlay browser / picker UI: filter
+  state, category items, overlay detail view, and the
+  `OverlayBrowserPageService` that projects the catalog +
+  user state into the QML-friendly shape.
+- `runtime_instances.py`
+  Per-instance lifecycle controller that mounts and unmounts
+  overlay renderer instances, plus the bus that routes user
+  actions back to the orchestration service.
+- `settings_models.py`
+  Declarative schema models for per-overlay settings —
+  fields, sections, validation rules, visibility conditions,
+  resolution + migration result types.
+- `settings_service.py`
+  Schema registry, validator, and migration runner for
+  per-overlay settings. Sits between `settings_models` and
+  `service.py` so settings remain editable independently of
+  overlay placement / runtime state.
+- `telemetry_bindings.py`
+  Declares the telemetry channels each overlay needs, scores
+  availability against the live snapshot, and serves preview
+  fixtures when the live signal is missing — the contract
+  between overlay definitions and the live telemetry pipeline.
 - `__init__.py`
   Public exports and the default service factory.
 
