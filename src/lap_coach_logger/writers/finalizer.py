@@ -695,7 +695,7 @@ class SessionFinalizer:
         Returns the number of cleaned-up folders.
         """
         count = 0
-        if not output_root.exists():
+        if not output_root.exists() or not output_root.is_dir():
             return count
         for p in output_root.iterdir():
             if p.is_dir() and p.name.startswith(_TEMP_PREFIX):
