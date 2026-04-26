@@ -247,3 +247,29 @@ def test_help_overlay_does_not_list_unknown_shortcuts() -> None:
         f"ShortcutHelpOverlay.qml advertises unimplemented shortcuts: "
         f"{sorted(missing_impl)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# T237: F1 must actually open the help overlay (not just be declared)
+# ---------------------------------------------------------------------------
+
+
+def test_f1_shortcut_handler_opens_help_overlay() -> None:
+    """T237: F1's onActivated must touch ``shortcutHelp.visible`` —
+    otherwise F1 is declared but does nothing, and the existing
+    "F1 is declared" test wouldn't catch a regression where the
+    handler body is replaced or removed."""
+    src = _read(_APPSHELL)
+
+    # Match the F1 Shortcut block and capture its onActivated body.
+    # Tolerates the sequence/onActivated being on different lines.
+    m = re.search(
+        r'Shortcut\s*\{[^}]*sequence:\s*"F1"[^}]*?onActivated:\s*([^\n}]+)',
+        src,
+    )
+    assert m is not None, "AppShell.qml has no F1 Shortcut with onActivated"
+    handler = m.group(1)
+    assert "shortcutHelp" in handler and "visible" in handler, (
+        f"F1's onActivated handler doesn't toggle shortcutHelp.visible "
+        f"— got {handler!r}"
+    )
